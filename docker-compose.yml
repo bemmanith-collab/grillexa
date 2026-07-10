@@ -1,14 +1,25 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=grillexa
+      - POSTGRES_PASSWORD=grillexa
+      - POSTGRES_DB=grillexa
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
   backend:
     build: ./backend
+    depends_on:
+      - db
     environment:
-      - DATABASE_URL=file:/app/data/dev.db
+      - DATABASE_URL=postgresql://grillexa:grillexa@db:5432/grillexa
       - JWT_SECRET=${JWT_SECRET:-change-this-to-a-long-random-string}
       - JWT_EXPIRES_IN=8h
       - PORT=4000
       - CORS_ORIGIN=http://localhost:8080
-    volumes:
-      - backend_data:/app/data
     ports:
       - "4000:4000"
 
@@ -20,4 +31,4 @@ services:
       - "8080:80"
 
 volumes:
-  backend_data:
+  db_data:

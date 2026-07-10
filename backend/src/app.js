@@ -13,9 +13,32 @@ const salesRoutes = require('./routes/sales');
 
 const app = express();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
+// CORS_ORIGIN accepts a comma-separated list of allowed origins (e.g. the
+// Fly.io app URL plus a custom domain). Falls back to "*" so the app still
+// works before CORS_ORIGIN is configured, since auth uses a Bearer token
+// (not cookies), wildcard origin carries no credential-leak risk here.
+const allowedOrigins = (process.env.CORS_ORIGIN || '*')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin:
+      allowedOrigins.includes('*')
+        ? '*'
+        : (origin, callback) => {
+            if (!origin || allowedOrigins.includes(origin)) {
+              callback(null, true);
+            } else {
+              callback(new Error('Not allowed by CORS'));
+            }
+          },
+  })
+);
 app.use(express.json());
 
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 app.use('/api/auth', authRoutes);

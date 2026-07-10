@@ -1,18 +1,18 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
-// SQLite by default for zero-setup local dev. To use Postgres instead,
-// set provider = "postgresql" and point DATABASE_URL at your Postgres
-// instance (see README "Switching to PostgreSQL").
+// Postgres in all environments (production on Fly.io, local dev via
+// docker-compose or any reachable Postgres instance). DATABASE_URL is
+// supplied via environment variable / Fly secret, never hardcoded.
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// role/type fields are plain Strings rather than Prisma enums because
-// SQLite doesn't support native enums; values are validated in application
-// code, so this also works unchanged if you switch the provider to Postgres.
+// role/type fields are plain Strings rather than Prisma enums so this
+// schema stays portable; values are validated in application code.
 
 // role: "ADMIN" | "MANAGER" | "SALES"
 // SALES accounts are scoped to exactly one store (storeId is required for them,

@@ -10,8 +10,6 @@ RUN npx prisma generate
 
 COPY src ./src
 
-RUN mkdir -p /app/data
-
 ENV NODE_ENV=production
 EXPOSE 4000
 

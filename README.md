@@ -4,7 +4,7 @@ A full-stack stock management app for a distributed retail business (sprouts, fr
 
 - **Backend**: Node.js + Express, Prisma ORM, JWT auth, bcrypt password hashing
 - **Frontend**: React (Vite)
-- **Database**: SQLite by default (zero setup) — swappable to PostgreSQL, see below
+- **Database**: PostgreSQL
 
 ## How stock is tracked
 
@@ -56,7 +56,7 @@ grillexa/
 │   │   ├── app.js
 │   │   └── index.js
 │   ├── .env.example
-│   └── Dockerfile
+│   └── Dockerfile             local-dev-only image (used by docker-compose)
 ├── frontend/
 │   ├── src/
 │   │   ├── api/client.js
@@ -66,23 +66,29 @@ grillexa/
 │   │   └── pages/        Login, Signup, Inventory (Today's Stock),
 │   │                     Dispatches, Sales, StockHistory, Reports,
 │   │                     Users, Stores
-│   ├── nginx.conf
-│   └── Dockerfile
-├── docker-compose.yml
+│   ├── .env.example
+│   ├── nginx.conf             local-dev-only config (used by docker-compose)
+│   └── Dockerfile             local-dev-only image (used by docker-compose)
+├── Dockerfile                 production image for Fly.io (multi-stage: backend + frontend + Nginx)
+├── entrypoint.sh              runs `prisma migrate deploy`, then backend + Nginx together
+├── nginx.conf                 production Nginx config (proxies /api, /health to the backend)
+├── fly.toml                   Fly.io app config (region: bom, internal_port: 4000)
+├── .dockerignore
+├── docker-compose.yml         local dev only — not used by Fly.io
 └── README.md
 ```
 
 ## Local development (no Docker)
 
-Requires Node.js 20+.
+Requires Node.js 20+ and a reachable Postgres instance (e.g. `docker run -p 5432:5432 -e POSTGRES_USER=grillexa -e POSTGRES_PASSWORD=grillexa -e POSTGRES_DB=grillexa postgres:16-alpine`).
 
 **1. Backend**
 
 ```bash
 cd backend
-cp .env.example .env       # edit JWT_SECRET before deploying anywhere real
+cp .env.example .env       # point DATABASE_URL at your Postgres instance; edit JWT_SECRET before deploying anywhere real
 npm install
-npx prisma migrate dev --name init
+npx prisma migrate deploy
 npm run seed
 npm run dev                 # http://localhost:4000
 ```
@@ -112,7 +118,7 @@ The seed also backfills 14 days of demo dispatch/sales/wastage history so Report
 
 Change these passwords (or delete the seeded accounts) before using this anywhere beyond local testing.
 
-## Running with Docker
+## Running with Docker (local dev)
 
 ```bash
 docker compose up --build
@@ -120,8 +126,9 @@ docker compose up --build
 
 - Frontend: http://localhost:8080
 - Backend API: http://localhost:4000
+- Postgres: localhost:5432 (data persisted in the `db_data` volume)
 
-The SQLite database file is persisted in a named Docker volume (`backend_data`), so data survives container restarts. On first boot the backend runs `prisma migrate deploy` automatically; run the seed manually once if you want the sample data:
+On first boot the backend runs `prisma migrate deploy` automatically; run the seed manually once if you want the sample data:
 
 ```bash
 docker compose exec backend npm run seed
@@ -133,34 +140,30 @@ Set a real `JWT_SECRET` before deploying anywhere reachable by others:
 JWT_SECRET="$(openssl rand -hex 32)" docker compose up --build -d
 ```
 
-## Switching to PostgreSQL
+This `docker-compose.yml` setup is for local development only — it is not used when deploying to Fly.io (see below).
 
-The app ships with SQLite for zero-setup local dev, but Prisma makes swapping databases a two-line change:
+## Deploying to Fly.io
 
-1. In `backend/prisma/schema.prisma`, change the datasource provider:
-   ```prisma
-   datasource db {
-     provider = "postgresql"
-     url      = env("DATABASE_URL")
-   }
-   ```
-2. Point `DATABASE_URL` at your Postgres instance, e.g.:
-   ```
-   DATABASE_URL="postgresql://user:password@localhost:5432/grillexa"
-   ```
-3. Re-run `npx prisma migrate dev --name init` to generate fresh migrations for Postgres.
+The root `Dockerfile` builds a single production image (backend + frontend + Nginx) — see `fly.toml`, `entrypoint.sh`, and `nginx.conf` at the repo root.
 
-No application code changes are needed — the schema avoids Postgres/SQLite-specific features (enums are modeled as plain strings, validated in the route handlers) so it works identically on either database.
+```bash
+fly launch --no-deploy               # first time only; it will detect fly.toml — don't overwrite it
+fly postgres create                  # or attach an existing Postgres cluster
+fly secrets set DATABASE_URL="postgresql://..." JWT_SECRET="$(openssl rand -hex 32)" JWT_EXPIRES_IN="8h" CORS_ORIGIN="https://grillexa.fly.dev"
+fly deploy
+```
+
+`prisma migrate deploy` runs automatically on every container start (see `entrypoint.sh`), applying the migration in `backend/prisma/migrations/`.
 
 ## Environment variables (backend)
 
 | Variable         | Description                                      |
 |-------------------|--------------------------------------------------|
-| `DATABASE_URL`    | Prisma connection string (SQLite file or Postgres URL) |
+| `DATABASE_URL`    | Prisma Postgres connection string — set as a Fly secret in production, never committed |
 | `JWT_SECRET`      | Secret used to sign JWTs — must be a long random string in production |
 | `JWT_EXPIRES_IN`  | Token lifetime, e.g. `8h`                         |
-| `PORT`            | Port the API listens on (default `4000`)          |
-| `CORS_ORIGIN`     | Allowed origin for browser requests               |
+| `PORT`            | Port the Node process listens on (`4000` for local/docker-compose; `4001` inside the Fly image, where Nginx owns the externally exposed `4000`) |
+| `CORS_ORIGIN`     | Comma-separated list of allowed browser origins (defaults to `*`); not needed in the Fly image since Nginx serves frontend and API from one origin |
 
 All of these are read from the environment / `.env` file — nothing sensitive is hardcoded.
 
