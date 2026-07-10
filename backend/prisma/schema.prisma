@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// SQLite by default for zero-setup local dev. To use Postgres instead,
+// set provider = "postgresql" and point DATABASE_URL at your Postgres
+// instance (see README "Switching to PostgreSQL").
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// role/type fields are plain Strings rather than Prisma enums because
+// SQLite doesn't support native enums; values are validated in application
+// code, so this also works unchanged if you switch the provider to Postgres.
+
+// role: "ADMIN" | "MANAGER" | "SALES"
+// SALES accounts are scoped to exactly one store (storeId is required for them,
+// enforced in the users route, not in the schema, so ADMIN/MANAGER can stay company-wide).
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  passwordHash String
+  role      String   @default("SALES")
+  storeId   Int?
+  store     Store?   @relation(fields: [storeId], references: [id])
+  createdAt DateTime @default(now())
+
+  dispatchInvoices DispatchInvoice[]
+  sales            Sale[]
+}
+
+model Store {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  address   String?
+  createdAt DateTime @default(now())
+
+  users             User[]
+  dailyStockEntries DailyStockEntry[]
+  dispatchInvoices  DispatchInvoice[]
+  sales             Sale[]
+}
+
+model Product {
+  id        Int      @id @default(autoincrement())
+  name      String
+  sku       String   @unique
+  price     Float    @default(0)
+  // Company-wide default reorder point; used to flag a store's closing stock as low.
+  threshold Int      @default(10)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dailyStockEntries    DailyStockEntry[]
+  dispatchInvoiceLines DispatchInvoiceLine[]
+  saleLines            SaleLine[]
+}
+
+// One row per (date, store, product) — the daily stock ledger.
+// closing = opening + received - sold - wastage, recomputed whenever
+// a dispatch, sale, or wastage entry touches this date/store/product.
+model DailyStockEntry {
+  id        Int      @id @default(autoincrement())
+  date      DateTime
+  storeId   Int
+  store     Store    @relation(fields: [storeId], references: [id])
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+  opening   Int      @default(0)
+  received  Int      @default(0)
+  sold      Int      @default(0)
+  wastage   Int      @default(0)
+  closing   Int      @default(0)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([date, storeId, productId], name: "dailyEntryKey")
+}
+
+// The "bill" for stock sent from HQ to a store.
+model DispatchInvoice {
+  id          Int      @id @default(autoincrement())
+  number      String   @unique
+  date        DateTime
+  storeId     Int
+  store       Store    @relation(fields: [storeId], references: [id])
+  createdById Int
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  totalAmount Float
+  createdAt   DateTime @default(now())
+
+  lines DispatchInvoiceLine[]
+}
+
+model DispatchInvoiceLine {
+  id        Int             @id @default(autoincrement())
+  invoiceId Int
+  invoice   DispatchInvoice @relation(fields: [invoiceId], references: [id])
+  productId Int
+  product   Product         @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+  amount    Float
+}
+
+// A retail sales bill issued by a store to a customer.
+model Sale {
+  id          Int      @id @default(autoincrement())
+  number      String   @unique
+  date        DateTime
+  storeId     Int
+  store       Store    @relation(fields: [storeId], references: [id])
+  createdById Int
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  totalAmount Float
+  createdAt   DateTime @default(now())
+
+  lines SaleLine[]
+}
+
+model SaleLine {
+  id        Int     @id @default(autoincrement())
+  saleId    Int
+  sale      Sale    @relation(fields: [saleId], references: [id])
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+  amount    Float
+}
