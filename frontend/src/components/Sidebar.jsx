@@ -14,6 +14,7 @@ import {
   Menu,
   X,
 } from 'lucide-react';
+import logoIcon from '../assets/grillexa-icon.png';
 
 const ROLE_LABELS = {
   ADMIN: 'Admin',
@@ -71,7 +72,7 @@ export default function Sidebar() {
           {mobileOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
         <div className="sidebar-brand">
-          <span className="sidebar-logo">G</span>
+          <img src={logoIcon} alt="" className="sidebar-logo" />
           <span className="sidebar-brand-name">Grillexa</span>
         </div>
       </div>
@@ -80,7 +81,7 @@ export default function Sidebar() {
 
       <aside className={`sidebar${mobileOpen ? ' sidebar-mobile-open' : ''}`}>
         <div className="sidebar-brand">
-          <span className="sidebar-logo">G</span>
+          <img src={logoIcon} alt="" className="sidebar-logo" />
           <span className="sidebar-brand-name">Grillexa</span>
         </div>
 

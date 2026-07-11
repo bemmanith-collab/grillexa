@@ -163,13 +163,8 @@ select {
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: linear-gradient(135deg, var(--primary), #818cf8);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  color: #fff;
-  font-size: 0.95rem;
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
 .sidebar-nav {
