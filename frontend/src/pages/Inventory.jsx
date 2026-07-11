@@ -9,8 +9,10 @@ import { BoxIcon, AlertIcon, ReceiptIcon, TrashIcon } from '../components/icons'
 export default function Inventory() {
   const { user } = useAuth();
   const isScoped = user.role === 'SALES';
-  const [stores, setStores] = useState([]);
-  const [storeId, setStoreId] = useState(isScoped ? user.storeId : '');
+  const myStores = isScoped ? user.stores : [];
+  const showStorePicker = !isScoped || myStores.length > 1;
+  const [stores, setStores] = useState(isScoped ? myStores : []);
+  const [storeId, setStoreId] = useState(isScoped ? myStores[0]?.id || '' : '');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -25,7 +27,10 @@ export default function Inventory() {
   }, [isScoped]);
 
   async function load(sid) {
-    if (!sid) return;
+    if (!sid) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -65,7 +70,7 @@ export default function Inventory() {
             {data?.store && <> · {data.store}</>}
           </p>
         </div>
-        {!isScoped && stores.length > 0 && (
+        {showStorePicker && stores.length > 0 && (
           <select value={storeId} onChange={(e) => setStoreId(Number(e.target.value))}>
             {stores.map((s) => (
               <option key={s.id} value={s.id}>
@@ -77,8 +82,11 @@ export default function Inventory() {
       </div>
 
       {error && <div className="form-error">{error}</div>}
+      {isScoped && myStores.length === 0 && (
+        <div className="form-error">Your account isn't assigned to a store yet. Ask an admin to assign one.</div>
+      )}
 
-      {loading || !data ? (
+      {!storeId ? null : loading || !data ? (
         <Spinner label="Loading today's stock…" />
       ) : (
         <>

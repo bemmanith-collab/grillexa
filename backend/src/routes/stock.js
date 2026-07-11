@@ -34,7 +34,11 @@ function todayStr() {
 // missing rows (opening carried over from the prior day) so the page
 // always shows all products even before anything happens today.
 router.get('/today', async (req, res) => {
-  const storeId = Number(req.query.storeId || req.user.storeId);
+  const storeId = req.query.storeId
+    ? Number(req.query.storeId)
+    : req.user.role === 'SALES'
+    ? req.user.storeIds[0]
+    : undefined;
   if (!storeId) return res.status(400).json({ error: 'storeId is required' });
   try {
     assertStoreAccess(req.user, storeId);
@@ -68,18 +72,22 @@ router.get('/today', async (req, res) => {
 // Historical ledger, filterable by store/product/date range.
 router.get('/history', async (req, res) => {
   const { productId, from, to } = req.query;
-  const storeId = req.query.storeId ? Number(req.query.storeId) : req.user.role === 'SALES' ? req.user.storeId : undefined;
+  const requestedStoreId = req.query.storeId ? Number(req.query.storeId) : undefined;
 
-  if (req.user.role === 'SALES') {
+  if (req.user.role === 'SALES' && requestedStoreId) {
     try {
-      assertStoreAccess(req.user, storeId);
+      assertStoreAccess(req.user, requestedStoreId);
     } catch (err) {
       return res.status(err.status || 403).json({ error: err.message });
     }
   }
 
   const where = {};
-  if (storeId) where.storeId = storeId;
+  if (requestedStoreId) {
+    where.storeId = requestedStoreId;
+  } else if (req.user.role === 'SALES') {
+    where.storeId = { in: req.user.storeIds };
+  }
   if (productId) where.productId = Number(productId);
   if (from || to) {
     where.date = {};

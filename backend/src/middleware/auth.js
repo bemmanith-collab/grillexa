@@ -17,12 +17,18 @@ async function authenticate(req, res, next) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 
-  const user = await prisma.user.findUnique({ where: { id: payload.id } });
+  const user = await prisma.user.findUnique({ where: { id: payload.id }, include: { stores: true } });
   if (!user) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 
-  req.user = { id: user.id, email: user.email, role: user.role, name: user.name, storeId: user.storeId };
+  req.user = {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    name: user.name,
+    storeIds: user.stores.map((s) => s.id),
+  };
   next();
 }
 

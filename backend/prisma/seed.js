@@ -34,7 +34,13 @@ async function upsertUser({ name, email, role, storeId }) {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return existing;
   const user = await prisma.user.create({
-    data: { name, email, passwordHash: await bcrypt.hash(PASSWORD, 10), role, storeId: storeId || null },
+    data: {
+      name,
+      email,
+      passwordHash: await bcrypt.hash(PASSWORD, 10),
+      role,
+      stores: storeId ? { connect: { id: storeId } } : undefined,
+    },
   });
   console.log(`Seeded ${role.toLowerCase()} user: ${email} / ${PASSWORD}`);
   return user;

@@ -1,13 +1,13 @@
-// SALES accounts are locked to their own store; ADMIN/MANAGER can reach any store.
+// SALES accounts are locked to their own stores; ADMIN/MANAGER can reach any store.
 function assertStoreAccess(user, storeId) {
   if (user.role !== 'SALES') return;
-  if (!user.storeId) {
+  if (!user.storeIds || user.storeIds.length === 0) {
     const err = new Error('Your account is not assigned to a store yet. Ask an admin to assign one.');
     err.status = 403;
     throw err;
   }
-  if (Number(storeId) !== user.storeId) {
-    const err = new Error('You can only access your own store');
+  if (!user.storeIds.includes(Number(storeId))) {
+    const err = new Error('You can only access your own stores');
     err.status = 403;
     throw err;
   }

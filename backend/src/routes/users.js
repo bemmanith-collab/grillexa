@@ -8,20 +8,35 @@ const router = express.Router();
 const ROLES = ['ADMIN', 'MANAGER', 'SALES'];
 
 function sanitize(user) {
-  const { passwordHash, ...rest } = user;
-  return { ...rest, store: user.store?.name };
+  const { passwordHash, stores, ...rest } = user;
+  return { ...rest, stores: (stores || []).map((s) => ({ id: s.id, name: s.name })) };
+}
+
+function uniqueIds(storeIds) {
+  return [...new Set((Array.isArray(storeIds) ? storeIds : []).map(Number))];
+}
+
+// Checks every id exists and isn't already owned by a different sales user.
+// Returns an error string, or null if the list is clear to assign.
+async function validateStoreIds(storeIds, ownerId) {
+  if (storeIds.length === 0) return null;
+  const stores = await prisma.store.findMany({ where: { id: { in: storeIds } } });
+  if (stores.length !== storeIds.length) return 'One or more storeIds do not exist';
+  const takenByOther = stores.find((s) => s.salesUserId != null && s.salesUserId !== ownerId);
+  if (takenByOther) return `Store "${takenByOther.name}" is already assigned to another sales user`;
+  return null;
 }
 
 // Every route below is Admin-only.
 router.use(authenticate, requireRole('ADMIN'));
 
 router.get('/', async (req, res) => {
-  const users = await prisma.user.findMany({ include: { store: true }, orderBy: { createdAt: 'asc' } });
+  const users = await prisma.user.findMany({ include: { stores: true }, orderBy: { createdAt: 'asc' } });
   res.json({ users: users.map(sanitize) });
 });
 
 router.post('/', async (req, res) => {
-  const { name, email, password, role, storeId } = req.body;
+  const { name, email, password, role, storeIds } = req.body;
   if (!name || !email || !password || !role) {
     return res.status(400).json({ error: 'name, email, password and role are required' });
   }
@@ -31,28 +46,34 @@ router.post('/', async (req, res) => {
   if (password.length < 8) {
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
-  if (role === 'SALES' && !storeId) {
-    return res.status(400).json({ error: 'Sales accounts must be assigned to a store' });
+  const ids = uniqueIds(storeIds);
+  if (role === 'SALES' && ids.length === 0) {
+    return res.status(400).json({ error: 'Sales accounts must be assigned at least one store' });
   }
-  if (storeId) {
-    const store = await prisma.store.findUnique({ where: { id: Number(storeId) } });
-    if (!store) return res.status(400).json({ error: 'storeId does not exist' });
-  }
+  const storeError = await validateStoreIds(ids, null);
+  if (storeError) return res.status(400).json({ error: storeError });
+
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     return res.status(409).json({ error: 'An account with this email already exists' });
   }
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await prisma.user.create({
-    data: { name, email, passwordHash, role, storeId: role === 'SALES' ? Number(storeId) : null },
-    include: { store: true },
+    data: {
+      name,
+      email,
+      passwordHash,
+      role,
+      stores: role === 'SALES' ? { connect: ids.map((id) => ({ id })) } : undefined,
+    },
+    include: { stores: true },
   });
   res.status(201).json({ user: sanitize(user) });
 });
 
 router.patch('/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const { name, email, role, storeId } = req.body;
+  const { name, email, role, storeIds } = req.body;
 
   if (role && !ROLES.includes(role)) {
     return res.status(400).json({ error: `role must be one of ${ROLES.join(', ')}` });
@@ -61,19 +82,17 @@ router.patch('/:id', async (req, res) => {
     return res.status(400).json({ error: 'You cannot remove your own admin role' });
   }
 
-  const current = await prisma.user.findUnique({ where: { id } });
+  const current = await prisma.user.findUnique({ where: { id }, include: { stores: true } });
   if (!current) return res.status(404).json({ error: 'User not found' });
 
   const nextRole = role !== undefined ? role : current.role;
-  const nextStoreId = storeId !== undefined ? Number(storeId) : current.storeId;
+  const nextIds = storeIds !== undefined ? uniqueIds(storeIds) : current.stores.map((s) => s.id);
 
-  if (nextRole === 'SALES' && !nextStoreId) {
-    return res.status(400).json({ error: 'Sales accounts must be assigned to a store' });
+  if (nextRole === 'SALES' && nextIds.length === 0) {
+    return res.status(400).json({ error: 'Sales accounts must be assigned at least one store' });
   }
-  if (nextStoreId) {
-    const store = await prisma.store.findUnique({ where: { id: nextStoreId } });
-    if (!store) return res.status(400).json({ error: 'storeId does not exist' });
-  }
+  const storeError = await validateStoreIds(nextIds, id);
+  if (storeError) return res.status(400).json({ error: storeError });
 
   const user = await prisma.user.update({
     where: { id },
@@ -81,9 +100,9 @@ router.patch('/:id', async (req, res) => {
       ...(name !== undefined && { name }),
       ...(email !== undefined && { email }),
       role: nextRole,
-      storeId: nextRole === 'SALES' ? nextStoreId : null,
+      stores: { set: nextRole === 'SALES' ? nextIds.map((sid) => ({ id: sid })) : [] },
     },
-    include: { store: true },
+    include: { stores: true },
   });
   res.json({ user: sanitize(user) });
 });

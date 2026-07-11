@@ -31,15 +31,19 @@ function shapeSale(sale) {
 }
 
 router.get('/', async (req, res) => {
-  const storeId = req.query.storeId ? Number(req.query.storeId) : req.user.role === 'SALES' ? req.user.storeId : undefined;
-  if (req.user.role === 'SALES') {
+  const requestedStoreId = req.query.storeId ? Number(req.query.storeId) : undefined;
+  if (req.user.role === 'SALES' && requestedStoreId) {
     try {
-      assertStoreAccess(req.user, storeId);
+      assertStoreAccess(req.user, requestedStoreId);
     } catch (err) {
       return res.status(err.status || 403).json({ error: err.message });
     }
   }
-  const where = storeId ? { storeId } : {};
+  const where = requestedStoreId
+    ? { storeId: requestedStoreId }
+    : req.user.role === 'SALES'
+    ? { storeId: { in: req.user.storeIds } }
+    : {};
   const sales = await prisma.sale.findMany({
     where,
     include: { store: true, createdBy: true, lines: { include: { product: true } } },
@@ -70,7 +74,10 @@ router.get('/:id', async (req, res) => {
 // bill if any line would oversell the day's available stock.
 router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
   const { date, lines } = req.body;
-  const storeId = req.user.role === 'SALES' ? req.user.storeId : Number(req.body.storeId);
+  const storeId =
+    req.user.role === 'SALES'
+      ? Number(req.body.storeId) || req.user.storeIds[0]
+      : Number(req.body.storeId);
 
   if (!storeId) {
     return res.status(400).json({ error: req.user.role === 'SALES' ? 'Your account is not assigned to a store yet' : 'storeId is required' });

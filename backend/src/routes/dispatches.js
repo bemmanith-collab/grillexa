@@ -32,15 +32,19 @@ function shapeInvoice(invoice) {
 
 // Sales can view dispatches sent to their own store (read-only, so staff know what arrived).
 router.get('/', async (req, res) => {
-  const storeId = req.query.storeId ? Number(req.query.storeId) : req.user.role === 'SALES' ? req.user.storeId : undefined;
-  if (req.user.role === 'SALES') {
+  const requestedStoreId = req.query.storeId ? Number(req.query.storeId) : undefined;
+  if (req.user.role === 'SALES' && requestedStoreId) {
     try {
-      assertStoreAccess(req.user, storeId);
+      assertStoreAccess(req.user, requestedStoreId);
     } catch (err) {
       return res.status(err.status || 403).json({ error: err.message });
     }
   }
-  const where = storeId ? { storeId } : {};
+  const where = requestedStoreId
+    ? { storeId: requestedStoreId }
+    : req.user.role === 'SALES'
+    ? { storeId: { in: req.user.storeIds } }
+    : {};
   const invoices = await prisma.dispatchInvoice.findMany({
     where,
     include: { store: true, createdBy: true, lines: { include: { product: true } } },

@@ -16,8 +16,8 @@ function signToken(user) {
 }
 
 function sanitize(user) {
-  const { passwordHash, ...rest } = user;
-  return rest;
+  const { passwordHash, stores, ...rest } = user;
+  return { ...rest, stores: (stores || []).map((s) => ({ id: s.id, name: s.name })) };
 }
 
 router.post('/signup', async (req, res) => {
@@ -36,6 +36,7 @@ router.post('/signup', async (req, res) => {
   // Public signup always creates a SALES account; an Admin must promote via the Users page.
   const user = await prisma.user.create({
     data: { name, email, passwordHash, role: 'SALES' },
+    include: { stores: true },
   });
   const token = signToken(user);
   res.status(201).json({ token, user: sanitize(user) });
@@ -46,7 +47,7 @@ router.post('/login', async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ error: 'email and password are required' });
   }
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email }, include: { stores: true } });
   if (!user) {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
@@ -59,7 +60,7 @@ router.post('/login', async (req, res) => {
 });
 
 router.get('/me', authenticate, async (req, res) => {
-  const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+  const user = await prisma.user.findUnique({ where: { id: req.user.id }, include: { stores: true } });
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({ user: sanitize(user) });
 });

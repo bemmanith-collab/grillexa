@@ -18,7 +18,9 @@ function daysAgoStr(n) {
 export default function StockHistory() {
   const { user } = useAuth();
   const isScoped = user.role === 'SALES';
-  const [stores, setStores] = useState([]);
+  const myStores = isScoped ? user.stores : [];
+  const showStorePicker = !isScoped || myStores.length > 1;
+  const [stores, setStores] = useState(isScoped ? myStores : []);
   const [products, setProducts] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +70,7 @@ export default function StockHistory() {
 
       <div className="card form-card">
         <div className="inline-form">
-          {!isScoped && (
+          {showStorePicker && (
             <select value={storeId} onChange={(e) => setStoreId(e.target.value)}>
               <option value="">All stores</option>
               {stores.map((s) => (
@@ -108,7 +110,7 @@ export default function StockHistory() {
             <thead>
               <tr>
                 <th>Date</th>
-                {!isScoped && <th>Store</th>}
+                {showStorePicker && <th>Store</th>}
                 <th>Product</th>
                 <th>Opening</th>
                 <th>Received</th>
@@ -122,7 +124,7 @@ export default function StockHistory() {
               {entries.map((e) => (
                 <tr key={e.id}>
                   <td>{e.date}</td>
-                  {!isScoped && <td>{e.store}</td>}
+                  {showStorePicker && <td>{e.store}</td>}
                   <td className="cell-strong">{e.product}</td>
                   <td>{e.opening}</td>
                   <td>{e.received}</td>
@@ -138,7 +140,7 @@ export default function StockHistory() {
               ))}
               {entries.length === 0 && (
                 <tr>
-                  <td colSpan={isScoped ? 8 : 9}>
+                  <td colSpan={showStorePicker ? 9 : 8}>
                     <EmptyState icon={HistoryIcon} message="No stock history for this filter." />
                   </td>
                 </tr>

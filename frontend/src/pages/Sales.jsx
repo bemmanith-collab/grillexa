@@ -14,13 +14,16 @@ function todayStr() {
 export default function Sales() {
   const { user } = useAuth();
   const isScoped = user.role === 'SALES';
-  const [stores, setStores] = useState([]);
+  const myStores = isScoped ? user.stores : [];
+  // A scoped user with just one store never needs to pick — same UX as before.
+  const showStorePicker = !isScoped || myStores.length > 1;
+  const [stores, setStores] = useState(isScoped ? myStores : []);
   const [products, setProducts] = useState([]);
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formOpen, setFormOpen] = useState(false);
-  const [storeId, setStoreId] = useState(isScoped ? user.storeId : '');
+  const [storeId, setStoreId] = useState(isScoped ? myStores[0]?.id || '' : '');
   const [date, setDate] = useState(todayStr());
   const [lines, setLines] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -59,14 +62,14 @@ export default function Sales() {
     const cleanLines = lines
       .filter((l) => l.productId && Number(l.quantity) > 0)
       .map((l) => ({ productId: Number(l.productId), quantity: Number(l.quantity), unitPrice: Number(l.unitPrice) || 0 }));
-    if ((!isScoped && !storeId) || cleanLines.length === 0) {
+    if (!storeId || cleanLines.length === 0) {
       setError('Pick a store and at least one product line with a quantity.');
       return;
     }
     setSubmitting(true);
     try {
       await client.post('/sales', {
-        ...(isScoped ? {} : { storeId: Number(storeId) }),
+        storeId: Number(storeId),
         date,
         lines: cleanLines,
       });
@@ -85,6 +88,8 @@ export default function Sales() {
     setDetail(res.data.sale);
   }
 
+  const noStoresAssigned = isScoped && myStores.length === 0;
+
   return (
     <div className="page">
       <div className="page-header">
@@ -92,21 +97,25 @@ export default function Sales() {
           <h1>Sales</h1>
           <p className="page-subtitle">Retail bills issued to customers</p>
         </div>
-        <button className="btn-primary" onClick={() => setFormOpen((v) => !v)}>
+        <button className="btn-primary" onClick={() => setFormOpen((v) => !v)} disabled={noStoresAssigned}>
           {formOpen ? 'Cancel' : '+ New Sale'}
         </button>
       </div>
 
       {error && <div className="form-error">{error}</div>}
+      {noStoresAssigned && (
+        <div className="form-error">Your account isn't assigned to a store yet. Ask an admin to assign one.</div>
+      )}
 
       {formOpen && (
         <div className="card form-card">
           <form onSubmit={handleSubmit}>
             <div className="bill-form-header">
-              {!isScoped && (
+              {showStorePicker && (
                 <label>
                   Store
                   <select value={storeId} onChange={(e) => setStoreId(e.target.value)}>
+                    {!isScoped && <option value="">Select a store…</option>}
                     {stores.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}
@@ -140,7 +149,7 @@ export default function Sales() {
               <tr>
                 <th>Bill #</th>
                 <th>Date</th>
-                {!isScoped && <th>Store</th>}
+                {showStorePicker && <th>Store</th>}
                 {!isScoped && <th>Created By</th>}
                 <th>Total</th>
                 <th></th>
@@ -151,7 +160,7 @@ export default function Sales() {
                 <tr key={s.id}>
                   <td className="cell-mono">{s.number}</td>
                   <td>{s.date}</td>
-                  {!isScoped && <td>{s.store}</td>}
+                  {showStorePicker && <td>{s.store}</td>}
                   {!isScoped && <td>{s.createdBy}</td>}
                   <td>₹{s.totalAmount.toFixed(2)}</td>
                   <td className="actions-cell">
@@ -163,7 +172,7 @@ export default function Sales() {
               ))}
               {sales.length === 0 && (
                 <tr>
-                  <td colSpan={isScoped ? 4 : 6}>
+                  <td colSpan={showStorePicker ? (isScoped ? 5 : 6) : 4}>
                     <EmptyState icon={ReceiptIcon} message="No sales recorded yet." />
                   </td>
                 </tr>
