@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { HistoryIcon } from '../components/icons';
+import { STATUS_LABEL, STATUS_BADGE_CLASS } from '../lib/stockStatus';
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -132,9 +133,7 @@ export default function StockHistory() {
                   <td>{e.wastage}</td>
                   <td className="cell-strong">{e.closing}</td>
                   <td>
-                    <span className={`badge ${e.status === 'LOW' ? 'badge-low' : 'badge-ok'}`}>
-                      {e.status === 'LOW' ? 'Low' : 'OK'}
-                    </span>
+                    <span className={`badge ${STATUS_BADGE_CLASS[e.status]}`}>{STATUS_LABEL[e.status]}</span>
                   </td>
                 </tr>
               ))}

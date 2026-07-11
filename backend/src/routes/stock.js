@@ -8,6 +8,15 @@ const router = express.Router();
 
 router.use(authenticate);
 
+// OK: above the reorder threshold. LOW: at/below threshold but still some
+// stock. CRITICAL: nothing left to sell — the most urgent of the three.
+function computeStatus(entry) {
+  if (!entry.product) return 'OK';
+  if (entry.closing <= 0) return 'CRITICAL';
+  if (entry.closing <= entry.product.threshold) return 'LOW';
+  return 'OK';
+}
+
 function shapeEntry(entry) {
   return {
     id: entry.id,
@@ -22,7 +31,7 @@ function shapeEntry(entry) {
     sold: entry.sold,
     wastage: entry.wastage,
     closing: entry.closing,
-    status: entry.product && entry.closing <= entry.product.threshold ? 'LOW' : 'OK',
+    status: computeStatus(entry),
   };
 }
 

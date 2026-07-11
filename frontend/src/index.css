@@ -327,8 +327,20 @@ select {
   transition: background 0.1s ease;
 }
 
+.data-table-zebra tbody tr:nth-child(even) {
+  background: #fafafc;
+}
+
 .data-table tbody tr:hover {
   background: #fafbff;
+}
+
+.data-table tbody tr.row-clickable {
+  cursor: pointer;
+}
+
+.data-table tbody tr.row-clickable:hover {
+  background: #eef0fb;
 }
 
 .cell-strong {
@@ -420,6 +432,11 @@ select {
 .badge-ok {
   background: var(--success-soft);
   color: var(--success);
+}
+
+.badge-critical {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .badge-low {
@@ -843,6 +860,52 @@ button:disabled {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.stock-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 18px 0 4px;
+}
+
+.stock-detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stock-detail-row .form-hint {
+  margin: 0;
+}
+
+.search-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  flex: 1;
+  min-width: 200px;
+  color: var(--text-muted);
+}
+
+.search-input:focus-within {
+  outline: 2px solid var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.search-input input {
+  border: none;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font-size: 1rem;
+  background: transparent;
+  color: var(--text);
 }
 
 .store-names {

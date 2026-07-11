@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { Package, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Package, CheckCircle2, XCircle, AlertTriangle, Search } from 'lucide-react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import WastageModal from '../components/WastageModal';
+import StockDetailModal from '../components/StockDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { BoxIcon } from '../components/icons';
+import { STATUS_LABEL, STATUS_BADGE_CLASS } from '../lib/stockStatus';
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -56,6 +58,9 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [wastageTarget, setWastageTarget] = useState(null);
+  const [detailEntry, setDetailEntry] = useState(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   useEffect(() => {
     if (isScoped) return;
@@ -100,15 +105,24 @@ export default function Inventory() {
     }));
   }
 
-  const lowCount = data?.entries.filter((e) => e.status === 'LOW').length || 0;
+  const lowCount = data?.entries.filter((e) => e.status !== 'OK').length || 0;
   const totalClosing = data?.entries.reduce((sum, e) => sum + e.closing, 0) || 0;
   const totalSold = data?.entries.reduce((sum, e) => sum + e.sold, 0) || 0;
   const totalWastage = data?.entries.reduce((sum, e) => sum + e.wastage, 0) || 0;
 
-  const prevLowCount = prevEntries.filter((e) => e.status === 'LOW').length;
+  const prevLowCount = prevEntries.filter((e) => e.status !== 'OK').length;
   const prevClosing = prevEntries.reduce((sum, e) => sum + e.closing, 0);
   const prevSold = prevEntries.reduce((sum, e) => sum + e.sold, 0);
   const prevWastage = prevEntries.reduce((sum, e) => sum + e.wastage, 0);
+
+  const filteredEntries = useMemo(() => {
+    if (!data) return [];
+    return data.entries.filter((e) => {
+      if (statusFilter !== 'ALL' && e.status !== statusFilter) return false;
+      if (search.trim() && !e.product.toLowerCase().includes(search.trim().toLowerCase())) return false;
+      return true;
+    });
+  }, [data, search, statusFilter]);
 
   return (
     <div className="page">
@@ -175,9 +189,28 @@ export default function Inventory() {
             </div>
           </div>
 
+          <div className="card form-card">
+            <div className="inline-form">
+              <div className="search-input">
+                <Search size={16} />
+                <input
+                  placeholder="Search products…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="ALL">All statuses</option>
+                <option value="OK">In Stock</option>
+                <option value="LOW">Low Stock</option>
+                <option value="CRITICAL">Critical</option>
+              </select>
+            </div>
+          </div>
+
           <div className="card">
             <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table data-table-zebra">
               <thead>
                 <tr>
                   <th>Product</th>
@@ -191,8 +224,8 @@ export default function Inventory() {
                 </tr>
               </thead>
               <tbody>
-                {data.entries.map((e) => (
-                  <tr key={e.id}>
+                {filteredEntries.map((e) => (
+                  <tr key={e.id} className="row-clickable" onClick={() => setDetailEntry(e)}>
                     <td className="cell-strong">{e.product}</td>
                     <td>{e.opening}</td>
                     <td>{e.received}</td>
@@ -200,12 +233,16 @@ export default function Inventory() {
                     <td>{e.wastage}</td>
                     <td className="cell-strong">{e.closing}</td>
                     <td>
-                      <span className={`badge ${e.status === 'LOW' ? 'badge-low' : 'badge-ok'}`}>
-                        {e.status === 'LOW' ? 'Low Stock' : 'OK'}
-                      </span>
+                      <span className={`badge ${STATUS_BADGE_CLASS[e.status]}`}>{STATUS_LABEL[e.status]}</span>
                     </td>
                     <td className="actions-cell">
-                      <button className="btn-secondary btn-sm" onClick={() => setWastageTarget(e)}>
+                      <button
+                        className="btn-secondary btn-sm"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          setWastageTarget(e);
+                        }}
+                      >
                         Record Wastage
                       </button>
                     </td>
@@ -215,6 +252,13 @@ export default function Inventory() {
                   <tr>
                     <td colSpan={8}>
                       <EmptyState icon={BoxIcon} message="No products in the catalog yet." />
+                    </td>
+                  </tr>
+                )}
+                {data.entries.length > 0 && filteredEntries.length === 0 && (
+                  <tr>
+                    <td colSpan={8}>
+                      <EmptyState icon={Search} message="No products match your search or filter." />
                     </td>
                   </tr>
                 )}
@@ -230,6 +274,17 @@ export default function Inventory() {
           entry={wastageTarget}
           onClose={() => setWastageTarget(null)}
           onSubmit={(quantity) => handleWastageSubmit(wastageTarget, quantity)}
+        />
+      )}
+
+      {detailEntry && (
+        <StockDetailModal
+          entry={detailEntry}
+          onClose={() => setDetailEntry(null)}
+          onRecordWastage={() => {
+            setWastageTarget(detailEntry);
+            setDetailEntry(null);
+          }}
         />
       )}
     </div>
