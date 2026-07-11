@@ -405,18 +405,50 @@ select {
   font-size: 0.88rem;
 }
 
-.spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--border);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+.brand-spinner {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-@keyframes spin {
+.brand-spinner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, var(--primary), var(--info), transparent 75%);
+  animation: brand-spin 1s linear infinite;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+}
+
+.brand-spinner-icon {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  animation: brand-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes brand-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes brand-pulse {
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
   }
 }
 
