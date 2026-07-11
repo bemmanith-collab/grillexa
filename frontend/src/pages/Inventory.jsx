@@ -6,6 +6,7 @@ import WastageModal from '../components/WastageModal';
 import StockDetailModal from '../components/StockDetailModal';
 import ReturnStockModal from '../components/ReturnStockModal';
 import Toast from '../components/Toast';
+import DailyWisdom from '../components/DailyWisdom';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { BoxIcon } from '../components/icons';
@@ -167,6 +168,8 @@ export default function Inventory() {
           </button>
         </div>
       </div>
+
+      <DailyWisdom variant={user.role === 'SALES' ? 'prominent' : 'subtle'} />
 
       {error && <div className="form-error">{error}</div>}
       {isScoped && myStores.length === 0 && (
