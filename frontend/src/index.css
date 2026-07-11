@@ -689,27 +689,62 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(160deg, #14161f 0%, #1f2233 45%, #4f46e5 140%);
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #061426 0%, #0a2b45 30%, #0d5c63 68%, #14b8a6 100%);
   padding: 20px;
+}
+
+.auth-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 18% 15%, rgba(45, 212, 191, 0.28), transparent 42%),
+    radial-gradient(circle at 85% 85%, rgba(79, 70, 229, 0.25), transparent 45%),
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: auto, auto, 44px 44px, 44px 44px;
+  pointer-events: none;
+}
+
+.auth-shell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  max-width: 380px;
+}
+
+.auth-logo {
+  width: 86px;
+  height: 86px;
+  border-radius: 22px;
+  box-shadow: 0 24px 48px -16px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  animation: fade-in 0.4s ease;
 }
 
 .auth-form {
   width: 100%;
   min-width: 0;
-  max-width: 380px;
   padding: 36px 32px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  box-shadow: 0 30px 60px -18px rgba(0, 0, 0, 0.45);
+  border-color: rgba(255, 255, 255, 0.6);
 }
 
-.auth-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 4px;
+.auth-form h1 {
+  margin: 0;
+}
+
+.auth-subtitle {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  margin: 4px 0 0;
 }
 
 .auth-form label {
