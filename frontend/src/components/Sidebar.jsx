@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { BoxIcon, ReceiptIcon, TruckIcon, HistoryIcon, ChartIcon, StoreIcon, UsersIcon, LogoutIcon, InboxIcon } from './icons';
+import { BarChart3, Banknote, Package, Tag, ScrollText, TrendingUp, Store, Users, LogOut } from 'lucide-react';
 
 const ROLE_LABELS = {
   ADMIN: 'Admin',
@@ -17,7 +17,7 @@ function NavItem({ to, end, icon: Icon, children }) {
       aria-label={children}
       className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
     >
-      <Icon className="sidebar-link-icon" />
+      <Icon className="sidebar-link-icon" size={18} strokeWidth={1.8} />
       <span className="sidebar-link-label">{children}</span>
     </NavLink>
   );
@@ -44,20 +44,20 @@ export default function Sidebar() {
       </div>
 
       <nav className="sidebar-nav">
-        <NavItem to="/" end icon={BoxIcon}>Today's Stock</NavItem>
-        <NavItem to="/sales" icon={ReceiptIcon}>Sales</NavItem>
+        <NavItem to="/" end icon={BarChart3}>Today's Stock</NavItem>
+        <NavItem to="/sales" icon={Banknote}>Sales</NavItem>
         {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
-          <NavItem to="/dispatches" icon={TruckIcon}>Dispatches</NavItem>
+          <NavItem to="/dispatches" icon={Package}>Dispatches</NavItem>
         )}
         {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
-          <NavItem to="/products" icon={InboxIcon}>Products</NavItem>
+          <NavItem to="/products" icon={Tag}>Products</NavItem>
         )}
-        <NavItem to="/stock-history" icon={HistoryIcon}>Stock History</NavItem>
+        <NavItem to="/stock-history" icon={ScrollText}>Stock History</NavItem>
         {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
-          <NavItem to="/reports" icon={ChartIcon}>Reports</NavItem>
+          <NavItem to="/reports" icon={TrendingUp}>Reports</NavItem>
         )}
-        {user.role === 'ADMIN' && <NavItem to="/stores" icon={StoreIcon}>Stores</NavItem>}
-        {user.role === 'ADMIN' && <NavItem to="/users" icon={UsersIcon}>Users</NavItem>}
+        {user.role === 'ADMIN' && <NavItem to="/stores" icon={Store}>Stores</NavItem>}
+        {user.role === 'ADMIN' && <NavItem to="/users" icon={Users}>Users</NavItem>}
       </nav>
 
       <div className="sidebar-user">
@@ -77,7 +77,7 @@ export default function Sidebar() {
             navigate('/login');
           }}
         >
-          <LogoutIcon />
+          <LogOut size={18} strokeWidth={1.8} />
         </button>
       </div>
     </aside>
