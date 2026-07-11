@@ -73,7 +73,7 @@ export default function LineItemsForm({ products, lines, setLines }) {
                     onChange={(e) => updateLine(i, { unitPrice: e.target.value })}
                   />
                 </td>
-                <td>${amount.toFixed(2)}</td>
+                <td>₹{amount.toFixed(2)}</td>
                 <td>
                   <button type="button" className="btn-danger btn-sm" onClick={() => removeLine(i)} disabled={lines.length === 1}>
                     Remove
@@ -89,7 +89,7 @@ export default function LineItemsForm({ products, lines, setLines }) {
         <button type="button" className="btn-secondary btn-sm" onClick={addLine}>
           + Add line
         </button>
-        <div className="line-items-total">Total: ${total.toFixed(2)}</div>
+        <div className="line-items-total">Total: ₹{total.toFixed(2)}</div>
       </div>
     </div>
   );

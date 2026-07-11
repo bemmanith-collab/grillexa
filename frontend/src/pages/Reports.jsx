@@ -52,7 +52,7 @@ export default function Reports() {
 
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-value">${summary.salesRevenueToday.toFixed(2)}</div>
+          <div className="stat-value">₹{summary.salesRevenueToday.toFixed(2)}</div>
           <div className="stat-label">Sales Revenue Today</div>
         </div>
         <div className="stat-card">

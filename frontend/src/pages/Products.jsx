@@ -117,7 +117,7 @@ export default function Products() {
               required
             />
             <input
-              placeholder="Price"
+              placeholder="Price (₹)"
               type="number"
               min="0"
               step="0.01"
@@ -206,7 +206,7 @@ export default function Products() {
                       <>
                         <td className="cell-strong">{p.name}</td>
                         <td className="cell-mono">{p.sku}</td>
-                        <td>${p.price.toFixed(2)}</td>
+                        <td>₹{p.price.toFixed(2)}</td>
                         <td>{p.threshold}</td>
                         <td className="actions-cell">
                           <button className="btn-secondary btn-sm" onClick={() => startEdit(p)}>

@@ -141,7 +141,7 @@ export default function Sales() {
                 <th>Bill #</th>
                 <th>Date</th>
                 {!isScoped && <th>Store</th>}
-                <th>Created By</th>
+                {!isScoped && <th>Created By</th>}
                 <th>Total</th>
                 <th></th>
               </tr>
@@ -152,8 +152,8 @@ export default function Sales() {
                   <td className="cell-mono">{s.number}</td>
                   <td>{s.date}</td>
                   {!isScoped && <td>{s.store}</td>}
-                  <td>{s.createdBy}</td>
-                  <td>${s.totalAmount.toFixed(2)}</td>
+                  {!isScoped && <td>{s.createdBy}</td>}
+                  <td>₹{s.totalAmount.toFixed(2)}</td>
                   <td className="actions-cell">
                     <button className="btn-secondary btn-sm" onClick={() => openDetail(s.id)}>
                       View
@@ -163,7 +163,7 @@ export default function Sales() {
               ))}
               {sales.length === 0 && (
                 <tr>
-                  <td colSpan={isScoped ? 5 : 6}>
+                  <td colSpan={isScoped ? 4 : 6}>
                     <EmptyState icon={ReceiptIcon} message="No sales recorded yet." />
                   </td>
                 </tr>
@@ -174,7 +174,9 @@ export default function Sales() {
         </div>
       )}
 
-      {detail && <BillDetailModal title="Sale Bill" bill={detail} onClose={() => setDetail(null)} />}
+      {detail && (
+        <BillDetailModal title="Sale Bill" bill={detail} onClose={() => setDetail(null)} hideCreatedBy={isScoped} />
+      )}
     </div>
   );
 }

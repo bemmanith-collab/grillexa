@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function BillDetailModal({ title, bill, onClose }) {
+export default function BillDetailModal({ title, bill, onClose, hideCreatedBy }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal bill-modal" onClick={(e) => e.stopPropagation()}>
@@ -12,7 +12,7 @@ export default function BillDetailModal({ title, bill, onClose }) {
           <div className="bill-meta">
             <div><strong>Date:</strong> {bill.date}</div>
             <div><strong>Store:</strong> {bill.store}</div>
-            <div><strong>By:</strong> {bill.createdBy}</div>
+            {!hideCreatedBy && <div><strong>By:</strong> {bill.createdBy}</div>}
           </div>
         </div>
 
@@ -31,15 +31,15 @@ export default function BillDetailModal({ title, bill, onClose }) {
               <tr key={l.id}>
                 <td>{l.product}</td>
                 <td>{l.quantity}</td>
-                <td>${l.unitPrice.toFixed(2)}</td>
-                <td>${l.amount.toFixed(2)}</td>
+                <td>₹{l.unitPrice.toFixed(2)}</td>
+                <td>₹{l.amount.toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
         </table>
         </div>
 
-        <div className="bill-total">Total: ${bill.totalAmount.toFixed(2)}</div>
+        <div className="bill-total">Total: ₹{bill.totalAmount.toFixed(2)}</div>
 
         <div className="modal-actions">
           <button type="button" className="btn-secondary" onClick={onClose}>

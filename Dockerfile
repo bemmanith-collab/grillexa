@@ -23,7 +23,11 @@ RUN npm run build
 
 # ---------- Stage 3: runtime (Nginx serves frontend, proxies /api to backend) ----------
 FROM nginx:alpine AS final
-RUN apk add --no-cache nodejs npm
+# openssl is required at runtime so Prisma's query engine can detect the
+# libssl version and load the matching engine binary (built in stage 1
+# against linux-musl-openssl-3.0.x) — without it Prisma can't detect any
+# OpenSSL version and fails to start.
+RUN apk add --no-cache nodejs npm openssl
 
 WORKDIR /app/backend
 COPY --from=backend-build /app/backend ./

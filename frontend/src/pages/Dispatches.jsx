@@ -142,7 +142,7 @@ export default function Dispatches() {
                   <td>{inv.date}</td>
                   <td>{inv.store}</td>
                   <td>{inv.createdBy}</td>
-                  <td>${inv.totalAmount.toFixed(2)}</td>
+                  <td>₹{inv.totalAmount.toFixed(2)}</td>
                   <td className="actions-cell">
                     <button className="btn-secondary btn-sm" onClick={() => openDetail(inv.id)}>
                       View
