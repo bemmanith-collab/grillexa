@@ -5,6 +5,14 @@ import Spinner from '../components/Spinner';
 import StoreAssignModal from '../components/StoreAssignModal';
 
 const ROLES = ['ADMIN', 'MANAGER', 'SALES'];
+const MAX_VISIBLE_STORES = 3;
+
+function storesLabel(stores) {
+  if (stores.length === 0) return 'No stores assigned';
+  if (stores.length <= MAX_VISIBLE_STORES) return stores.map((s) => s.name).join(', ');
+  const shown = stores.slice(0, MAX_VISIBLE_STORES).map((s) => s.name).join(', ');
+  return `${shown} +${stores.length - MAX_VISIBLE_STORES} more`;
+}
 
 export default function Users() {
   const { user: currentUser } = useAuth();
@@ -192,7 +200,9 @@ export default function Users() {
                   <td>
                     {u.role === 'SALES' ? (
                       <div className="store-cell">
-                        <span>{u.stores.length > 0 ? u.stores.map((s) => s.name).join(', ') : 'No stores assigned'}</span>
+                        <span className="store-names" title={u.stores.map((s) => s.name).join(', ')}>
+                          {storesLabel(u.stores)}
+                        </span>
                         <button
                           type="button"
                           className="btn-secondary btn-sm"

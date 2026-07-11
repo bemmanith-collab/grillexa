@@ -817,6 +817,13 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.store-names {
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .badge-neutral {
   background: #f3f4f6;
   color: var(--text-muted);
