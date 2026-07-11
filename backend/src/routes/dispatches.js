@@ -3,11 +3,12 @@ const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
 const { normalizeDate, adjustStock } = require('../lib/stock');
-const { assertStoreAccess } = require('../lib/scope');
 
 const router = express.Router();
 
-router.use(authenticate);
+// This is a B2B (HQ-to-store) operation — Sales staff have no reason to see
+// what HQ shipped, only what's on the shelf right now (Today's Stock).
+router.use(authenticate, requireRole('ADMIN', 'MANAGER'));
 
 function shapeInvoice(invoice) {
   return {
@@ -30,21 +31,9 @@ function shapeInvoice(invoice) {
   };
 }
 
-// Sales can view dispatches sent to their own store (read-only, so staff know what arrived).
 router.get('/', async (req, res) => {
   const requestedStoreId = req.query.storeId ? Number(req.query.storeId) : undefined;
-  if (req.user.role === 'SALES' && requestedStoreId) {
-    try {
-      assertStoreAccess(req.user, requestedStoreId);
-    } catch (err) {
-      return res.status(err.status || 403).json({ error: err.message });
-    }
-  }
-  const where = requestedStoreId
-    ? { storeId: requestedStoreId }
-    : req.user.role === 'SALES'
-    ? { storeId: { in: req.user.storeIds } }
-    : {};
+  const where = requestedStoreId ? { storeId: requestedStoreId } : {};
   const invoices = await prisma.dispatchInvoice.findMany({
     where,
     include: { store: true, createdBy: true, lines: { include: { product: true } } },
@@ -60,19 +49,12 @@ router.get('/:id', async (req, res) => {
     include: { store: true, createdBy: true, lines: { include: { product: true } } },
   });
   if (!invoice) return res.status(404).json({ error: 'Dispatch invoice not found' });
-  if (req.user.role === 'SALES') {
-    try {
-      assertStoreAccess(req.user, invoice.storeId);
-    } catch (err) {
-      return res.status(err.status || 403).json({ error: err.message });
-    }
-  }
   res.json({ invoice: shapeInvoice(invoice) });
 });
 
 // Create a dispatch invoice — the "bill" for stock sent from HQ to a store.
-// Only Admin/Manager send stock out; this bumps the store's received stock for that date.
-router.post('/', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
+// This bumps the store's received stock for that date.
+router.post('/', async (req, res) => {
   const { storeId, date, lines } = req.body;
   if (!storeId || !date || !Array.isArray(lines) || lines.length === 0) {
     return res.status(400).json({ error: 'storeId, date and at least one line are required' });
