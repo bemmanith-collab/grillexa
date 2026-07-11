@@ -13,6 +13,8 @@
   --success-soft: #f0fdf4;
   --warn: #d97706;
   --warn-soft: #fffbeb;
+  --info: #2563eb;
+  --info-soft: #eff6ff;
   --sidebar-bg: #14161f;
   --sidebar-text: #cbd0dc;
   --sidebar-active: #1f2233;
@@ -453,8 +455,8 @@ select {
 }
 
 .stat-card:hover {
-  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.08), 0 2px 4px rgba(16, 24, 40, 0.06);
-  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.1), 0 3px 6px rgba(16, 24, 40, 0.06);
+  transform: translateY(-3px);
 }
 
 .stat-card-alert {
@@ -492,6 +494,11 @@ select {
   color: var(--warn);
 }
 
+.stat-icon-blue {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
 .stat-value {
   font-size: 1.6rem;
   font-weight: 700;
@@ -502,6 +509,27 @@ select {
   color: var(--text-muted);
   font-size: 0.8rem;
   margin-top: 2px;
+}
+
+.stat-trend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.stat-trend-good {
+  color: var(--success);
+}
+
+.stat-trend-bad {
+  color: var(--danger);
+}
+
+.stat-trend-neutral {
+  color: var(--text-muted);
 }
 
 /* ---------- Buttons ---------- */

@@ -1,10 +1,48 @@
 import React, { useEffect, useState } from 'react';
+import { Package, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import WastageModal from '../components/WastageModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
-import { BoxIcon, AlertIcon, ReceiptIcon, TrashIcon } from '../components/icons';
+import { BoxIcon } from '../components/icons';
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function yesterdayStr() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// direction the metric moved, plus the % change (null once previous is 0 —
+// a percentage off a zero baseline isn't meaningful, so we just say "New").
+function computeTrend(current, previous) {
+  if (!previous) return current > 0 ? { direction: 'up', pct: null } : null;
+  if (current === previous) return { direction: 'flat', pct: 0 };
+  const pct = Math.round((Math.abs(current - previous) / previous) * 100);
+  return { direction: current > previous ? 'up' : 'down', pct };
+}
+
+// sentiment: which direction counts as "good" for this metric, or 'neutral'
+// for metrics (like Units On Hand) where up/down isn't inherently good/bad.
+function StatTrend({ trend, sentiment }) {
+  if (!trend) return null;
+  const arrow = trend.direction === 'up' ? '↑' : trend.direction === 'down' ? '↓' : '→';
+  const amount = trend.pct == null ? 'New today' : `${trend.pct}% from yesterday`;
+  let tone = 'stat-trend-neutral';
+  if (sentiment !== 'neutral' && trend.direction !== 'flat') {
+    const good = sentiment === 'up-is-good' ? trend.direction === 'up' : trend.direction === 'down';
+    tone = good ? 'stat-trend-good' : 'stat-trend-bad';
+  }
+  return (
+    <div className={`stat-trend ${tone}`}>
+      {arrow} {amount}
+    </div>
+  );
+}
 
 export default function Inventory() {
   const { user } = useAuth();
@@ -14,6 +52,7 @@ export default function Inventory() {
   const [stores, setStores] = useState(isScoped ? myStores : []);
   const [storeId, setStoreId] = useState(isScoped ? myStores[0]?.id || '' : '');
   const [data, setData] = useState(null);
+  const [prevEntries, setPrevEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [wastageTarget, setWastageTarget] = useState(null);
@@ -34,8 +73,14 @@ export default function Inventory() {
     setLoading(true);
     setError('');
     try {
-      const res = await client.get('/stock/today', { params: { storeId: sid } });
-      setData(res.data);
+      const [todayRes, historyRes] = await Promise.all([
+        client.get('/stock/today', { params: { storeId: sid, date: todayStr() } }),
+        client
+          .get('/stock/history', { params: { storeId: sid, from: yesterdayStr(), to: yesterdayStr() } })
+          .catch(() => ({ data: { entries: [] } })),
+      ]);
+      setData(todayRes.data);
+      setPrevEntries(historyRes.data.entries);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load stock.');
     } finally {
@@ -59,6 +104,11 @@ export default function Inventory() {
   const totalClosing = data?.entries.reduce((sum, e) => sum + e.closing, 0) || 0;
   const totalSold = data?.entries.reduce((sum, e) => sum + e.sold, 0) || 0;
   const totalWastage = data?.entries.reduce((sum, e) => sum + e.wastage, 0) || 0;
+
+  const prevLowCount = prevEntries.filter((e) => e.status === 'LOW').length;
+  const prevClosing = prevEntries.reduce((sum, e) => sum + e.closing, 0);
+  const prevSold = prevEntries.reduce((sum, e) => sum + e.sold, 0);
+  const prevWastage = prevEntries.reduce((sum, e) => sum + e.wastage, 0);
 
   return (
     <div className="page">
@@ -92,31 +142,35 @@ export default function Inventory() {
         <>
           <div className="stat-grid">
             <div className="stat-card">
-              <div className="stat-icon stat-icon-indigo"><BoxIcon /></div>
+              <div className="stat-icon stat-icon-blue"><Package size={20} strokeWidth={1.8} /></div>
               <div>
                 <div className="stat-value">{totalClosing}</div>
                 <div className="stat-label">Units On Hand</div>
+                <StatTrend trend={computeTrend(totalClosing, prevClosing)} sentiment="neutral" />
               </div>
             </div>
             <div className="stat-card">
-              <div className="stat-icon stat-icon-green"><ReceiptIcon /></div>
+              <div className="stat-icon stat-icon-green"><CheckCircle2 size={20} strokeWidth={1.8} /></div>
               <div>
                 <div className="stat-value">{totalSold}</div>
                 <div className="stat-label">Units Sold Today</div>
+                <StatTrend trend={computeTrend(totalSold, prevSold)} sentiment="up-is-good" />
               </div>
             </div>
             <div className="stat-card">
-              <div className="stat-icon stat-icon-red"><TrashIcon /></div>
+              <div className="stat-icon stat-icon-amber"><XCircle size={20} strokeWidth={1.8} /></div>
               <div>
                 <div className="stat-value">{totalWastage}</div>
                 <div className="stat-label">Units Wasted Today</div>
+                <StatTrend trend={computeTrend(totalWastage, prevWastage)} sentiment="down-is-good" />
               </div>
             </div>
             <div className={`stat-card${lowCount > 0 ? ' stat-card-alert' : ''}`}>
-              <div className="stat-icon stat-icon-amber"><AlertIcon /></div>
+              <div className="stat-icon stat-icon-red"><AlertTriangle size={20} strokeWidth={1.8} /></div>
               <div>
                 <div className="stat-value">{lowCount}</div>
                 <div className="stat-label">Low Stock Alerts</div>
+                <StatTrend trend={computeTrend(lowCount, prevLowCount)} sentiment="down-is-good" />
               </div>
             </div>
           </div>
