@@ -101,6 +101,13 @@ select {
   margin-bottom: 20px;
 }
 
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .page-subtitle {
   color: var(--text-muted);
   font-size: 0.9rem;
@@ -562,6 +569,9 @@ select {
 .btn-primary,
 .btn-secondary,
 .btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: none;
   border-radius: 8px;
   padding: 9px 16px;
@@ -921,6 +931,43 @@ button:disabled {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #14161f;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  font-size: 0.88rem;
+  font-weight: 600;
+  z-index: 60;
+  animation: toast-in 0.2s ease;
+  max-width: calc(100vw - 32px);
+  white-space: nowrap;
+}
+
+.toast svg {
+  color: #4ade80;
+  flex-shrink: 0;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .badge-neutral {

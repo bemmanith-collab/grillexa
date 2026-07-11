@@ -10,6 +10,7 @@ const reportRoutes = require('./routes/reports');
 const stockRoutes = require('./routes/stock');
 const dispatchRoutes = require('./routes/dispatches');
 const salesRoutes = require('./routes/sales');
+const returnRoutes = require('./routes/returns');
 
 const app = express();
 
@@ -49,6 +50,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/stock', stockRoutes);
 app.use('/api/dispatches', dispatchRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/returns', returnRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

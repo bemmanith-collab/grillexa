@@ -57,4 +57,17 @@ async function adjustStock(tx, { storeId, productId, date, receivedDelta = 0, so
   });
 }
 
-module.exports = { normalizeDate, previousDay, getOrCreateDailyEntry, adjustStock };
+// A return credits the full quantity back to closing stock. It first
+// reverses today's recorded sales (so "Units Sold Today" reflects the
+// return, as requested) up to however much was actually sold today, and
+// treats anything beyond that — e.g. a return of stock sold on an earlier
+// day — as newly received stock re-entering inventory. This way `sold`
+// never goes negative but the store still gets full credit for the return.
+async function processReturn(tx, { storeId, productId, date, quantity }) {
+  const entry = await getOrCreateDailyEntry(tx, storeId, productId, date);
+  const soldReduction = Math.min(quantity, entry.sold);
+  const overflow = quantity - soldReduction;
+  return adjustStock(tx, { storeId, productId, date, soldDelta: -soldReduction, receivedDelta: overflow });
+}
+
+module.exports = { normalizeDate, previousDay, getOrCreateDailyEntry, adjustStock, processReturn };

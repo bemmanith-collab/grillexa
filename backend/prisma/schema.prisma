@@ -31,6 +31,7 @@ model User {
   stores           Store[]
   dispatchInvoices DispatchInvoice[]
   sales            Sale[]
+  returns          Return[]
 }
 
 model Store {
@@ -43,6 +44,7 @@ model Store {
   dailyStockEntries DailyStockEntry[]
   dispatchInvoices  DispatchInvoice[]
   sales             Sale[]
+  returns           Return[]
 }
 
 model Product {
@@ -58,6 +60,7 @@ model Product {
   dailyStockEntries    DailyStockEntry[]
   dispatchInvoiceLines DispatchInvoiceLine[]
   saleLines            SaleLine[]
+  returns              Return[]
 }
 
 // One row per (date, store, product) — the daily stock ledger.
@@ -131,4 +134,23 @@ model SaleLine {
   quantity  Int
   unitPrice Float
   amount    Float
+}
+
+// reason: "CUSTOMER_RETURN" | "DAMAGED" | "EXCHANGE" | "OTHER"
+// A customer return/exchange processed at a store. Unlike Sale/DispatchInvoice
+// this is single-product (matches the simple "Return Stock" modal — one
+// product, one quantity, one reason per return) rather than a multi-line bill.
+model Return {
+  id          Int      @id @default(autoincrement())
+  date        DateTime
+  storeId     Int
+  store       Store    @relation(fields: [storeId], references: [id])
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Int
+  reason      String
+  reference   String?
+  createdById Int
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
 }
