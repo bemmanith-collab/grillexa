@@ -8,9 +8,12 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/', async (req, res) => {
-  const stores = await prisma.store.findMany({ include: { salesUser: true }, orderBy: { name: 'asc' } });
+  const stores = await prisma.store.findMany({ include: { salesUsers: true }, orderBy: { name: 'asc' } });
   res.json({
-    stores: stores.map(({ salesUser, ...s }) => ({ ...s, salesUserName: salesUser?.name || null })),
+    stores: stores.map(({ salesUsers, ...s }) => ({
+      ...s,
+      salesUsers: salesUsers.map((u) => ({ id: u.id, name: u.name })),
+    })),
   });
 });
 

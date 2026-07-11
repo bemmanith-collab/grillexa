@@ -16,14 +16,12 @@ function uniqueIds(storeIds) {
   return [...new Set((Array.isArray(storeIds) ? storeIds : []).map(Number))];
 }
 
-// Checks every id exists and isn't already owned by a different sales user.
-// Returns an error string, or null if the list is clear to assign.
-async function validateStoreIds(storeIds, ownerId) {
+// Stores can be shared across sales users (e.g. someone covering for a
+// colleague), so this only checks the ids actually exist.
+async function validateStoreIds(storeIds) {
   if (storeIds.length === 0) return null;
   const stores = await prisma.store.findMany({ where: { id: { in: storeIds } } });
   if (stores.length !== storeIds.length) return 'One or more storeIds do not exist';
-  const takenByOther = stores.find((s) => s.salesUserId != null && s.salesUserId !== ownerId);
-  if (takenByOther) return `Store "${takenByOther.name}" is already assigned to another sales user`;
   return null;
 }
 
@@ -50,7 +48,7 @@ router.post('/', async (req, res) => {
   if (role === 'SALES' && ids.length === 0) {
     return res.status(400).json({ error: 'Sales accounts must be assigned at least one store' });
   }
-  const storeError = await validateStoreIds(ids, null);
+  const storeError = await validateStoreIds(ids);
   if (storeError) return res.status(400).json({ error: storeError });
 
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -91,7 +89,7 @@ router.patch('/:id', async (req, res) => {
   if (nextRole === 'SALES' && nextIds.length === 0) {
     return res.status(400).json({ error: 'Sales accounts must be assigned at least one store' });
   }
-  const storeError = await validateStoreIds(nextIds, id);
+  const storeError = await validateStoreIds(nextIds);
   if (storeError) return res.status(400).json({ error: storeError });
 
   const user = await prisma.user.update({

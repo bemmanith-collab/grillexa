@@ -806,6 +806,10 @@ button:disabled {
   width: auto;
 }
 
+.store-checkbox-hint {
+  margin: 0;
+}
+
 .store-cell {
   display: flex;
   align-items: center;

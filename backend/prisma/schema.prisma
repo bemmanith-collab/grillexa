@@ -16,10 +16,10 @@ datasource db {
 
 // role: "ADMIN" | "MANAGER" | "SALES"
 // SALES accounts must be assigned at least one store (enforced in the users
-// route, not in the schema, so ADMIN/MANAGER can stay company-wide). A SALES
-// user may own several stores, but each store has at most one owning SALES
-// user — the FK lives on Store (salesUserId), not on User, so that
-// exclusivity is a simple per-row column rather than a join table.
+// route, not in the schema, so ADMIN/MANAGER can stay company-wide). Stores
+// and SALES users are many-to-many — a store can have more than one sales
+// person assigned (e.g. a backup covering for someone who's out) and a
+// sales person can cover several stores.
 model User {
   id        Int      @id @default(autoincrement())
   name      String
@@ -28,19 +28,18 @@ model User {
   role      String   @default("SALES")
   createdAt DateTime @default(now())
 
-  stores           Store[]           @relation("StoreSalesUser")
+  stores           Store[]
   dispatchInvoices DispatchInvoice[]
   sales            Sale[]
 }
 
 model Store {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  address     String?
-  createdAt   DateTime @default(now())
-  salesUserId Int?
-  salesUser   User?    @relation("StoreSalesUser", fields: [salesUserId], references: [id])
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  address   String?
+  createdAt DateTime @default(now())
 
+  salesUsers        User[]
   dailyStockEntries DailyStockEntry[]
   dispatchInvoices  DispatchInvoice[]
   sales             Sale[]
