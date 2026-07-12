@@ -1043,6 +1043,7 @@ button:disabled {
 
 .modal-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 18px;
@@ -1252,6 +1253,20 @@ button:disabled {
   max-width: 560px;
 }
 
+.bill-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.bill-brand-icon {
+  width: 24px;
+  height: 24px;
+}
+
 .bill-header {
   display: flex;
   justify-content: space-between;
@@ -1440,5 +1455,37 @@ button:disabled {
   .inline-form select,
   .inline-form button {
     width: 100%;
+  }
+}
+
+/* ---------- Printing a bill (Sale/Dispatch) ---------- */
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .bill-modal,
+  .bill-modal * {
+    visibility: visible;
+  }
+
+  .modal-backdrop {
+    position: static;
+    background: none;
+    padding: 0;
+  }
+
+  .bill-modal {
+    position: absolute;
+    inset: 0;
+    max-width: 100%;
+    max-height: none;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .no-print {
+    display: none !important;
   }
 }
