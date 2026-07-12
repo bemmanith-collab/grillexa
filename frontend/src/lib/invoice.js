@@ -1,17 +1,15 @@
 import { formatCurrency } from './format';
 import { BUSINESS_INFO } from './businessInfo';
 
-const COL_WIDTH = 34;
-
-function padRight(text, width) {
-  const t = String(text);
-  return t.length >= width ? t.slice(0, width) : t + ' '.repeat(width - t.length);
-}
-
-function padLeft(text, width) {
-  const t = String(text);
-  return t.length >= width ? t.slice(0, width) : ' '.repeat(width - t.length) + t;
-}
+// Keep the boxed header narrow — WhatsApp's mobile app wraps (or in some
+// clients, horizontally clips) monospace lines that don't fit the message
+// bubble on a small phone screen, which breaks the box border alignment.
+// Everything in this box is short, fixed copy we control, so a tight width
+// is safe; the itemized list below uses single-line, non-columnar rows
+// instead of fixed-width columns, since product names are variable-length
+// and would be the first thing to overflow on a narrow screen.
+const BOX_WIDTH = 20;
+const DASH_WIDTH = 24;
 
 function center(text, width) {
   const t = String(text).length > width ? String(text).slice(0, width) : String(text);
@@ -22,10 +20,8 @@ function center(text, width) {
 
 function lineItemRow(l) {
   const isReturn = l.type === 'RETURN';
-  const qty = padRight(l.quantity, 4);
-  const name = padRight((isReturn ? 'RETURN: ' : '') + l.product, 20);
-  const amt = padLeft(formatCurrency(isReturn ? -l.amount : l.amount), 10);
-  return `${qty}${name}${amt}`;
+  const amt = formatCurrency(isReturn ? -l.amount : l.amount);
+  return `${l.quantity}x ${l.product}${isReturn ? ' (Return)' : ''} — ${amt}`;
 }
 
 // A monospace, WhatsApp-friendly invoice (wrapped in ``` by the caller so it
@@ -33,16 +29,14 @@ function lineItemRow(l) {
 // it — links inside a ``` block don't always stay tappable in WhatsApp.
 export function buildInvoiceShareText(title, bill, hideCreatedBy) {
   const b = BUSINESS_INFO;
-  const dash = '─'.repeat(COL_WIDTH);
-  const boxWidth = COL_WIDTH;
+  const dash = '─'.repeat(DASH_WIDTH);
 
   const block = [
-    `╔${'═'.repeat(boxWidth)}╗`,
-    `║${center(`🥗 ${b.name}`, boxWidth)}║`,
-    ...(b.tagline ? [`║${center(b.tagline, boxWidth)}║`] : []),
-    `╠${'═'.repeat(boxWidth)}╣`,
-    `║${center('OFFICIAL INVOICE', boxWidth)}║`,
-    `╚${'═'.repeat(boxWidth)}╝`,
+    `╔${'═'.repeat(BOX_WIDTH)}╗`,
+    `║${center(`🥗 ${b.name}`, BOX_WIDTH)}║`,
+    `╚${'═'.repeat(BOX_WIDTH)}╝`,
+    ...(b.tagline ? [b.tagline] : []),
+    'OFFICIAL INVOICE',
     '',
     `Invoice #: ${bill.number}`,
     `Date: ${bill.date}`,
@@ -53,11 +47,9 @@ export function buildInvoiceShareText(title, bill, hideCreatedBy) {
     ...(!hideCreatedBy && bill.createdBy ? [`Billed by: ${bill.createdBy}`] : []),
     '',
     dash,
-    `${padRight('Qty', 4)}${padRight('Item', 20)}${padLeft('Total', 10)}`,
-    dash,
     ...bill.lines.map(lineItemRow),
     dash,
-    `${padRight('TOTAL', 24)}${padLeft(formatCurrency(bill.totalAmount), 10)}`,
+    `TOTAL: ${formatCurrency(bill.totalAmount)}`,
     dash,
     '',
     ...(b.gstin ? [`GSTIN: ${b.gstin}`] : []),
