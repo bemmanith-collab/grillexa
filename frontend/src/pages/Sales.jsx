@@ -96,13 +96,17 @@ export default function Sales() {
   }
 
   const noStoresAssigned = isScoped && myStores.length === 0;
+  const singleStoreName = isScoped && myStores.length === 1 ? myStores[0].name : null;
 
   return (
     <div className="page">
       <div className="page-header">
         <div>
           <h1>Sales</h1>
-          <p className="page-subtitle">Retail bills issued to customers — add a Return line to credit stock back in the same bill</p>
+          <p className="page-subtitle">
+            Retail bills issued to customers — add a Return line to credit stock back in the same bill
+            {singleStoreName && <> · {singleStoreName}</>}
+          </p>
         </div>
         <button className="btn-primary" onClick={() => setFormOpen((v) => !v)} disabled={noStoresAssigned}>
           {formOpen ? 'Cancel' : '+ New Sale'}
@@ -118,7 +122,7 @@ export default function Sales() {
         <div className="card form-card">
           <form onSubmit={handleSubmit}>
             <div className="bill-form-header">
-              {showStorePicker && (
+              {showStorePicker ? (
                 <label>
                   Store
                   <select value={storeId} onChange={(e) => setStoreId(e.target.value)}>
@@ -130,6 +134,13 @@ export default function Sales() {
                     ))}
                   </select>
                 </label>
+              ) : (
+                singleStoreName && (
+                  <label>
+                    Store
+                    <input type="text" value={singleStoreName} disabled />
+                  </label>
+                )
               )}
               <label>
                 Date
@@ -156,7 +167,7 @@ export default function Sales() {
               <tr>
                 <th>Bill #</th>
                 <th>Date</th>
-                {showStorePicker && <th>Store</th>}
+                <th>Store</th>
                 {!isScoped && <th>Created By</th>}
                 <th>Total</th>
                 <th></th>
@@ -167,7 +178,7 @@ export default function Sales() {
                 <tr key={s.id}>
                   <td className="cell-mono">{s.number}</td>
                   <td>{s.date}</td>
-                  {showStorePicker && <td>{s.store}</td>}
+                  <td>{s.store}</td>
                   {!isScoped && <td>{s.createdBy}</td>}
                   <td>{formatCurrency(s.totalAmount)}</td>
                   <td className="actions-cell">
@@ -179,7 +190,7 @@ export default function Sales() {
               ))}
               {sales.length === 0 && (
                 <tr>
-                  <td colSpan={showStorePicker ? (isScoped ? 5 : 6) : 4}>
+                  <td colSpan={isScoped ? 5 : 6}>
                     <EmptyState icon={ReceiptIcon} message="No sales recorded yet." />
                   </td>
                 </tr>
