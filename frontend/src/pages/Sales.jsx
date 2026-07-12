@@ -26,6 +26,9 @@ export default function Sales() {
   const [formOpen, setFormOpen] = useState(false);
   const [storeId, setStoreId] = useState(isScoped ? myStores[0]?.id || '' : '');
   const [date, setDate] = useState(todayStr());
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerGstin, setCustomerGstin] = useState('');
   const [lines, setLines] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [detail, setDetail] = useState(null);
@@ -79,8 +82,14 @@ export default function Sales() {
         storeId: Number(storeId),
         date,
         lines: cleanLines,
+        customerName: customerName.trim() || undefined,
+        customerPhone: customerPhone.trim() || undefined,
+        customerGstin: customerGstin.trim() || undefined,
       });
       setLines([emptyLine(products)]);
+      setCustomerName('');
+      setCustomerPhone('');
+      setCustomerGstin('');
       setFormOpen(false);
       loadAll();
     } catch (err) {
@@ -145,6 +154,20 @@ export default function Sales() {
               <label>
                 Date
                 <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              </label>
+            </div>
+            <div className="bill-form-header">
+              <label>
+                Customer name <span className="form-optional">(optional)</span>
+                <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Walk-in customer" />
+              </label>
+              <label>
+                Customer phone <span className="form-optional">(optional)</span>
+                <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="For the WhatsApp invoice" />
+              </label>
+              <label>
+                Customer GSTIN <span className="form-optional">(optional)</span>
+                <input type="text" value={customerGstin} onChange={(e) => setCustomerGstin(e.target.value)} placeholder="If they need it for ITC" />
               </label>
             </div>
             <LineItemsForm products={products} lines={lines} setLines={setLines} />

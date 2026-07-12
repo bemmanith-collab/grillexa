@@ -113,17 +113,23 @@ model DispatchInvoiceLine {
   amount    Float
 }
 
-// A retail sales bill issued by a store to a customer.
+// A retail sales bill issued by a store to a customer. Customer fields are
+// all optional walk-in retail sales usually have none of these — they only
+// get filled in when the bill needs to double as a proper invoice (e.g. the
+// customer wants their GSTIN on it for input tax credit).
 model Sale {
-  id          Int      @id @default(autoincrement())
-  number      String   @unique
-  date        DateTime
-  storeId     Int
-  store       Store    @relation(fields: [storeId], references: [id])
-  createdById Int
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  totalAmount Float
-  createdAt   DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  number        String   @unique
+  date          DateTime
+  storeId       Int
+  store         Store    @relation(fields: [storeId], references: [id])
+  createdById   Int
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  totalAmount   Float
+  customerName  String?
+  customerPhone String?
+  customerGstin String?
+  createdAt     DateTime @default(now())
 
   lines SaleLine[]
 }

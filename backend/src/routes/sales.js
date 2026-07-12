@@ -20,6 +20,9 @@ function shapeSale(sale) {
     store: sale.store?.name,
     createdBy: sale.createdBy?.name,
     totalAmount: sale.totalAmount,
+    customerName: sale.customerName,
+    customerPhone: sale.customerPhone,
+    customerGstin: sale.customerGstin,
     createdAt: sale.createdAt,
     lines: sale.lines?.map((l) => ({
       id: l.id,
@@ -77,7 +80,7 @@ router.get('/:id', async (req, res) => {
 // store; Admin/Manager may bill on behalf of any store. Rejects the whole
 // bill if any line would oversell the day's available stock.
 router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
-  const { date, lines } = req.body;
+  const { date, lines, customerName, customerPhone, customerGstin } = req.body;
   const storeId =
     req.user.role === 'SALES'
       ? Number(req.body.storeId) || req.user.storeIds[0]
@@ -144,6 +147,9 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
           storeId,
           createdById: req.user.id,
           totalAmount,
+          customerName: customerName?.trim() || null,
+          customerPhone: customerPhone?.trim() || null,
+          customerGstin: customerGstin?.trim() || null,
           lines: { create: preparedLines },
         },
         include: { store: true, createdBy: true, lines: { include: { product: true } } },

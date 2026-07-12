@@ -1,50 +1,34 @@
 import React, { useState } from 'react';
-import { Printer, Share2, MessageCircle, Check } from 'lucide-react';
+import { Printer, Share2, MessageCircle, Check, Copy, FileDown } from 'lucide-react';
 import { formatCurrency } from '../lib/format';
 import { RETURN_REASONS } from '../lib/returnReasons';
+import { BUSINESS_INFO } from '../lib/businessInfo';
+import { buildInvoiceShareText, downloadInvoicePdf } from '../lib/invoice';
 import logoIcon from '../assets/grillexa-icon.png';
 
 const REASON_LABEL = Object.fromEntries(RETURN_REASONS.map((r) => [r.value, r.label]));
 
-function buildBillText(title, bill, hideCreatedBy) {
-  const lines = bill.lines.map((l) => {
-    const isReturn = l.type === 'RETURN';
-    return `${isReturn ? 'RETURN — ' : ''}${l.product} x${l.quantity} @ ₹${l.unitPrice.toFixed(2)} = ${formatCurrency(isReturn ? -l.amount : l.amount)}`;
-  });
-  return [
-    `Grillexa – ${title}`,
-    `Bill #: ${bill.number}`,
-    `Date: ${bill.date}`,
-    `Store: ${bill.store}`,
-    ...(!hideCreatedBy && bill.createdBy ? [`By: ${bill.createdBy}`] : []),
-    '',
-    ...lines,
-    '',
-    `Total: ${formatCurrency(bill.totalAmount)}`,
-  ].join('\n');
-}
-
 export default function BillDetailModal({ title, bill, onClose, hideCreatedBy }) {
   const hasReturns = bill.lines.some((l) => l.type === 'RETURN');
   const [copied, setCopied] = useState(false);
+  const b = BUSINESS_INFO;
+
+  async function copyInvoice() {
+    await navigator.clipboard.writeText(buildInvoiceShareText(title, bill, hideCreatedBy));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   function shareWhatsApp() {
-    const text = buildBillText(title, bill, hideCreatedBy);
+    const text = buildInvoiceShareText(title, bill, hideCreatedBy);
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   }
 
   async function shareGeneric() {
-    const text = buildBillText(title, bill, hideCreatedBy);
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: `${title} ${bill.number}`, text });
-      } catch (err) {
-        // user dismissed the share sheet — nothing to do
-      }
-    } else if (navigator.clipboard) {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.share({ title: `${title} ${bill.number}`, text: buildInvoiceShareText(title, bill, hideCreatedBy) });
+    } catch (err) {
+      // user dismissed the native share sheet — nothing to do
     }
   }
 
@@ -53,8 +37,13 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy })
       <div className="modal bill-modal" onClick={(e) => e.stopPropagation()}>
         <div className="bill-brand">
           <img src={logoIcon} alt="" className="bill-brand-icon" />
-          <span>Grillexa</span>
+          <div>
+            <div className="bill-brand-name">🥗 {b.name}</div>
+            {b.tagline && <div className="bill-brand-tagline">{b.tagline}</div>}
+          </div>
         </div>
+
+        <div className="bill-official-tag">OFFICIAL INVOICE</div>
 
         <div className="bill-header">
           <div>
@@ -67,6 +56,14 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy })
             {!hideCreatedBy && <div><strong>By:</strong> {bill.createdBy}</div>}
           </div>
         </div>
+
+        {(bill.customerName || bill.customerPhone || bill.customerGstin) && (
+          <div className="bill-customer">
+            {bill.customerName && <div><strong>Customer:</strong> {bill.customerName}</div>}
+            {bill.customerPhone && <div><strong>Phone:</strong> {bill.customerPhone}</div>}
+            {bill.customerGstin && <div><strong>GSTIN:</strong> {bill.customerGstin}</div>}
+          </div>
+        )}
 
         <div className="table-scroll">
         <table className="data-table">
@@ -98,17 +95,43 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy })
 
         <div className="bill-total">Total: {formatCurrency(bill.totalAmount)}</div>
 
+        <div className="bill-footer">
+          {(b.gstin || b.fssai) && (
+            <div>
+              {b.gstin && <span>GSTIN: {b.gstin}</span>}
+              {b.gstin && b.fssai && ' · '}
+              {b.fssai && <span>FSSAI Lic. No: {b.fssai}</span>}
+            </div>
+          )}
+          {b.addressLines.map((line) => <div key={line}>{line}</div>)}
+          {(b.phone || b.email || b.website || b.instagram) && (
+            <div className="bill-footer-contacts">
+              {[b.phone, b.email, b.website, b.instagram].filter(Boolean).join('  ·  ')}
+            </div>
+          )}
+          <div className="bill-thankyou">🙏 Thank you for shopping with us!</div>
+          <div className="bill-disclaimer">This is a system-generated invoice.</div>
+        </div>
+
         <div className="modal-actions no-print">
           <button type="button" className="btn-secondary" onClick={() => window.print()}>
-            <Printer size={16} strokeWidth={2} /> Print / PDF
+            <Printer size={16} strokeWidth={2} /> Print
+          </button>
+          <button type="button" className="btn-secondary" onClick={() => downloadInvoicePdf(title, bill, hideCreatedBy).catch(console.error)}>
+            <FileDown size={16} strokeWidth={2} /> Download PDF
+          </button>
+          <button type="button" className="btn-secondary" onClick={copyInvoice}>
+            {copied ? <Check size={16} strokeWidth={2} /> : <Copy size={16} strokeWidth={2} />}
+            {copied ? 'Copied' : 'Copy Invoice'}
           </button>
           <button type="button" className="btn-secondary" onClick={shareWhatsApp}>
             <MessageCircle size={16} strokeWidth={2} /> WhatsApp
           </button>
-          <button type="button" className="btn-secondary" onClick={shareGeneric}>
-            {copied ? <Check size={16} strokeWidth={2} /> : <Share2 size={16} strokeWidth={2} />}
-            {copied ? 'Copied' : 'Share'}
-          </button>
+          {typeof navigator !== 'undefined' && navigator.share && (
+            <button type="button" className="btn-secondary" onClick={shareGeneric}>
+              <Share2 size={16} strokeWidth={2} /> Share
+            </button>
+          )}
           <button type="button" className="btn-primary" onClick={onClose}>
             Close
           </button>
