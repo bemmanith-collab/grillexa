@@ -1,7 +1,7 @@
 import React from 'react';
 
 function emptyLine(products) {
-  return { productId: products[0]?.id || '', quantity: '', unitPrice: '' };
+  return { productId: products[0]?.id || '', quantity: '', unitPrice: products[0]?.price != null ? products[0].price : '' };
 }
 
 export default function LineItemsForm({ products, lines, setLines }) {
