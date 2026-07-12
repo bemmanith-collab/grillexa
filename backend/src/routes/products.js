@@ -7,10 +7,11 @@ const router = express.Router();
 
 router.use(authenticate);
 
-// Product catalog (name/sku/price/reorder threshold). Actual quantities live
-// per-store-per-day in the DailyStockEntry ledger — see routes/stock.js.
-// Financial data (price) is stripped for Sales at the API layer, not just
-// hidden in the UI, so the restriction can't be bypassed by calling the API directly.
+// Product catalog (name/sku/price/cost/reorder threshold). Actual quantities
+// live per-store-per-day in the DailyStockEntry ledger — see routes/stock.js.
+// Financial data (price, costPrice) is stripped for Sales at the API layer,
+// not just hidden in the UI, so the restriction can't be bypassed by calling
+// the API directly. costPrice is margin-sensitive so it's held to the same bar.
 function shapeProduct(product, role) {
   const base = {
     id: product.id,
@@ -20,6 +21,7 @@ function shapeProduct(product, role) {
   };
   if (role !== 'SALES') {
     base.price = product.price;
+    base.costPrice = product.costPrice;
   }
   return base;
 }
@@ -30,7 +32,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
-  const { name, sku, threshold, price } = req.body;
+  const { name, sku, threshold, price, costPrice } = req.body;
   if (!name || !sku) {
     return res.status(400).json({ error: 'name and sku are required' });
   }
@@ -41,6 +43,7 @@ router.post('/', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
         sku,
         threshold: threshold != null ? Number(threshold) : 10,
         price: price != null ? Number(price) : 0,
+        costPrice: costPrice != null ? Number(costPrice) : 0,
       },
     });
     res.status(201).json({ product: shapeProduct(product, req.user.role) });
@@ -54,7 +57,7 @@ router.post('/', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
 
 router.patch('/:id', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
   const id = Number(req.params.id);
-  const { name, sku, threshold, price } = req.body;
+  const { name, sku, threshold, price, costPrice } = req.body;
   try {
     const product = await prisma.product.update({
       where: { id },
@@ -63,6 +66,7 @@ router.patch('/:id', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
         ...(sku !== undefined && { sku }),
         ...(threshold !== undefined && { threshold: Number(threshold) }),
         ...(price !== undefined && { price: Number(price) }),
+        ...(costPrice !== undefined && { costPrice: Number(costPrice) }),
       },
     });
     res.json({ product: shapeProduct(product, req.user.role) });

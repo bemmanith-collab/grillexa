@@ -43,6 +43,60 @@ router.get('/summary', async (req, res) => {
   });
 });
 
+// Profit & loss over a trailing window: revenue and cost of goods sold from
+// every SaleLine (RETURN lines subtract, since they give back both the sale
+// amount and its cost), combined and broken out per store.
+router.get('/pnl', async (req, res) => {
+  const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365);
+  const to = new Date();
+  to.setUTCHours(0, 0, 0, 0);
+  const from = new Date(to);
+  from.setUTCDate(from.getUTCDate() - (days - 1));
+
+  const [saleLines, stores] = await Promise.all([
+    prisma.saleLine.findMany({
+      where: { sale: { date: { gte: from, lte: to } } },
+      include: { sale: true, product: true },
+    }),
+    prisma.store.findMany({ orderBy: { name: 'asc' } }),
+  ]);
+
+  const byStore = new Map();
+  function bucket(storeId) {
+    if (!byStore.has(storeId)) byStore.set(storeId, { revenue: 0, cogs: 0 });
+    return byStore.get(storeId);
+  }
+
+  let overallRevenue = 0;
+  let overallCogs = 0;
+  for (const line of saleLines) {
+    const sign = line.type === 'RETURN' ? -1 : 1;
+    const revenue = sign * line.amount;
+    const cogs = sign * (line.product?.costPrice || 0) * line.quantity;
+    overallRevenue += revenue;
+    overallCogs += cogs;
+    const b = bucket(line.sale.storeId);
+    b.revenue += revenue;
+    b.cogs += cogs;
+  }
+
+  function shape(revenue, cogs) {
+    const profit = revenue - cogs;
+    return { revenue, cogs, profit, marginPct: revenue !== 0 ? (profit / revenue) * 100 : 0 };
+  }
+
+  res.json({
+    days,
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+    overall: shape(overallRevenue, overallCogs),
+    stores: stores.map((s) => {
+      const b = byStore.get(s.id) || { revenue: 0, cogs: 0 };
+      return { storeId: s.id, store: s.name, ...shape(b.revenue, b.cogs) };
+    }),
+  });
+});
+
 // Per-store, per-product sales performance over a trailing window, with a
 // simple recommendation (increase / maintain / decrease supply) based on
 // sell-through rate (sold ÷ received) and wastage rate.

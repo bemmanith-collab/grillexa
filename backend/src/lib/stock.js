@@ -35,21 +35,17 @@ async function getOrCreateDailyEntry(tx, storeId, productId, date) {
 }
 
 // Applies a delta (positive or negative) to received/sold/wastage for a
-// given day, recomputes closing, and rejects if that would make closing
-// stock negative (e.g. selling more than is actually available).
+// given day and recomputes closing. Billing (Sales/Returns) is intentionally
+// decoupled from inventory enforcement — a bill is never rejected for
+// insufficient recorded stock, so closing can go negative when stock wasn't
+// (yet) dispatched/recorded. The movement is still written to the ledger so
+// history is preserved if strict inventory tracking is turned back on later.
 async function adjustStock(tx, { storeId, productId, date, receivedDelta = 0, soldDelta = 0, wastageDelta = 0 }) {
   const entry = await getOrCreateDailyEntry(tx, storeId, productId, date);
   const received = entry.received + receivedDelta;
   const sold = entry.sold + soldDelta;
   const wastage = entry.wastage + wastageDelta;
   const closing = entry.opening + received - sold - wastage;
-
-  if (closing < 0) {
-    const available = entry.opening + entry.received - entry.sold - entry.wastage;
-    const err = new Error(`Insufficient stock for product ${productId}: ${available} available, ${soldDelta + wastageDelta} requested`);
-    err.status = 400;
-    throw err;
-  }
 
   return tx.dailyStockEntry.update({
     where: { id: entry.id },

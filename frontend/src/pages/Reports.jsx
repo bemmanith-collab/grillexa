@@ -3,6 +3,7 @@ import client from '../api/client';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { AlertIcon } from '../components/icons';
+import { formatCurrency } from '../lib/format';
 
 const RECOMMENDATION_LABEL = {
   INCREASE: 'Increase Supply',
@@ -20,6 +21,7 @@ const RECOMMENDATION_CLASS = {
 
 export default function Reports() {
   const [summary, setSummary] = useState(null);
+  const [pnl, setPnl] = useState(null);
   const [recommendations, setRecommendations] = useState(null);
   const [days, setDays] = useState(30);
   const [error, setError] = useState('');
@@ -33,35 +35,54 @@ export default function Reports() {
 
   useEffect(() => {
     client
+      .get('/reports/pnl', { params: { days } })
+      .then((res) => setPnl(res.data))
+      .catch(() => setError('Failed to load profit & loss.'));
+  }, [days]);
+
+  useEffect(() => {
+    client
       .get('/reports/recommendations', { params: { days } })
       .then((res) => setRecommendations(res.data))
       .catch(() => setError('Failed to load recommendations.'));
   }, [days]);
 
   if (error) return <div className="page"><div className="form-error">{error}</div></div>;
-  if (!summary || !recommendations) return <Spinner label="Loading reports…" />;
+  if (!summary || !pnl || !recommendations) return <Spinner label="Loading reports…" />;
 
   return (
     <div className="page">
       <div className="page-header">
         <div>
           <h1>Reports</h1>
-          <p className="page-subtitle">Today: {summary.date} · {summary.storesReporting} stores reporting</p>
+          <p className="page-subtitle">
+            {pnl.from} – {pnl.to} · {summary.storesReporting} stores reporting
+          </p>
         </div>
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
+          <option value={7}>Last 7 days</option>
+          <option value={14}>Last 14 days</option>
+          <option value={30}>Last 30 days</option>
+          <option value={90}>Last 90 days</option>
+        </select>
       </div>
 
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-value">₹{summary.salesRevenueToday.toFixed(2)}</div>
-          <div className="stat-label">Sales Revenue Today</div>
+          <div className="stat-value">{formatCurrency(pnl.overall.revenue)}</div>
+          <div className="stat-label">Revenue</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{summary.totalSoldToday}</div>
-          <div className="stat-label">Units Sold Today</div>
+          <div className="stat-value">{formatCurrency(pnl.overall.cogs)}</div>
+          <div className="stat-label">Cost of Goods Sold</div>
+        </div>
+        <div className={`stat-card${pnl.overall.profit < 0 ? ' stat-card-alert' : ''}`}>
+          <div className="stat-value">{formatCurrency(pnl.overall.profit)}</div>
+          <div className="stat-label">Profit</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{summary.totalClosingStock}</div>
-          <div className="stat-label">Total Stock On Hand</div>
+          <div className="stat-value">{pnl.overall.revenue !== 0 ? `${pnl.overall.marginPct.toFixed(1)}%` : '—'}</div>
+          <div className="stat-label">Profit Margin</div>
         </div>
         <div className={`stat-card${summary.lowStockCount > 0 ? ' stat-card-alert' : ''}`}>
           <div className="stat-value">{summary.lowStockCount}</div>
@@ -69,7 +90,42 @@ export default function Reports() {
         </div>
       </div>
 
-      <h2 className="section-title">Low Stock Today</h2>
+      <h2 className="section-title">Profit &amp; Loss by Store</h2>
+      <div className="card">
+        <div className="table-scroll">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Store</th>
+              <th>Revenue</th>
+              <th>COGS</th>
+              <th>Profit</th>
+              <th>Margin</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pnl.stores.map((s) => (
+              <tr key={s.storeId}>
+                <td className="cell-strong">{s.store}</td>
+                <td>{formatCurrency(s.revenue)}</td>
+                <td>{formatCurrency(s.cogs)}</td>
+                <td className={s.profit < 0 ? 'text-danger' : undefined}>{formatCurrency(s.profit)}</td>
+                <td>{s.revenue !== 0 ? `${s.marginPct.toFixed(1)}%` : '—'}</td>
+              </tr>
+            ))}
+            {pnl.stores.length === 0 && (
+              <tr>
+                <td colSpan={5}>
+                  <EmptyState icon={AlertIcon} message="No stores yet." />
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        </div>
+      </div>
+
+      <h2 className="section-title" style={{ marginTop: 28 }}>Low Stock Today</h2>
       <div className="card">
         <div className="table-scroll">
         <table className="data-table">
@@ -102,17 +158,7 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="page-header" style={{ marginTop: 28 }}>
-        <h2 className="section-title" style={{ margin: 0 }}>
-          Product Recommendations by Store
-        </h2>
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
-          <option value={7}>Last 7 days</option>
-          <option value={14}>Last 14 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
-        </select>
-      </div>
+      <h2 className="section-title" style={{ marginTop: 28 }}>Product Recommendations by Store</h2>
 
       <div className="store-report-grid">
         {recommendations.stores.map((store) => (

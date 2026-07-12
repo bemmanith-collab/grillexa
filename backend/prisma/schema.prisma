@@ -52,6 +52,9 @@ model Product {
   name      String
   sku       String   @unique
   price     Float    @default(0)
+  // What it costs to stock this product — distinct from the selling price
+  // above. Drives the Profit & Loss report (profit = price - costPrice).
+  costPrice Float    @default(0)
   // Company-wide default reorder point; used to flag a store's closing stock as low.
   threshold Int      @default(10)
   createdAt DateTime @default(now())
