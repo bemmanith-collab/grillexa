@@ -2,12 +2,14 @@ const express = require('express');
 const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
-const { normalizeDate, adjustStock } = require('../lib/stock');
+const { normalizeDate, adjustStock, processReturn } = require('../lib/stock');
 const { assertStoreAccess } = require('../lib/scope');
 
 const router = express.Router();
 
 router.use(authenticate);
+
+const RETURN_REASONS = ['CUSTOMER_RETURN', 'DAMAGED', 'EXCHANGE', 'OTHER'];
 
 function shapeSale(sale) {
   return {
@@ -26,6 +28,8 @@ function shapeSale(sale) {
       quantity: l.quantity,
       unitPrice: l.unitPrice,
       amount: l.amount,
+      type: l.type,
+      reason: l.reason,
     })),
   };
 }
@@ -89,6 +93,9 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
     if (!line.productId || !Number.isFinite(Number(line.quantity)) || Number(line.quantity) <= 0) {
       return res.status(400).json({ error: 'Each line needs a productId and a positive quantity' });
     }
+    if (line.type === 'RETURN' && !RETURN_REASONS.includes(line.reason)) {
+      return res.status(400).json({ error: `Return lines need a reason (one of ${RETURN_REASONS.join(', ')})` });
+    }
   }
 
   try {
@@ -114,17 +121,20 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
         quantity: Number(l.quantity),
         unitPrice: Number(l.unitPrice) || 0,
         amount: Number(l.quantity) * (Number(l.unitPrice) || 0),
+        type: l.type === 'RETURN' ? 'RETURN' : 'SALE',
+        reason: l.type === 'RETURN' ? l.reason : null,
       }));
-      const totalAmount = preparedLines.reduce((sum, l) => sum + l.amount, 0);
+      // A RETURN line credits the customer back, so it subtracts from the bill total.
+      const totalAmount = preparedLines.reduce((sum, l) => sum + (l.type === 'RETURN' ? -l.amount : l.amount), 0);
 
-      // Validate stock availability for every line before writing anything.
+      // Apply stock movement for every line before writing anything: sale
+      // lines deduct, return lines credit back (also validates availability).
       for (const line of preparedLines) {
-        await adjustStock(tx, {
-          storeId,
-          productId: line.productId,
-          date: normalizedDate,
-          soldDelta: line.quantity,
-        });
+        if (line.type === 'RETURN') {
+          await processReturn(tx, { storeId, productId: line.productId, date: normalizedDate, quantity: line.quantity });
+        } else {
+          await adjustStock(tx, { storeId, productId: line.productId, date: normalizedDate, soldDelta: line.quantity });
+        }
       }
 
       const created = await tx.sale.create({
@@ -138,6 +148,22 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
         },
         include: { store: true, createdBy: true, lines: { include: { product: true } } },
       });
+
+      // Audit ledger: one Return row per RETURN line, referencing this bill.
+      const returnLines = preparedLines.filter((l) => l.type === 'RETURN');
+      if (returnLines.length > 0) {
+        await tx.return.createMany({
+          data: returnLines.map((l) => ({
+            date: normalizedDate,
+            storeId,
+            productId: l.productId,
+            quantity: l.quantity,
+            reason: l.reason,
+            reference: `SL-${String(created.id).padStart(6, '0')}`,
+            createdById: req.user.id,
+          })),
+        });
+      }
 
       return tx.sale.update({
         where: { id: created.id },

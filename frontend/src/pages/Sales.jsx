@@ -6,6 +6,7 @@ import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { ReceiptIcon } from '../components/icons';
+import { formatCurrency } from '../lib/format';
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -61,7 +62,13 @@ export default function Sales() {
     setError('');
     const cleanLines = lines
       .filter((l) => l.productId && Number(l.quantity) > 0)
-      .map((l) => ({ productId: Number(l.productId), quantity: Number(l.quantity), unitPrice: Number(l.unitPrice) || 0 }));
+      .map((l) => ({
+        productId: Number(l.productId),
+        quantity: Number(l.quantity),
+        unitPrice: Number(l.unitPrice) || 0,
+        type: l.type === 'RETURN' ? 'RETURN' : 'SALE',
+        reason: l.type === 'RETURN' ? l.reason : undefined,
+      }));
     if (!storeId || cleanLines.length === 0) {
       setError('Pick a store and at least one product line with a quantity.');
       return;
@@ -95,7 +102,7 @@ export default function Sales() {
       <div className="page-header">
         <div>
           <h1>Sales</h1>
-          <p className="page-subtitle">Retail bills issued to customers</p>
+          <p className="page-subtitle">Retail bills issued to customers — add a Return line to credit stock back in the same bill</p>
         </div>
         <button className="btn-primary" onClick={() => setFormOpen((v) => !v)} disabled={noStoresAssigned}>
           {formOpen ? 'Cancel' : '+ New Sale'}
@@ -162,7 +169,7 @@ export default function Sales() {
                   <td>{s.date}</td>
                   {showStorePicker && <td>{s.store}</td>}
                   {!isScoped && <td>{s.createdBy}</td>}
-                  <td>₹{s.totalAmount.toFixed(2)}</td>
+                  <td>{formatCurrency(s.totalAmount)}</td>
                   <td className="actions-cell">
                     <button className="btn-secondary btn-sm" onClick={() => openDetail(s.id)}>
                       View

@@ -1,11 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Package, CheckCircle2, XCircle, AlertTriangle, Search, RotateCcw } from 'lucide-react';
+import { Package, CheckCircle2, XCircle, AlertTriangle, Search } from 'lucide-react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import WastageModal from '../components/WastageModal';
 import StockDetailModal from '../components/StockDetailModal';
-import ReturnStockModal from '../components/ReturnStockModal';
-import Toast from '../components/Toast';
 import DailyWisdom from '../components/DailyWisdom';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
@@ -64,8 +62,6 @@ export default function Inventory() {
   const [detailEntry, setDetailEntry] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [returnModalOpen, setReturnModalOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
     if (isScoped) return;
@@ -110,12 +106,6 @@ export default function Inventory() {
     }));
   }
 
-  async function handleReturnSubmit({ productId, quantity, reason, reference }) {
-    await client.post('/returns', { storeId: Number(storeId), productId, quantity, reason, reference });
-    await load(storeId);
-    setToastMessage('Return processed successfully!');
-  }
-
   const lowCount = data?.entries.filter((e) => e.status !== 'OK').length || 0;
   const totalClosing = data?.entries.reduce((sum, e) => sum + e.closing, 0) || 0;
   const totalSold = data?.entries.reduce((sum, e) => sum + e.sold, 0) || 0;
@@ -134,8 +124,6 @@ export default function Inventory() {
       return true;
     });
   }, [data, search, statusFilter]);
-
-  const productOptions = data ? data.entries.map((e) => ({ id: e.productId, name: e.product })) : [];
 
   return (
     <div className="page">
@@ -157,15 +145,6 @@ export default function Inventory() {
               ))}
             </select>
           )}
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={productOptions.length === 0}
-            onClick={() => setReturnModalOpen(true)}
-          >
-            <RotateCcw size={16} strokeWidth={2} />
-            Return Stock
-          </button>
         </div>
       </div>
 
@@ -314,15 +293,6 @@ export default function Inventory() {
         />
       )}
 
-      {returnModalOpen && (
-        <ReturnStockModal
-          products={productOptions}
-          onClose={() => setReturnModalOpen(false)}
-          onSubmit={handleReturnSubmit}
-        />
-      )}
-
-      <Toast message={toastMessage} onDone={() => setToastMessage('')} />
     </div>
   );
 }

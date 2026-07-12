@@ -499,6 +499,19 @@ select {
   font-weight: 600;
 }
 
+.text-danger {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.cell-muted {
+  color: var(--text-muted);
+}
+
+.line-return {
+  background: var(--danger-soft);
+}
+
 /* ---------- Stat cards ---------- */
 
 .stat-grid {

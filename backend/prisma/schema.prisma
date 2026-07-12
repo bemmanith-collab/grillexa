@@ -125,6 +125,11 @@ model Sale {
   lines SaleLine[]
 }
 
+// type: "SALE" | "RETURN". A RETURN line credits its quantity back to stock
+// instead of deducting it, and its amount is subtracted from the sale's
+// totalAmount instead of added — this is what lets one bill cover both a
+// sale and a same-visit return/exchange. reason mirrors Return.reason and
+// is only set when type = "RETURN".
 model SaleLine {
   id        Int     @id @default(autoincrement())
   saleId    Int
@@ -134,12 +139,13 @@ model SaleLine {
   quantity  Int
   unitPrice Float
   amount    Float
+  type      String  @default("SALE")
+  reason    String?
 }
 
 // reason: "CUSTOMER_RETURN" | "DAMAGED" | "EXCHANGE" | "OTHER"
-// A customer return/exchange processed at a store. Unlike Sale/DispatchInvoice
-// this is single-product (matches the simple "Return Stock" modal — one
-// product, one quantity, one reason per return) rather than a multi-line bill.
+// An audit ledger row, written automatically whenever a Sale is created with
+// a RETURN-type line (see SaleLine.type) — one row per returned product.
 model Return {
   id          Int      @id @default(autoincrement())
   date        DateTime

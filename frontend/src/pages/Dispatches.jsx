@@ -109,7 +109,7 @@ export default function Dispatches() {
                 <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
               </label>
             </div>
-            <LineItemsForm products={products} lines={lines} setLines={setLines} />
+            <LineItemsForm products={products} lines={lines} setLines={setLines} allowReturns={false} />
             <div className="modal-actions">
               <button type="submit" className="btn-primary" disabled={submitting}>
                 {submitting ? 'Creating…' : 'Create Dispatch Invoice'}
