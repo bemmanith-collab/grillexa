@@ -51,6 +51,15 @@ router.get('/', async (req, res) => {
     : req.user.role === 'SALES'
     ? { storeId: { in: req.user.storeIds } }
     : {};
+
+  if (req.query.date) {
+    try {
+      where.date = normalizeDate(req.query.date);
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  }
+
   const sales = await prisma.sale.findMany({
     where,
     include: { store: true, createdBy: true, lines: { include: { product: true } } },

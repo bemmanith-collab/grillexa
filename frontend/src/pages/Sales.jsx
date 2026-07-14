@@ -21,7 +21,6 @@ export default function Sales() {
   const [stores, setStores] = useState(isScoped ? myStores : []);
   const [products, setProducts] = useState([]);
   const [sales, setSales] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [storeId, setStoreId] = useState(isScoped ? myStores[0]?.id || '' : '');
@@ -32,33 +31,48 @@ export default function Sales() {
   const [lines, setLines] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [dateFilter, setDateFilter] = useState('');
+  const [salesLoading, setSalesLoading] = useState(true);
 
-  async function loadAll() {
-    setLoading(true);
+  async function loadProductsAndStores() {
     setError('');
     try {
-      const requests = [client.get('/products'), client.get('/sales')];
+      const requests = [client.get('/products')];
       if (!isScoped) requests.unshift(client.get('/stores'));
       const results = await Promise.all(requests);
       const productsRes = isScoped ? results[0] : results[1];
-      const salesRes = isScoped ? results[1] : results[2];
       if (!isScoped) {
         setStores(results[0].data.stores);
         setStoreId((current) => current || results[0].data.stores[0]?.id || '');
       }
       setProducts(productsRes.data.products);
-      setSales(salesRes.data.sales);
       setLines((current) => (current.length ? current : [emptyLine(productsRes.data.products)]));
     } catch (err) {
       setError('Failed to load sales data.');
+    }
+  }
+
+  async function loadSales() {
+    setSalesLoading(true);
+    setError('');
+    try {
+      const params = dateFilter ? { date: dateFilter } : {};
+      const res = await client.get('/sales', { params });
+      setSales(res.data.sales);
+    } catch (err) {
+      setError('Failed to load sales data.');
     } finally {
-      setLoading(false);
+      setSalesLoading(false);
     }
   }
 
   useEffect(() => {
-    loadAll();
+    loadProductsAndStores();
   }, []);
+
+  useEffect(() => {
+    loadSales();
+  }, [dateFilter]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -91,7 +105,13 @@ export default function Sales() {
       setCustomerPhone('');
       setCustomerGstin('');
       setFormOpen(false);
-      loadAll();
+      // Jump the date filter to the bill's date so the new bill is visible
+      // immediately, even if you were viewing a different day.
+      if (dateFilter === date) {
+        loadSales();
+      } else {
+        setDateFilter(date);
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create sale.');
     } finally {
@@ -180,7 +200,19 @@ export default function Sales() {
         </div>
       )}
 
-      {loading ? (
+      <div className="page-header">
+        <h2 className="section-title" style={{ margin: 0 }}>Bill History</h2>
+        <div className="inline-form">
+          <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} />
+          {dateFilter && (
+            <button type="button" className="btn-secondary btn-sm" onClick={() => setDateFilter('')}>
+              All dates
+            </button>
+          )}
+        </div>
+      </div>
+
+      {salesLoading ? (
         <Spinner label="Loading sales…" />
       ) : (
         <div className="card">
@@ -214,7 +246,10 @@ export default function Sales() {
               {sales.length === 0 && (
                 <tr>
                   <td colSpan={isScoped ? 5 : 6}>
-                    <EmptyState icon={ReceiptIcon} message="No sales recorded yet." />
+                    <EmptyState
+                      icon={ReceiptIcon}
+                      message={dateFilter ? 'No sales on this date.' : 'No sales recorded yet.'}
+                    />
                   </td>
                 </tr>
               )}
