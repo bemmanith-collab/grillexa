@@ -74,9 +74,21 @@ export function buildInvoiceShareText(title, bill, hideCreatedBy) {
   return ['```', block, '```', ...(contactLines.length ? ['', ...contactLines] : [])].join('\n');
 }
 
-// A properly laid-out PDF (drawn borders, not ASCII art) using the same data.
-// jsPDF is loaded on demand so it doesn't add weight to the main bundle for
-// people who never click "Download PDF".
+// jsPDF's built-in fonts (Helvetica/Courier) are WinAnsi-only and have no ₹
+// glyph — it renders as a broken superscript and throws off text-width
+// calculations, clipping the digits after it. Use "Rs." in the PDF only;
+// the WhatsApp text and on-screen views keep ₹ since those render with a
+// real Unicode font.
+function formatCurrencyPdf(amount) {
+  const value = Number(amount) || 0;
+  return value < 0 ? `-Rs.${Math.abs(value).toFixed(2)}` : `Rs.${value.toFixed(2)}`;
+}
+
+// Mirrors the WhatsApp text invoice's look: a double-ruled box around the
+// store name, a monospace (Courier) typeface throughout, and dashed rules
+// around the item list — rather than the helvetica/table layout a normal
+// PDF invoice would use. jsPDF is loaded on demand so it doesn't add weight
+// to the main bundle for people who never click "Download PDF".
 export async function downloadInvoicePdf(title, bill, hideCreatedBy) {
   const { jsPDF } = await import('jspdf');
   const b = BUSINESS_INFO;
@@ -84,107 +96,116 @@ export async function downloadInvoicePdf(title, bill, hideCreatedBy) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 10;
   const innerWidth = pageWidth - margin * 2;
+  const center = pageWidth / 2;
   let y = margin;
 
+  const dashLine = (yy) => {
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(120, 120, 120);
+    doc.text('-'.repeat(Math.floor(innerWidth / 1.6)), center, yy, { align: 'center' });
+  };
+
+  // Double-ruled box around the store name, echoing the ╔═╗ WhatsApp header.
+  const boxTop = y;
+  const boxHeight = 12;
   doc.setDrawColor(230, 90, 30);
   doc.setLineWidth(0.6);
-  doc.rect(margin - 3, margin - 3, innerWidth + 6, doc.internal.pageSize.getHeight() - (margin - 3) * 2);
+  doc.rect(margin, boxTop, innerWidth, boxHeight);
+  doc.setLineWidth(0.25);
+  doc.rect(margin + 1.2, boxTop + 1.2, innerWidth - 2.4, boxHeight - 2.4);
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(16);
   doc.setTextColor(230, 90, 30);
-  doc.text(`🥗 ${b.name}`, pageWidth / 2, y + 6, { align: 'center' });
+  doc.text(`${b.name}`, center, boxTop + boxHeight / 2 + 2, { align: 'center' });
+  y = boxTop + boxHeight + 5;
 
   if (b.tagline) {
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('courier', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
-    doc.text(b.tagline, pageWidth / 2, y + 11, { align: 'center' });
+    doc.text(b.tagline, center, y, { align: 'center' });
+    y += 5;
   }
 
-  y += 16;
-  doc.setFillColor(230, 90, 30);
-  doc.rect(margin, y, innerWidth, 7, 'F');
-  doc.setFont('helvetica', 'bold');
+  doc.setFont('courier', 'bold');
   doc.setFontSize(11);
-  doc.setTextColor(255, 255, 255);
-  doc.text('OFFICIAL INVOICE', pageWidth / 2, y + 5, { align: 'center' });
-  y += 13;
+  doc.setTextColor(30, 30, 30);
+  doc.text('OFFICIAL INVOICE', center, y, { align: 'center' });
+  y += 8;
 
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('courier', 'normal');
   doc.setFontSize(9.5);
   doc.setTextColor(30, 30, 30);
-  const metaLeft = [`Invoice #: ${bill.number}`, `Date: ${bill.date}`, `Store: ${bill.store}`];
-  const metaRight = [
-    bill.customerName && `Customer: ${bill.customerName}`,
-    bill.customerPhone && `Phone: ${bill.customerPhone}`,
-    bill.customerGstin && `GSTIN: ${bill.customerGstin}`,
-    !hideCreatedBy && bill.createdBy && `Billed by: ${bill.createdBy}`,
-  ].filter(Boolean);
-  metaLeft.forEach((line, i) => doc.text(line, margin, y + i * 5));
-  metaRight.forEach((line, i) => doc.text(line, pageWidth - margin, y + i * 5, { align: 'right' }));
-  y += Math.max(metaLeft.length, metaRight.length) * 5 + 4;
+  const metaLines = [
+    `Invoice #: ${bill.number}`,
+    `Date: ${bill.date}`,
+    `Store: ${bill.store}`,
+    ...(bill.customerName ? [`Customer: ${bill.customerName}`] : []),
+    ...(bill.customerPhone ? [`Phone: ${bill.customerPhone}`] : []),
+    ...(bill.customerGstin ? [`GSTIN: ${bill.customerGstin}`] : []),
+    ...(!hideCreatedBy && bill.createdBy ? [`Billed by: ${bill.createdBy}`] : []),
+  ];
+  metaLines.forEach((line) => { doc.text(line, margin, y); y += 5; });
+  y += 2;
 
-  doc.setDrawColor(210, 210, 210);
-  doc.line(margin, y, pageWidth - margin, y);
+  dashLine(y);
   y += 6;
 
-  doc.setFont('helvetica', 'bold');
+  doc.setFont('courier', 'normal');
   doc.setFontSize(9.5);
-  const col = { product: margin, qty: margin + innerWidth * 0.55, price: margin + innerWidth * 0.7, amount: pageWidth - margin };
-  doc.text('Product', col.product, y);
-  doc.text('Qty', col.qty, y, { align: 'right' });
-  doc.text('Price', col.price, y, { align: 'right' });
-  doc.text('Amount', col.amount, y, { align: 'right' });
-  y += 2;
-  doc.setDrawColor(230, 90, 30);
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 5;
-
-  doc.setFont('helvetica', 'normal');
   bill.lines.forEach((l) => {
     const isReturn = l.type === 'RETURN';
     doc.setTextColor(isReturn ? 200 : 30, isReturn ? 40 : 30, isReturn ? 40 : 30);
-    const name = isReturn ? `${l.product} (Return)` : l.product;
-    doc.text(name, col.product, y, { maxWidth: innerWidth * 0.5 });
-    doc.text(String(l.quantity), col.qty, y, { align: 'right' });
-    doc.text(`₹${l.unitPrice.toFixed(2)}`, col.price, y, { align: 'right' });
-    doc.text(formatCurrency(isReturn ? -l.amount : l.amount), col.amount, y, { align: 'right' });
+    const amt = formatCurrencyPdf(isReturn ? -l.amount : l.amount);
+    const label = `${l.quantity}x ${l.product}${isReturn ? ' (Return)' : ''}`;
+    doc.text(label, margin, y, { maxWidth: innerWidth * 0.65 });
+    doc.text(amt, pageWidth - margin, y, { align: 'right' });
     y += 6;
   });
 
-  doc.setDrawColor(210, 210, 210);
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 6;
+  dashLine(y);
+  y += 7;
 
-  doc.setFont('helvetica', 'bold');
+  doc.setFont('courier', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(30, 30, 30);
-  doc.text('TOTAL', col.product, y);
-  doc.text(formatCurrency(bill.totalAmount), col.amount, y, { align: 'right' });
-  y += 10;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(90, 90, 90);
-  if (b.gstin) { doc.text(`GSTIN: ${b.gstin}`, margin, y); y += 4; }
-  if (b.fssai) { doc.text(`FSSAI Lic. No: ${b.fssai}`, margin, y); y += 4; }
-  b.addressLines.forEach((line) => { doc.text(line, margin, y); y += 4; });
-
-  const contacts = [b.phone, b.email, b.website, b.instagram].filter(Boolean).join('   |   ');
-  if (contacts) { y += 1; doc.text(contacts, margin, y); y += 4; }
-
-  y += 4;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(230, 90, 30);
-  doc.text('🙏 Thank you for shopping with us!', pageWidth / 2, y, { align: 'center' });
+  doc.text(`TOTAL: ${formatCurrencyPdf(bill.totalAmount)}`, center, y, { align: 'center' });
   y += 6;
 
-  doc.setFont('helvetica', 'italic');
+  dashLine(y);
+  y += 8;
+
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(90, 90, 90);
+  if (b.gstin) { doc.text(`GSTIN: ${b.gstin}`, center, y, { align: 'center' }); y += 4; }
+  if (b.fssai) { doc.text(`FSSAI Lic. No: ${b.fssai}`, center, y, { align: 'center' }); y += 4; }
+  b.addressLines.forEach((line) => { doc.text(line, center, y, { align: 'center' }); y += 4; });
+
+  const contacts = [b.phone, b.email, b.website, b.instagram].filter(Boolean).join('   |   ');
+  if (contacts) { y += 1; doc.text(contacts, center, y, { align: 'center' }); y += 4; }
+
+  y += 4;
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(230, 90, 30);
+  doc.text('Thank you for shopping with us!', center, y, { align: 'center' });
+  y += 5;
+
+  if (b.tagline) {
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text(b.tagline, center, y, { align: 'center' });
+    y += 6;
+  }
+
+  doc.setFont('courier', 'italic');
   doc.setFontSize(7);
   doc.setTextColor(140, 140, 140);
-  doc.text('This is a system-generated invoice.', pageWidth / 2, y, { align: 'center' });
+  doc.text('This is a system-generated invoice.', center, y, { align: 'center' });
 
   doc.save(`${bill.number}.pdf`);
 }
