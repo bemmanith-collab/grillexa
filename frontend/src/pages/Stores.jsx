@@ -1,16 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import client from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { StoreIcon } from '../components/icons';
 
 export default function Stores() {
+  const { user } = useAuth();
+  const isAdmin = user.role === 'ADMIN';
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState({ name: '', address: '' });
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   async function load() {
     setLoading(true);
@@ -42,6 +47,33 @@ export default function Stores() {
       setError(err.response?.data?.error || 'Failed to add store.');
     } finally {
       setCreating(false);
+    }
+  }
+
+  function startEdit(s) {
+    setEditingId(s.id);
+    setEditForm({ name: s.name, address: s.address || '' });
+  }
+
+  async function handleSaveEdit(id) {
+    setError('');
+    try {
+      await client.patch(`/stores/${id}`, { name: editForm.name, address: editForm.address });
+      setEditingId(null);
+      load();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update store.');
+    }
+  }
+
+  async function handleDelete(id, name) {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    setError('');
+    try {
+      await client.delete(`/stores/${id}`);
+      load();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete store.');
     }
   }
 
@@ -90,18 +122,61 @@ export default function Stores() {
               <tr>
                 <th>Name</th>
                 <th>Address</th>
+                {isAdmin && <th></th>}
               </tr>
             </thead>
             <tbody>
-              {stores.map((s) => (
-                <tr key={s.id}>
-                  <td className="cell-strong">{s.name}</td>
-                  <td>{s.address || '—'}</td>
-                </tr>
-              ))}
+              {stores.map((s) => {
+                const isEditing = editingId === s.id;
+                return (
+                  <tr key={s.id}>
+                    {isEditing ? (
+                      <>
+                        <td>
+                          <input
+                            className="line-input"
+                            value={editForm.name}
+                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            className="line-input"
+                            value={editForm.address}
+                            onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                          />
+                        </td>
+                        <td className="actions-cell">
+                          <button className="btn-secondary btn-sm" onClick={() => setEditingId(null)}>
+                            Cancel
+                          </button>
+                          <button className="btn-primary btn-sm" onClick={() => handleSaveEdit(s.id)}>
+                            Save
+                          </button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="cell-strong">{s.name}</td>
+                        <td>{s.address || '—'}</td>
+                        {isAdmin && (
+                          <td className="actions-cell">
+                            <button className="btn-secondary btn-sm" onClick={() => startEdit(s)}>
+                              Edit
+                            </button>
+                            <button className="btn-danger btn-sm" onClick={() => handleDelete(s.id, s.name)}>
+                              Delete
+                            </button>
+                          </td>
+                        )}
+                      </>
+                    )}
+                  </tr>
+                );
+              })}
               {stores.length === 0 && (
                 <tr>
-                  <td colSpan={2}>
+                  <td colSpan={isAdmin ? 3 : 2}>
                     <EmptyState icon={StoreIcon} message="No stores yet." />
                   </td>
                 </tr>

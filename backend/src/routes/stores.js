@@ -48,4 +48,17 @@ router.patch('/:id', requireRole('ADMIN'), async (req, res) => {
   }
 });
 
+router.delete('/:id', requireRole('ADMIN'), async (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    await prisma.store.delete({ where: { id } });
+    res.status(204).end();
+  } catch (err) {
+    if (err.code === 'P2003') {
+      return res.status(409).json({ error: 'Cannot delete a store with existing sales, dispatch, or stock history' });
+    }
+    res.status(404).json({ error: 'Store not found' });
+  }
+});
+
 module.exports = router;
