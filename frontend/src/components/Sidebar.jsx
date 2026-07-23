@@ -89,9 +89,7 @@ export default function Sidebar() {
 
         <nav className="sidebar-nav">
           <NavItem to="/" end icon={BarChart3} onNavigate={closeMenu}>Today's Stock</NavItem>
-          {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
-            <NavItem to="/deliver-to-store" icon={PackageCheck} onNavigate={closeMenu}>Deliver to Store</NavItem>
-          )}
+          <NavItem to="/deliver-to-store" icon={PackageCheck} onNavigate={closeMenu}>Deliver to Store</NavItem>
           <NavItem to="/settle-consignment" icon={Handshake} onNavigate={closeMenu}>Settle Consignment</NavItem>
           <NavItem to="/sales" icon={Banknote} onNavigate={closeMenu}>Sales</NavItem>
           {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
@@ -100,7 +98,9 @@ export default function Sidebar() {
           {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
             <NavItem to="/products" icon={Tag} onNavigate={closeMenu}>Products</NavItem>
           )}
-          <NavItem to="/stock-history" icon={ScrollText} onNavigate={closeMenu}>Stock History</NavItem>
+          {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
+            <NavItem to="/stock-history" icon={ScrollText} onNavigate={closeMenu}>Stock History</NavItem>
+          )}
           {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
             <NavItem to="/reports" icon={TrendingUp} onNavigate={closeMenu}>Reports</NavItem>
           )}

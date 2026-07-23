@@ -128,15 +128,29 @@ router.get('/:id', async (req, res) => {
 // no GST — it's a stock transfer HQ still owns until the store settles what
 // actually sold. Bumps both physical stock (received) and the consignment
 // marker (consignmentQty) for every line.
-router.post('/', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
-  const { storeId, date, lines, notes } = req.body;
-  if (!storeId || !date || !Array.isArray(lines) || lines.length === 0) {
-    return res.status(400).json({ error: 'storeId, date and at least one line are required' });
+router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
+  const { date, lines, notes } = req.body;
+  const storeId =
+    req.user.role === 'SALES'
+      ? Number(req.body.storeId) || req.user.storeIds[0]
+      : Number(req.body.storeId);
+
+  if (!storeId) {
+    return res.status(400).json({ error: req.user.role === 'SALES' ? 'Your account is not assigned to a store yet' : 'storeId is required' });
+  }
+  if (!date || !Array.isArray(lines) || lines.length === 0) {
+    return res.status(400).json({ error: 'date and at least one line are required' });
   }
   for (const line of lines) {
     if (!line.productId || !Number.isFinite(Number(line.quantity)) || Number(line.quantity) <= 0) {
       return res.status(400).json({ error: 'Each line needs a productId and a positive quantity' });
     }
+  }
+
+  try {
+    assertStoreAccess(req.user, storeId);
+  } catch (err) {
+    return res.status(err.status || 403).json({ error: err.message });
   }
 
   let normalizedDate;
@@ -146,7 +160,7 @@ router.post('/', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
     return res.status(400).json({ error: err.message });
   }
 
-  const store = await prisma.store.findUnique({ where: { id: Number(storeId) } });
+  const store = await prisma.store.findUnique({ where: { id: storeId } });
   if (!store) return res.status(404).json({ error: 'Store not found' });
 
   try {

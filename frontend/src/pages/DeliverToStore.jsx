@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import client from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import LineItemsForm, { emptyLine } from '../components/LineItemsForm';
 import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
@@ -32,13 +33,18 @@ function asBill(consignment) {
 }
 
 export default function DeliverToStore() {
-  const [stores, setStores] = useState([]);
+  const { user } = useAuth();
+  const isScoped = user.role === 'SALES';
+  const myStores = isScoped ? user.stores : [];
+  // A scoped user with just one store never needs to pick — same UX as Sales.
+  const showStorePicker = !isScoped || myStores.length > 1;
+  const [stores, setStores] = useState(isScoped ? myStores : []);
   const [products, setProducts] = useState([]);
   const [consignments, setConsignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formOpen, setFormOpen] = useState(false);
-  const [storeId, setStoreId] = useState('');
+  const [storeId, setStoreId] = useState(isScoped ? myStores[0]?.id || '' : '');
   const [date, setDate] = useState(todayStr());
   const [lines, setLines] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -48,15 +54,16 @@ export default function DeliverToStore() {
     setLoading(true);
     setError('');
     try {
-      const [storesRes, productsRes, consignmentsRes] = await Promise.all([
-        client.get('/stores'),
-        client.get('/products'),
-        client.get('/consignments'),
-      ]);
-      setStores(storesRes.data.stores);
+      const requests = [client.get('/products'), client.get('/consignments')];
+      if (!isScoped) requests.unshift(client.get('/stores'));
+      const results = await Promise.all(requests);
+      const [productsRes, consignmentsRes] = isScoped ? results : results.slice(1);
+      if (!isScoped) {
+        setStores(results[0].data.stores);
+        setStoreId((current) => current || results[0].data.stores[0]?.id || '');
+      }
       setProducts(productsRes.data.products);
       setConsignments(consignmentsRes.data.consignments);
-      setStoreId((current) => current || storesRes.data.stores[0]?.id || '');
       setLines((current) => (current.length ? current : [emptyLine(productsRes.data.products)]));
     } catch (err) {
       setError('Failed to load delivery data.');
@@ -67,6 +74,7 @@ export default function DeliverToStore() {
 
   useEffect(() => {
     loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSubmit(e) {
@@ -98,34 +106,53 @@ export default function DeliverToStore() {
     setDetail(res.data.consignment);
   }
 
+  const noStoresAssigned = isScoped && myStores.length === 0;
+  const singleStoreName = isScoped && myStores.length === 1 ? myStores[0].name : null;
+
   return (
     <div className="page">
       <div className="page-header">
         <div>
           <h1>Deliver to Store</h1>
-          <p className="page-subtitle">Stock sent to stores on consignment — not a sale until it's settled</p>
+          <p className="page-subtitle">
+            Stock sent to stores on consignment — not a sale until it's settled
+            {singleStoreName && <> · {singleStoreName}</>}
+          </p>
         </div>
-        <button className="btn-primary" onClick={() => setFormOpen((v) => !v)}>
+        <button className="btn-primary" onClick={() => setFormOpen((v) => !v)} disabled={noStoresAssigned}>
           {formOpen ? 'Cancel' : '+ New Delivery'}
         </button>
       </div>
 
       {error && <div className="form-error">{error}</div>}
+      {noStoresAssigned && (
+        <div className="form-error">Your account isn't assigned to a store yet. Ask an admin to assign one.</div>
+      )}
 
       {formOpen && (
         <div className="card form-card">
           <form onSubmit={handleSubmit}>
             <div className="bill-form-header">
-              <label>
-                Store
-                <select value={storeId} onChange={(e) => setStoreId(e.target.value)}>
-                  {stores.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {showStorePicker ? (
+                <label>
+                  Store
+                  <select value={storeId} onChange={(e) => setStoreId(e.target.value)}>
+                    {!isScoped && <option value="">Select a store…</option>}
+                    {stores.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                singleStoreName && (
+                  <label>
+                    Store
+                    <input type="text" value={singleStoreName} disabled />
+                  </label>
+                )
+              )}
               <label>
                 Delivery Date
                 <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -152,7 +179,7 @@ export default function DeliverToStore() {
                 <th>Consignment #</th>
                 <th>Delivered</th>
                 <th>Store</th>
-                <th>Delivered By</th>
+                {!isScoped && <th>Delivered By</th>}
                 <th>Status</th>
                 <th>Value</th>
                 <th></th>
@@ -164,7 +191,7 @@ export default function DeliverToStore() {
                   <td className="cell-mono">{c.consignmentNo}</td>
                   <td>{c.deliveredAt}</td>
                   <td>{c.store}</td>
-                  <td>{c.createdBy}</td>
+                  {!isScoped && <td>{c.createdBy}</td>}
                   <td>
                     <span className="badge">{c.status.replace('_', ' ')}</span>
                   </td>
@@ -178,7 +205,7 @@ export default function DeliverToStore() {
               ))}
               {consignments.length === 0 && (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={isScoped ? 6 : 7}>
                     <EmptyState icon={TruckIcon} message="No deliveries yet." />
                   </td>
                 </tr>
@@ -194,6 +221,7 @@ export default function DeliverToStore() {
           title="Consignment Note"
           bill={asBill(detail)}
           onClose={() => setDetail(null)}
+          hideCreatedBy={isScoped}
           documentOptions={{
             bandLabel: 'CONSIGNMENT NOTE — NOT A TAX INVOICE',
             numberLabel: 'Consignment #',

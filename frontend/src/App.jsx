@@ -50,7 +50,7 @@ export default function App() {
             <Route
               path="/stock-history"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute roles={['ADMIN', 'MANAGER']}>
                   <StockHistory />
                 </ProtectedRoute>
               }
@@ -66,7 +66,7 @@ export default function App() {
             <Route
               path="/deliver-to-store"
               element={
-                <ProtectedRoute roles={['ADMIN', 'MANAGER']}>
+                <ProtectedRoute>
                   <DeliverToStore />
                 </ProtectedRoute>
               }
