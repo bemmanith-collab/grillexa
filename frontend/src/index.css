@@ -319,6 +319,18 @@ select {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Page-level tables (Stores, Products, Users, …) can run to 50+ rows, which
+   used to push the "Add" button and page header off-screen and force
+   scrolling the whole page to reach the bottom row. Cap the table to a
+   viewport-relative height with its own scrollbar instead, so the header
+   and controls stay put on both phone and desktop. Scoped to `.page` so
+   modal-embedded tables (line items, bill details) — already bounded by
+   the modal's own scroll — aren't affected. */
+.page .table-scroll {
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+}
+
 .data-table thead th {
   text-align: left;
   font-weight: 600;
@@ -329,6 +341,9 @@ select {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   background: #fafafc;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .data-table tbody td {
@@ -1526,6 +1541,14 @@ button:disabled {
   .inline-form select,
   .inline-form button {
     width: 100%;
+  }
+
+  /* Smaller viewport + the sticky 56px topbar + a taller, wrapped page
+     header eat into the available height more than on desktop, so use a
+     bigger offset — but never let the table shrink to uselessness. */
+  .page .table-scroll {
+    max-height: calc(100vh - 320px);
+    min-height: 220px;
   }
 }
 
