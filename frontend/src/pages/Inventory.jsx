@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Package, CheckCircle2, XCircle, AlertTriangle, Search } from 'lucide-react';
+import { Package, CheckCircle2, XCircle, AlertTriangle, Search, Handshake, ReceiptText, Coins } from 'lucide-react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import WastageModal from '../components/WastageModal';
@@ -62,6 +62,7 @@ export default function Inventory() {
   const [detailEntry, setDetailEntry] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [pendingConsignments, setPendingConsignments] = useState([]);
 
   useEffect(() => {
     if (isScoped) return;
@@ -79,14 +80,18 @@ export default function Inventory() {
     setLoading(true);
     setError('');
     try {
-      const [todayRes, historyRes] = await Promise.all([
+      const [todayRes, historyRes, consignmentsRes] = await Promise.all([
         client.get('/stock/today', { params: { storeId: sid, date: todayStr() } }),
         client
           .get('/stock/history', { params: { storeId: sid, from: yesterdayStr(), to: yesterdayStr() } })
           .catch(() => ({ data: { entries: [] } })),
+        client
+          .get('/consignments', { params: { storeId: sid, status: 'DELIVERED,PARTIAL_SETTLED' } })
+          .catch(() => ({ data: { consignments: [] } })),
       ]);
       setData(todayRes.data);
       setPrevEntries(historyRes.data.entries);
+      setPendingConsignments(consignmentsRes.data.consignments);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load stock.');
     } finally {
@@ -110,6 +115,12 @@ export default function Inventory() {
   const totalClosing = data?.entries.reduce((sum, e) => sum + e.closing, 0) || 0;
   const totalSold = data?.entries.reduce((sum, e) => sum + e.sold, 0) || 0;
   const totalWastage = data?.entries.reduce((sum, e) => sum + e.wastage, 0) || 0;
+  const totalOnConsignment = data?.entries.reduce((sum, e) => sum + (e.consignmentQty || 0), 0) || 0;
+  const pendingSettlementsCount = pendingConsignments.length;
+  const consignmentValue = pendingConsignments.reduce(
+    (sum, c) => sum + (c.items?.reduce((s, i) => s + i.remainingQty * i.pricePerUnit, 0) || 0),
+    0
+  );
 
   const prevLowCount = prevEntries.filter((e) => e.status !== 'OK').length;
   const prevClosing = prevEntries.reduce((sum, e) => sum + e.closing, 0);
@@ -192,6 +203,27 @@ export default function Inventory() {
                 <StatTrend trend={computeTrend(lowCount, prevLowCount)} sentiment="down-is-good" />
               </div>
             </div>
+            <div className="stat-card">
+              <div className="stat-icon stat-icon-blue"><Handshake size={20} strokeWidth={1.8} /></div>
+              <div>
+                <div className="stat-value">{totalOnConsignment}</div>
+                <div className="stat-label">Units On Consignment</div>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon stat-icon-amber"><ReceiptText size={20} strokeWidth={1.8} /></div>
+              <div>
+                <div className="stat-value">{pendingSettlementsCount}</div>
+                <div className="stat-label">Pending Settlements</div>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon stat-icon-green"><Coins size={20} strokeWidth={1.8} /></div>
+              <div>
+                <div className="stat-value">₹{consignmentValue.toFixed(2)}</div>
+                <div className="stat-label">Consignment Value</div>
+              </div>
+            </div>
           </div>
 
           <div className="card form-card">
@@ -224,6 +256,7 @@ export default function Inventory() {
                   <th>Sold</th>
                   <th>Wastage</th>
                   <th>Closing</th>
+                  <th>On Consignment</th>
                   <th>Status</th>
                   <th></th>
                 </tr>
@@ -237,6 +270,7 @@ export default function Inventory() {
                     <td>{e.sold}</td>
                     <td>{e.wastage}</td>
                     <td className="cell-strong">{e.closing}</td>
+                    <td>{e.consignmentQty}</td>
                     <td>
                       <span className={`badge ${STATUS_BADGE_CLASS[e.status]}`}>{STATUS_LABEL[e.status]}</span>
                     </td>
@@ -255,14 +289,14 @@ export default function Inventory() {
                 ))}
                 {data.entries.length === 0 && (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                       <EmptyState icon={BoxIcon} message="No products in the catalog yet." />
                     </td>
                   </tr>
                 )}
                 {data.entries.length > 0 && filteredEntries.length === 0 && (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                       <EmptyState icon={Search} message="No products match your search or filter." />
                     </td>
                   </tr>

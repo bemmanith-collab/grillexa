@@ -118,6 +118,7 @@ export default function StockHistory() {
                 <th>Sold</th>
                 <th>Wastage</th>
                 <th>Closing</th>
+                <th>On Consignment</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -132,6 +133,7 @@ export default function StockHistory() {
                   <td>{e.sold}</td>
                   <td>{e.wastage}</td>
                   <td className="cell-strong">{e.closing}</td>
+                  <td>{e.consignmentQty}</td>
                   <td>
                     <span className={`badge ${STATUS_BADGE_CLASS[e.status]}`}>{STATUS_LABEL[e.status]}</span>
                   </td>
@@ -139,7 +141,7 @@ export default function StockHistory() {
               ))}
               {entries.length === 0 && (
                 <tr>
-                  <td colSpan={showStorePicker ? 9 : 8}>
+                  <td colSpan={showStorePicker ? 10 : 9}>
                     <EmptyState icon={HistoryIcon} message="No stock history for this filter." />
                   </td>
                 </tr>

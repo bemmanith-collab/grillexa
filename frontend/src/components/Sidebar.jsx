@@ -5,6 +5,8 @@ import {
   BarChart3,
   Banknote,
   Package,
+  PackageCheck,
+  Handshake,
   Tag,
   ScrollText,
   TrendingUp,
@@ -87,6 +89,10 @@ export default function Sidebar() {
 
         <nav className="sidebar-nav">
           <NavItem to="/" end icon={BarChart3} onNavigate={closeMenu}>Today's Stock</NavItem>
+          {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
+            <NavItem to="/deliver-to-store" icon={PackageCheck} onNavigate={closeMenu}>Deliver to Store</NavItem>
+          )}
+          <NavItem to="/settle-consignment" icon={Handshake} onNavigate={closeMenu}>Settle Consignment</NavItem>
           <NavItem to="/sales" icon={Banknote} onNavigate={closeMenu}>Sales</NavItem>
           {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
             <NavItem to="/dispatches" icon={Package} onNavigate={closeMenu}>Dispatches</NavItem>

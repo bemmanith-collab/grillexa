@@ -1,32 +1,37 @@
 import React, { useState } from 'react';
 import { Printer, Share2, MessageCircle, Check, Copy, FileDown } from 'lucide-react';
 import { formatCurrency } from '../lib/format';
-import { RETURN_REASONS } from '../lib/returnReasons';
+import { ALL_RETURN_REASON_LABELS } from '../lib/returnReasons';
 import { BUSINESS_INFO } from '../lib/businessInfo';
 import { buildInvoiceShareText, downloadInvoicePdf } from '../lib/invoice';
 import logoIcon from '../assets/grillexa-icon.png';
 
-const REASON_LABEL = Object.fromEntries(RETURN_REASONS.map((r) => [r.value, r.label]));
+const REASON_LABEL = Object.fromEntries(ALL_RETURN_REASON_LABELS.map((r) => [r.value, r.label]));
 
-export default function BillDetailModal({ title, bill, onClose, hideCreatedBy }) {
+// documentOptions lets a non-billing document (e.g. a Consignment delivery
+// note — stock transferred but no money owed yet) reuse this same
+// print/share UI without visually claiming to be a paid invoice. Omit it
+// for anything that's actually a bill (Sales, Dispatches, Settlement).
+export default function BillDetailModal({ title, bill, onClose, hideCreatedBy, documentOptions }) {
   const hasReturns = bill.lines.some((l) => l.type === 'RETURN');
   const [copied, setCopied] = useState(false);
   const b = BUSINESS_INFO;
+  const bandLabel = documentOptions?.bandLabel || 'OFFICIAL INVOICE';
 
   async function copyInvoice() {
-    await navigator.clipboard.writeText(buildInvoiceShareText(title, bill, hideCreatedBy));
+    await navigator.clipboard.writeText(buildInvoiceShareText(title, bill, hideCreatedBy, documentOptions));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
   function shareWhatsApp() {
-    const text = buildInvoiceShareText(title, bill, hideCreatedBy);
+    const text = buildInvoiceShareText(title, bill, hideCreatedBy, documentOptions);
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   }
 
   async function shareGeneric() {
     try {
-      await navigator.share({ title: `${title} ${bill.number}`, text: buildInvoiceShareText(title, bill, hideCreatedBy) });
+      await navigator.share({ title: `${title} ${bill.number}`, text: buildInvoiceShareText(title, bill, hideCreatedBy, documentOptions) });
     } catch (err) {
       // user dismissed the native share sheet — nothing to do
     }
@@ -43,7 +48,7 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy })
           </div>
         </div>
 
-        <div className="bill-official-tag">OFFICIAL INVOICE</div>
+        <div className="bill-official-tag">{bandLabel}</div>
 
         <div className="bill-header">
           <div>
@@ -109,8 +114,8 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy })
               {[b.phone, b.email, b.website, b.instagram].filter(Boolean).join('  ·  ')}
             </div>
           )}
-          <div className="bill-thankyou">🙏 Thank you for shopping with us!</div>
-          <div className="bill-disclaimer">This is a system-generated invoice.</div>
+          <div className="bill-thankyou">{documentOptions?.footerMessage || '🙏 Thank you for shopping with us!'}</div>
+          <div className="bill-disclaimer">This is a system-generated document.</div>
         </div>
 
         <div className="modal-actions no-print">

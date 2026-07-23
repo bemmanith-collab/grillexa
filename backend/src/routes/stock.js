@@ -31,6 +31,7 @@ function shapeEntry(entry) {
     sold: entry.sold,
     wastage: entry.wastage,
     closing: entry.closing,
+    consignmentQty: entry.consignmentQty,
     status: computeStatus(entry),
   };
 }

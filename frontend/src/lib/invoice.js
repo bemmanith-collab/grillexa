@@ -24,10 +24,16 @@ function lineItemRow(l) {
   return `${l.quantity}x ${l.product}${isReturn ? ' (Return)' : ''} — ${amt}`;
 }
 
-// A monospace, WhatsApp-friendly invoice (wrapped in ``` by the caller so it
-// renders aligned) plus a plain-text block of clickable links appended after
-// it — links inside a ``` block don't always stay tappable in WhatsApp.
-export function buildInvoiceShareText(title, bill, hideCreatedBy) {
+// bandLabel/numberLabel/footerMessage let a non-billing document (e.g. a
+// Consignment delivery note, where no money is due yet) reuse this same
+// template without claiming to be an invoice — defaults preserve the
+// original wording for every existing caller (Sales, Dispatches, Settlement).
+export function buildInvoiceShareText(
+  title,
+  bill,
+  hideCreatedBy,
+  { bandLabel = 'OFFICIAL INVOICE', numberLabel = 'Invoice #', footerMessage = '🙏 Thank you for shopping with us!' } = {}
+) {
   const b = BUSINESS_INFO;
   const dash = '─'.repeat(DASH_WIDTH);
 
@@ -36,9 +42,9 @@ export function buildInvoiceShareText(title, bill, hideCreatedBy) {
     `║${center(`🥗 ${b.name}`, BOX_WIDTH)}║`,
     `╚${'═'.repeat(BOX_WIDTH)}╝`,
     ...(b.tagline ? [b.tagline] : []),
-    'OFFICIAL INVOICE',
+    bandLabel,
     '',
-    `Invoice #: ${bill.number}`,
+    `${numberLabel}: ${bill.number}`,
     `Date: ${bill.date}`,
     `Store: ${bill.store}`,
     ...(bill.customerName ? [`Customer: ${bill.customerName}`] : []),
@@ -56,10 +62,10 @@ export function buildInvoiceShareText(title, bill, hideCreatedBy) {
     ...(b.fssai ? [`FSSAI Lic. No: ${b.fssai}`] : []),
     ...(b.addressLines.length ? b.addressLines : []),
     '',
-    '🙏 Thank you for shopping with us!',
+    footerMessage,
     ...(b.tagline ? [b.tagline] : []),
     '',
-    'This is a system-generated invoice.',
+    'This is a system-generated document.',
   ].join('\n');
 
   const contactLines = [
@@ -89,7 +95,12 @@ function formatCurrencyPdf(amount) {
 // around the item list — rather than the helvetica/table layout a normal
 // PDF invoice would use. jsPDF is loaded on demand so it doesn't add weight
 // to the main bundle for people who never click "Download PDF".
-export async function downloadInvoicePdf(title, bill, hideCreatedBy) {
+export async function downloadInvoicePdf(
+  title,
+  bill,
+  hideCreatedBy,
+  { bandLabel = 'OFFICIAL INVOICE', numberLabel = 'Invoice #', footerMessage = 'Thank you for shopping with us!' } = {}
+) {
   const { jsPDF } = await import('jspdf');
   const b = BUSINESS_INFO;
   const doc = new jsPDF({ unit: 'mm', format: 'a5' });
@@ -132,14 +143,14 @@ export async function downloadInvoicePdf(title, bill, hideCreatedBy) {
   doc.setFont('courier', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(30, 30, 30);
-  doc.text('OFFICIAL INVOICE', center, y, { align: 'center' });
+  doc.text(bandLabel, center, y, { align: 'center' });
   y += 8;
 
   doc.setFont('courier', 'normal');
   doc.setFontSize(9.5);
   doc.setTextColor(30, 30, 30);
   const metaLines = [
-    `Invoice #: ${bill.number}`,
+    `${numberLabel}: ${bill.number}`,
     `Date: ${bill.date}`,
     `Store: ${bill.store}`,
     ...(bill.customerName ? [`Customer: ${bill.customerName}`] : []),
@@ -191,7 +202,7 @@ export async function downloadInvoicePdf(title, bill, hideCreatedBy) {
   doc.setFont('courier', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(230, 90, 30);
-  doc.text('Thank you for shopping with us!', center, y, { align: 'center' });
+  doc.text(footerMessage, center, y, { align: 'center' });
   y += 5;
 
   if (b.tagline) {

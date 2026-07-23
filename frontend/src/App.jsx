@@ -9,6 +9,8 @@ const Login = lazy(() => import('./pages/Login'));
 const Signup = lazy(() => import('./pages/Signup'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Dispatches = lazy(() => import('./pages/Dispatches'));
+const DeliverToStore = lazy(() => import('./pages/DeliverToStore'));
+const SettleConsignment = lazy(() => import('./pages/SettleConsignment'));
 const Products = lazy(() => import('./pages/Products'));
 const Sales = lazy(() => import('./pages/Sales'));
 const StockHistory = lazy(() => import('./pages/StockHistory'));
@@ -58,6 +60,22 @@ export default function App() {
               element={
                 <ProtectedRoute roles={['ADMIN', 'MANAGER']}>
                   <Dispatches />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/deliver-to-store"
+              element={
+                <ProtectedRoute roles={['ADMIN', 'MANAGER']}>
+                  <DeliverToStore />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settle-consignment"
+              element={
+                <ProtectedRoute>
+                  <SettleConsignment />
                 </ProtectedRoute>
               }
             />

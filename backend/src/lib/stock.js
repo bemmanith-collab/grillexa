@@ -16,6 +16,9 @@ function previousDay(date) {
 
 // Returns the ledger row for (date, storeId, productId), creating it (with
 // opening = previous day's closing, or 0 if there's no history yet) if needed.
+// consignmentQty is carried forward the same way opening is — it's a running
+// balance (how much of this store's stock is still on consignment, delivered
+// but not yet settled), not a fresh-per-day delta like received/sold/wastage.
 // Must be called with a Prisma transaction client so creation is race-free.
 async function getOrCreateDailyEntry(tx, storeId, productId, date) {
   const existing = await tx.dailyStockEntry.findUnique({
@@ -28,9 +31,10 @@ async function getOrCreateDailyEntry(tx, storeId, productId, date) {
     orderBy: { date: 'desc' },
   });
   const opening = prevEntry ? prevEntry.closing : 0;
+  const consignmentQty = prevEntry ? prevEntry.consignmentQty : 0;
 
   return tx.dailyStockEntry.create({
-    data: { date, storeId, productId, opening, received: 0, sold: 0, wastage: 0, closing: opening },
+    data: { date, storeId, productId, opening, received: 0, sold: 0, wastage: 0, closing: opening, consignmentQty },
   });
 }
 
@@ -40,16 +44,20 @@ async function getOrCreateDailyEntry(tx, storeId, productId, date) {
 // insufficient recorded stock, so closing can go negative when stock wasn't
 // (yet) dispatched/recorded. The movement is still written to the ledger so
 // history is preserved if strict inventory tracking is turned back on later.
-async function adjustStock(tx, { storeId, productId, date, receivedDelta = 0, soldDelta = 0, wastageDelta = 0 }) {
+// consignmentDelta adjusts the running consignmentQty balance directly —
+// it's independent of the closing formula above (see the Consignment model
+// and /consignments routes for how it's used).
+async function adjustStock(tx, { storeId, productId, date, receivedDelta = 0, soldDelta = 0, wastageDelta = 0, consignmentDelta = 0 }) {
   const entry = await getOrCreateDailyEntry(tx, storeId, productId, date);
   const received = entry.received + receivedDelta;
   const sold = entry.sold + soldDelta;
   const wastage = entry.wastage + wastageDelta;
   const closing = entry.opening + received - sold - wastage;
+  const consignmentQty = entry.consignmentQty + consignmentDelta;
 
   return tx.dailyStockEntry.update({
     where: { id: entry.id },
-    data: { received, sold, wastage, closing },
+    data: { received, sold, wastage, closing, consignmentQty },
   });
 }
 
