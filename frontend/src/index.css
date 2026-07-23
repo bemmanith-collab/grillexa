@@ -352,6 +352,7 @@ select {
   vertical-align: middle;
 }
 
+
 .data-table tbody tr:last-child td {
   border-bottom: none;
 }
@@ -1485,6 +1486,29 @@ button:disabled {
 
   .actions-cell {
     flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* A row's Name + Address (or SKU/Price/etc.) text used to be free to grow
+     as wide as the content needed, which routinely pushed the Edit/Delete
+     buttons several hundred pixels past the edge of the phone screen.
+     Truncating the non-action columns keeps a row's total width close to
+     the viewport, so reaching those buttons takes little or no horizontal
+     scrolling. Doesn't apply while a cell is showing an edit <input> — the
+     input has its own width/scroll behavior and the value shouldn't look
+     cut off while someone is actively editing it. */
+  .data-table td.cell-strong:not(:has(input)) {
+    max-width: 13ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .data-table td:not(.cell-strong):not(.actions-cell):not(:has(input)) {
+    max-width: 10ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* Touch targets: Apple/Google both recommend ~44px minimum. */
@@ -1505,7 +1529,7 @@ button:disabled {
      even though it's visually a "small" button. */
   .actions-cell .btn-sm {
     min-height: 44px;
-    padding: 10px 16px;
+    padding: 10px 12px;
   }
 
   .stat-grid {

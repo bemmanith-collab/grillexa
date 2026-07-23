@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { Search } from 'lucide-react';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { StoreIcon } from '../components/icons';
@@ -16,6 +17,13 @@ export default function Stores() {
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [search, setSearch] = useState('');
+
+  const filteredStores = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return stores;
+    return stores.filter((s) => s.name.toLowerCase().includes(q) || (s.address || '').toLowerCase().includes(q));
+  }, [stores, search]);
 
   async function load() {
     setLoading(true);
@@ -112,6 +120,15 @@ export default function Stores() {
         </div>
       )}
 
+      {!loading && (
+        <div className="card form-card">
+          <div className="search-input">
+            <Search size={16} />
+            <input placeholder="Search stores…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <Spinner label="Loading stores…" />
       ) : (
@@ -126,7 +143,7 @@ export default function Stores() {
               </tr>
             </thead>
             <tbody>
-              {stores.map((s) => {
+              {filteredStores.map((s) => {
                 const isEditing = editingId === s.id;
                 return (
                   <tr key={s.id}>
@@ -174,10 +191,13 @@ export default function Stores() {
                   </tr>
                 );
               })}
-              {stores.length === 0 && (
+              {filteredStores.length === 0 && (
                 <tr>
                   <td colSpan={isAdmin ? 3 : 2}>
-                    <EmptyState icon={StoreIcon} message="No stores yet." />
+                    <EmptyState
+                      icon={StoreIcon}
+                      message={stores.length === 0 ? 'No stores yet.' : 'No stores match your search.'}
+                    />
                   </td>
                 </tr>
               )}
