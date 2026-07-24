@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import client from '../api/client';
-import { formatCurrency } from '../lib/format';
+import { formatCurrency, formatDate } from '../lib/format';
 import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
@@ -84,7 +84,7 @@ function SettleForm({ consignment, onClose, onSettled }) {
       <div className="modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
         <h3>Settle {consignment.consignmentNo}</h3>
         <p className="modal-help">
-          {consignment.store} · delivered {consignment.deliveredAt} · enter what actually sold and what's coming back unsold
+          {consignment.store} · delivered {formatDate(consignment.deliveredAt)} · enter what actually sold and what's coming back unsold
         </p>
 
         {error && <div className="form-error">{error}</div>}
@@ -222,7 +222,7 @@ export default function SettleConsignment() {
               {consignments.map((c) => (
                 <tr key={c.id}>
                   <td className="cell-mono">{c.consignmentNo}</td>
-                  <td>{c.deliveredAt}</td>
+                  <td className="cell-date">{formatDate(c.deliveredAt)}</td>
                   <td>{c.store}</td>
                   <td>
                     <span className="badge">{c.status.replace('_', ' ')}</span>

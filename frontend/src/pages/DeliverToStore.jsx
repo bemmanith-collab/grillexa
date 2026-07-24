@@ -6,6 +6,7 @@ import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { TruckIcon } from '../components/icons';
+import { formatDate } from '../lib/format';
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -189,7 +190,7 @@ export default function DeliverToStore() {
               {consignments.map((c) => (
                 <tr key={c.id}>
                   <td className="cell-mono">{c.consignmentNo}</td>
-                  <td>{c.deliveredAt}</td>
+                  <td className="cell-date">{formatDate(c.deliveredAt)}</td>
                   <td>{c.store}</td>
                   {!isScoped && <td>{c.createdBy}</td>}
                   <td>
