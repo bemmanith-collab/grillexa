@@ -5,6 +5,7 @@ import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { HistoryIcon } from '../components/icons';
 import { STATUS_LABEL, STATUS_BADGE_CLASS } from '../lib/stockStatus';
+import { formatDate } from '../utils/date';
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -125,7 +126,7 @@ export default function StockHistory() {
             <tbody>
               {entries.map((e) => (
                 <tr key={e.id}>
-                  <td>{e.date}</td>
+                  <td className="cell-date">{formatDate(e.date)}</td>
                   {showStorePicker && <td>{e.store}</td>}
                   <td className="cell-strong">{e.product}</td>
                   <td>{e.opening}</td>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Printer, Share2, MessageCircle, Check, Copy, FileDown } from 'lucide-react';
 import { formatCurrency } from '../lib/format';
+import { formatDate } from '../utils/date';
 import { ALL_RETURN_REASON_LABELS } from '../lib/returnReasons';
 import { BUSINESS_INFO } from '../lib/businessInfo';
 import { buildInvoiceShareText, downloadInvoicePdf } from '../lib/invoice';
@@ -56,7 +57,7 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy, d
             <p className="modal-help">{bill.number}</p>
           </div>
           <div className="bill-meta">
-            <div><strong>Date:</strong> {bill.date}</div>
+            <div><strong>Date:</strong> {formatDate(bill.date)}</div>
             <div><strong>Store:</strong> {bill.store}</div>
             {!hideCreatedBy && <div><strong>By:</strong> {bill.createdBy}</div>}
           </div>

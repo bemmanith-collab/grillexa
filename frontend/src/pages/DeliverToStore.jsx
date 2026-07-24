@@ -6,7 +6,7 @@ import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { TruckIcon } from '../components/icons';
-import { formatDate } from '../lib/format';
+import { formatDate } from '../utils/date';
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);

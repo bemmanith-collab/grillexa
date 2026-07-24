@@ -9,6 +9,7 @@ import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { BoxIcon } from '../components/icons';
 import { STATUS_LABEL, STATUS_BADGE_CLASS } from '../lib/stockStatus';
+import { formatDate } from '../utils/date';
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -142,7 +143,7 @@ export default function Inventory() {
         <div>
           <h1>Today's Stock</h1>
           <p className="page-subtitle">
-            {data ? data.date : ''}
+            {data ? formatDate(data.date) : ''}
             {data?.store && <> · {data.store}</>}
           </p>
         </div>

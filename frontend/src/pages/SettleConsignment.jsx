@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import client from '../api/client';
-import { formatCurrency, formatDate } from '../lib/format';
+import { formatCurrency } from '../lib/format';
+import { formatDate } from '../utils/date';
 import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';

@@ -387,10 +387,11 @@ select {
   color: var(--text-muted);
 }
 
-/* "24 Jul 2026" is ~11 characters — wider than the 10ch mobile truncation
-   below would allow, so date cells get their own no-wrap, no-ellipsis rule
-   instead of falling into the generic cell-truncation behavior. */
+/* "24/07/2026" is wider than the 10ch mobile truncation below would allow,
+   so date cells get their own no-wrap, no-ellipsis rule and a fixed
+   min-width instead of falling into the generic cell-truncation behavior. */
 .cell-date {
+  min-width: 120px;
   white-space: nowrap;
 }
 
@@ -1518,11 +1519,11 @@ button:disabled {
     white-space: nowrap;
   }
 
-  /* Full date, never truncated — sized to fit "24 Jul 2026" with a little
+  /* Full date, never truncated — sized to fit "24/07/2026" with a little
      breathing room, and exempt from the ellipsis rule above. */
   .data-table td.cell-date {
     max-width: none;
-    min-width: 11ch;
+    min-width: 120px;
     overflow: visible;
     white-space: nowrap;
   }

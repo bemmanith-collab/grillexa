@@ -6,6 +6,7 @@ import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { ReceiptIcon } from '../components/icons';
 import { formatCurrency } from '../lib/format';
+import { formatDate } from '../utils/date';
 
 export default function Sales() {
   const { user } = useAuth();
@@ -88,7 +89,7 @@ export default function Sales() {
               {sales.map((s) => (
                 <tr key={s.id}>
                   <td className="cell-mono">{s.number}</td>
-                  <td>{s.date}</td>
+                  <td className="cell-date">{formatDate(s.date)}</td>
                   <td>{s.store}</td>
                   {!isScoped && <td>{s.createdBy}</td>}
                   <td>{formatCurrency(s.totalAmount)}</td>

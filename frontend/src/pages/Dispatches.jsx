@@ -4,6 +4,7 @@ import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { TruckIcon } from '../components/icons';
+import { formatDate } from '../utils/date';
 
 export default function Dispatches() {
   const [invoices, setInvoices] = useState([]);
@@ -66,7 +67,7 @@ export default function Dispatches() {
               {invoices.map((inv) => (
                 <tr key={inv.id}>
                   <td className="cell-mono">{inv.number}</td>
-                  <td>{inv.date}</td>
+                  <td className="cell-date">{formatDate(inv.date)}</td>
                   <td>{inv.store}</td>
                   <td>{inv.createdBy}</td>
                   <td>₹{inv.totalAmount.toFixed(2)}</td>

@@ -1,4 +1,5 @@
 import { formatCurrency } from './format';
+import { formatDate } from '../utils/date';
 import { BUSINESS_INFO } from './businessInfo';
 
 // Keep the boxed header narrow — WhatsApp's mobile app wraps (or in some
@@ -45,7 +46,7 @@ export function buildInvoiceShareText(
     bandLabel,
     '',
     `${numberLabel}: ${bill.number}`,
-    `Date: ${bill.date}`,
+    `Date: ${formatDate(bill.date)}`,
     `Store: ${bill.store}`,
     ...(bill.customerName ? [`Customer: ${bill.customerName}`] : []),
     ...(bill.customerPhone ? [`Phone: ${bill.customerPhone}`] : []),
@@ -151,7 +152,7 @@ export async function downloadInvoicePdf(
   doc.setTextColor(30, 30, 30);
   const metaLines = [
     `${numberLabel}: ${bill.number}`,
-    `Date: ${bill.date}`,
+    `Date: ${formatDate(bill.date)}`,
     `Store: ${bill.store}`,
     ...(bill.customerName ? [`Customer: ${bill.customerName}`] : []),
     ...(bill.customerPhone ? [`Phone: ${bill.customerPhone}`] : []),
