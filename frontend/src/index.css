@@ -876,6 +876,17 @@ button:disabled {
   margin-bottom: 14px;
 }
 
+/* Non-blocking counterpart to .form-error — the action went through, but
+   something about it needs calling out (e.g. a reorder that skipped lines). */
+.form-warning {
+  background: var(--warn-soft);
+  color: var(--warn);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  margin-bottom: 14px;
+}
+
 .form-hint {
   font-size: 0.8rem;
   color: var(--text-muted);
@@ -1233,6 +1244,23 @@ button:disabled {
   font-weight: 400;
   text-transform: none;
   letter-spacing: normal;
+}
+
+/* Buttons sitting in the form header row line up with the inputs beside
+   them, not with the labels above those inputs. */
+.bill-form-action {
+  display: flex;
+  align-items: flex-end;
+}
+
+.icon-spin {
+  animation: icon-spin 0.9s linear infinite;
+}
+
+@keyframes icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .bill-form-header select,

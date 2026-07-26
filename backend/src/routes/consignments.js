@@ -317,6 +317,36 @@ router.get('/', async (req, res) => {
   res.json({ consignments: consignments.map(shapeConsignment) });
 });
 
+// The store's most recent delivery, backing the "Reorder from Last Delivery"
+// shortcut on Deliver to Store. Settlements are deliberately left out of the
+// include — the caller only copies delivered lines into a fresh form, and
+// pulling the settlement tree here would be dead weight on every click.
+// Declared above GET /:id purely for readability; the two can't collide since
+// Express path params never match across a "/".
+router.get('/latest/:storeId', async (req, res) => {
+  const storeId = Number(req.params.storeId);
+  if (!Number.isInteger(storeId) || storeId <= 0) {
+    return res.status(400).json({ error: 'A valid storeId is required' });
+  }
+
+  try {
+    assertStoreAccess(req.user, storeId);
+  } catch (err) {
+    return res.status(err.status || 403).json({ error: err.message });
+  }
+
+  const latest = await prisma.consignment.findFirst({
+    where: { storeId },
+    // deliveredAt is date-only (normalized to UTC midnight), so same-day
+    // deliveries tie — id breaks it toward whichever was entered last.
+    orderBy: [{ deliveredAt: 'desc' }, { id: 'desc' }],
+    include: { store: true, createdBy: true, items: { include: { product: true } } },
+  });
+  if (!latest) return res.status(404).json({ error: 'No past deliveries found' });
+
+  res.json({ consignment: shapeConsignment(latest) });
+});
+
 router.get('/:id', async (req, res) => {
   const consignment = await prisma.consignment.findUnique({
     where: { id: Number(req.params.id) },

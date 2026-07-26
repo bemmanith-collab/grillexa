@@ -5,7 +5,8 @@ import LineItemsForm, { emptyLine } from '../components/LineItemsForm';
 import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
-import { TruckIcon } from '../components/icons';
+import Toast from '../components/Toast';
+import { TruckIcon, RefreshIcon } from '../components/icons';
 import { formatDate } from '../utils/date';
 
 function todayStr() {
@@ -51,6 +52,9 @@ export default function DeliverToStore() {
   const [lines, setLines] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [reordering, setReordering] = useState(false);
+  const [reorderWarning, setReorderWarning] = useState('');
+  const [toast, setToast] = useState('');
 
   async function loadAll() {
     setLoading(true);
@@ -97,6 +101,7 @@ export default function DeliverToStore() {
       setLines([emptyLine(products)]);
       setFormOpen(false);
       setEditingId(null);
+      setReorderWarning('');
       setDetail(res.data.consignment);
       loadAll();
     } catch (err) {
@@ -106,8 +111,58 @@ export default function DeliverToStore() {
     }
   }
 
+  // Copies the store's most recent delivery into the form, so a repeat order
+  // is one click instead of re-keying every line. Products that have since
+  // left the catalog are dropped — they'd be unselectable in the line picker
+  // and rejected on submit — but they're called out rather than silently
+  // shrinking the order.
+  async function handleReorder() {
+    if (!storeId) {
+      setError('Pick a store first.');
+      return;
+    }
+    setError('');
+    setReorderWarning('');
+    setReordering(true);
+    try {
+      const res = await client.get(`/consignments/latest/${storeId}`);
+      const last = res.data.consignment;
+      const inCatalog = (item) => products.some((p) => p.id === item.productId);
+      const available = last.items.filter(inCatalog);
+      const dropped = last.items.filter((i) => !inCatalog(i));
+
+      if (available.length === 0) {
+        setReorderWarning(
+          `${last.consignmentNo} only has products that are no longer in the catalog — nothing to reorder.`
+        );
+        return;
+      }
+
+      setLines(
+        available.map((i) => ({ productId: i.productId, quantity: i.deliveredQty, unitPrice: i.pricePerUnit }))
+      );
+      if (dropped.length > 0) {
+        setReorderWarning(
+          `Skipped ${dropped.length} discontinued ${dropped.length === 1 ? 'product' : 'products'} from ${
+            last.consignmentNo
+          }: ${dropped.map((i) => i.product).join(', ')}.`
+        );
+      }
+      setToast(`Reordered from ${last.consignmentNo} · ${formatDate(last.deliveredAt)}`);
+    } catch (err) {
+      setError(
+        err.response?.status === 404
+          ? 'No past deliveries found'
+          : err.response?.data?.error || 'Failed to load the last delivery.'
+      );
+    } finally {
+      setReordering(false);
+    }
+  }
+
   function startEdit(c) {
     setError('');
+    setReorderWarning('');
     setEditingId(c.id);
     setStoreId(c.storeId);
     setDate(c.deliveredAt);
@@ -121,6 +176,7 @@ export default function DeliverToStore() {
     setLines([emptyLine(products)]);
     setDate(todayStr());
     setError('');
+    setReorderWarning('');
   }
 
   async function openDetail(id) {
@@ -163,7 +219,13 @@ export default function DeliverToStore() {
               {showStorePicker ? (
                 <label>
                   Store
-                  <select value={storeId} onChange={(e) => setStoreId(e.target.value)}>
+                  <select
+                    value={storeId}
+                    onChange={(e) => {
+                      setStoreId(e.target.value);
+                      setReorderWarning('');
+                    }}
+                  >
                     {!isScoped && <option value="">Select a store…</option>}
                     {stores.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -184,7 +246,25 @@ export default function DeliverToStore() {
                 Delivery Date
                 <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
               </label>
+              {/* Hidden while editing: the store's latest delivery is often
+                  the very one being edited, so "reordering" it would just
+                  overwrite the lines with themselves. */}
+              {!editingId && (
+                <div className="bill-form-action">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={handleReorder}
+                    disabled={!storeId || reordering}
+                    title="Fill these lines with the same products and quantities as this store's last delivery"
+                  >
+                    <RefreshIcon className={reordering ? 'icon-spin' : undefined} />
+                    {reordering ? 'Loading…' : 'Reorder from Last Delivery'}
+                  </button>
+                </div>
+              )}
             </div>
+            {reorderWarning && <div className="form-warning">{reorderWarning}</div>}
             <LineItemsForm products={products} lines={lines} setLines={setLines} allowReturns={false} />
             <div className="modal-actions">
               <button type="submit" className="btn-primary" disabled={submitting}>
@@ -261,6 +341,8 @@ export default function DeliverToStore() {
           }}
         />
       )}
+
+      <Toast message={toast} onDone={() => setToast('')} />
     </div>
   );
 }

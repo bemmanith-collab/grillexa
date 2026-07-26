@@ -150,6 +150,17 @@ export function EyeOffIcon(props) {
   );
 }
 
+export function RefreshIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M20.5 11a8.5 8.5 0 0 0-15-4.4L3 9" />
+      <path d="M3 4v5h5" />
+      <path d="M3.5 13a8.5 8.5 0 0 0 15 4.4L21 15" />
+      <path d="M21 20v-5h-5" />
+    </svg>
+  );
+}
+
 export function InboxIcon(props) {
   return (
     <svg {...base} {...props}>
