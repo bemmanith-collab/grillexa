@@ -3,6 +3,7 @@ import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
 import StoreAssignModal from '../components/StoreAssignModal';
+import ResetPasswordModal from '../components/ResetPasswordModal';
 
 const ROLES = ['ADMIN', 'MANAGER', 'SALES'];
 const MAX_VISIBLE_STORES = 3;
@@ -24,6 +25,7 @@ export default function Users() {
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'SALES', storeIds: [] });
   const [creating, setCreating] = useState(false);
   const [assignModal, setAssignModal] = useState(null);
+  const [resetModal, setResetModal] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -218,6 +220,9 @@ export default function Users() {
                     )}
                   </td>
                   <td className="actions-cell">
+                    <button className="btn-secondary btn-sm" onClick={() => setResetModal({ id: u.id, name: u.name })}>
+                      Reset Password
+                    </button>
                     <button
                       className="btn-danger btn-sm"
                       disabled={u.id === currentUser.id}
@@ -242,6 +247,10 @@ export default function Users() {
           onClose={() => setAssignModal(null)}
           onConfirm={handleAssignConfirm}
         />
+      )}
+
+      {resetModal && (
+        <ResetPasswordModal userId={resetModal.id} userName={resetModal.name} onClose={() => setResetModal(null)} />
       )}
     </div>
   );

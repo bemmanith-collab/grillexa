@@ -14,10 +14,12 @@ import {
   Store,
   Users,
   LogOut,
+  KeyRound,
   Menu,
   X,
 } from 'lucide-react';
 import logoIcon from '../assets/grillexa-icon.png';
+import ChangePasswordModal from './ChangePasswordModal';
 
 const ROLE_LABELS = {
   ADMIN: 'Admin',
@@ -45,6 +47,7 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   // Close the drawer any time the route changes (link click, back button, etc).
   useEffect(() => {
@@ -120,6 +123,14 @@ export default function Sidebar() {
           </div>
           <button
             className="logout-btn"
+            title="Change password"
+            aria-label="Change password"
+            onClick={() => setChangePasswordOpen(true)}
+          >
+            <KeyRound size={18} strokeWidth={1.8} />
+          </button>
+          <button
+            className="logout-btn"
             title="Log out"
             aria-label="Log out"
             onClick={() => {
@@ -131,6 +142,8 @@ export default function Sidebar() {
           </button>
         </div>
       </aside>
+
+      {changePasswordOpen && <ChangePasswordModal onClose={() => setChangePasswordOpen(false)} />}
     </>
   );
 }

@@ -71,13 +71,16 @@ router.post('/', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const { name, email, role, storeIds } = req.body;
+  const { name, email, role, storeIds, password } = req.body;
 
   if (role && !ROLES.includes(role)) {
     return res.status(400).json({ error: `role must be one of ${ROLES.join(', ')}` });
   }
   if (id === req.user.id && role && role !== 'ADMIN') {
     return res.status(400).json({ error: 'You cannot remove your own admin role' });
+  }
+  if (password !== undefined && password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
 
   const current = await prisma.user.findUnique({ where: { id }, include: { stores: true } });
@@ -92,11 +95,14 @@ router.patch('/:id', async (req, res) => {
   const storeError = await validateStoreIds(nextIds);
   if (storeError) return res.status(400).json({ error: storeError });
 
+  const passwordHash = password !== undefined ? await bcrypt.hash(password, 10) : undefined;
+
   const user = await prisma.user.update({
     where: { id },
     data: {
       ...(name !== undefined && { name }),
       ...(email !== undefined && { email }),
+      ...(passwordHash !== undefined && { passwordHash }),
       role: nextRole,
       stores: { set: nextRole === 'SALES' ? nextIds.map((sid) => ({ id: sid })) : [] },
     },
