@@ -188,6 +188,11 @@ model Return {
   createdById Int
   createdBy   User     @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
+  // Set only for CONSIGNMENT_UNSOLD rows, so editing a settlement can find
+  // and replace exactly the rows it created (reference alone isn't unique
+  // enough — the same consignment can be settled in more than one pass).
+  settlementId Int?
+  settlement   Settlement? @relation(fields: [settlementId], references: [id])
 }
 
 // The sale-or-return model this business runs on: HQ delivers stock to a
@@ -252,7 +257,8 @@ model Settlement {
   sale          Sale?       @relation(fields: [saleId], references: [id])
   createdAt     DateTime    @default(now())
 
-  lines SettlementLine[]
+  lines   SettlementLine[]
+  returns Return[]
 }
 
 // soldQty/returnedQty here are what was settled in THIS pass only (not

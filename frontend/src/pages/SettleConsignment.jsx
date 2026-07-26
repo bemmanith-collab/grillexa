@@ -36,10 +36,32 @@ function asSaleBill(settlement, consignment) {
   };
 }
 
-function SettleForm({ consignment, onClose, onSettled }) {
-  const [date, setDate] = useState(todayStr());
+// existingSettlement, when passed, switches this form into edit mode: it
+// pre-fills the most recent settlement's own sold/returned quantities and
+// PATCHes that settlement instead of posting a new one. Each item's
+// "remaining" is widened back out by that settlement's own contribution,
+// since we're replacing it rather than adding on top of it.
+function SettleForm({ consignment, existingSettlement, onClose, onSettled }) {
+  const isEdit = !!existingSettlement;
+
+  const effectiveItems = useMemo(() => {
+    if (!isEdit) return consignment.items;
+    return consignment.items.map((item) => {
+      const line = existingSettlement.lines.find((l) => l.consignmentItemId === item.id);
+      return { ...item, remainingQty: item.remainingQty + (line?.soldQty || 0) + (line?.returnedQty || 0) };
+    });
+  }, [consignment.items, isEdit, existingSettlement]);
+
+  const [date, setDate] = useState(existingSettlement?.settledAt || todayStr());
   const [rows, setRows] = useState(() =>
-    consignment.items.map((i) => ({ consignmentItemId: i.id, soldQty: '', returnedQty: '' }))
+    effectiveItems.map((i) => {
+      const line = existingSettlement?.lines.find((l) => l.consignmentItemId === i.id);
+      return {
+        consignmentItemId: i.id,
+        soldQty: line?.soldQty ? String(line.soldQty) : '',
+        returnedQty: line?.returnedQty ? String(line.returnedQty) : '',
+      };
+    })
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -50,10 +72,10 @@ function SettleForm({ consignment, onClose, onSettled }) {
 
   const paymentDue = useMemo(() => {
     return rows.reduce((sum, r) => {
-      const item = consignment.items.find((i) => i.id === r.consignmentItemId);
+      const item = effectiveItems.find((i) => i.id === r.consignmentItemId);
       return sum + (Number(r.soldQty) || 0) * (item?.pricePerUnit || 0);
     }, 0);
-  }, [rows, consignment.items]);
+  }, [rows, effectiveItems]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -71,10 +93,12 @@ function SettleForm({ consignment, onClose, onSettled }) {
     }
     setSubmitting(true);
     try {
-      const res = await client.post(`/consignments/${consignment.id}/settle`, { date, lines });
+      const res = isEdit
+        ? await client.patch(`/consignments/${consignment.id}/settlements/${existingSettlement.id}`, { date, lines })
+        : await client.post(`/consignments/${consignment.id}/settle`, { date, lines });
       onSettled(res.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to settle consignment.');
+      setError(err.response?.data?.error || `Failed to ${isEdit ? 'update' : 'settle'} consignment.`);
     } finally {
       setSubmitting(false);
     }
@@ -83,9 +107,10 @@ function SettleForm({ consignment, onClose, onSettled }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
-        <h3>Settle {consignment.consignmentNo}</h3>
+        <h3>{isEdit ? `Edit ${existingSettlement.settlementNo}` : `Settle ${consignment.consignmentNo}`}</h3>
         <p className="modal-help">
-          {consignment.store} · delivered {formatDate(consignment.deliveredAt)} · enter what actually sold and what's coming back unsold
+          {consignment.store} · delivered {formatDate(consignment.deliveredAt)} ·{' '}
+          {isEdit ? "correct what was actually sold and what's coming back unsold" : "enter what actually sold and what's coming back unsold"}
         </p>
 
         {error && <div className="form-error">{error}</div>}
@@ -107,7 +132,7 @@ function SettleForm({ consignment, onClose, onSettled }) {
                 </tr>
               </thead>
               <tbody>
-                {consignment.items.map((item) => {
+                {effectiveItems.map((item) => {
                   const row = rows.find((r) => r.consignmentItemId === item.id);
                   return (
                     <tr key={item.id}>
@@ -151,7 +176,7 @@ function SettleForm({ consignment, onClose, onSettled }) {
               Cancel
             </button>
             <button type="submit" className="btn-primary" disabled={submitting}>
-              {submitting ? 'Settling…' : 'Settle Consignment'}
+              {submitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Settle Consignment'}
             </button>
           </div>
         </form>
@@ -165,16 +190,19 @@ export default function SettleConsignment() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [settling, setSettling] = useState(null);
+  const [editingSettlement, setEditingSettlement] = useState(null);
   const [result, setResult] = useState(null);
 
   async function load() {
     setLoading(true);
     setError('');
     try {
-      const res = await client.get('/consignments', { params: { status: 'DELIVERED,PARTIAL_SETTLED' } });
+      // No status filter: consignments that are fully SETTLED/RETURNED still
+      // need to show up here so their last settlement can be corrected.
+      const res = await client.get('/consignments');
       setConsignments(res.data.consignments);
     } catch (err) {
-      setError('Failed to load pending consignments.');
+      setError('Failed to load consignments.');
     } finally {
       setLoading(false);
     }
@@ -186,10 +214,24 @@ export default function SettleConsignment() {
 
   function handleSettled(data) {
     setSettling(null);
+    setEditingSettlement(null);
     if (data.settlement.saleId) {
       setResult({ settlement: data.settlement, consignment: data.consignment });
     }
     load();
+  }
+
+  async function openEditSettlement(c) {
+    setError('');
+    try {
+      const res = await client.get(`/consignments/${c.id}`);
+      const consignment = res.data.consignment;
+      const settlement = consignment.settlements?.[0];
+      if (!settlement) return;
+      setEditingSettlement({ consignment, settlement });
+    } catch (err) {
+      setError('Failed to load settlement detail.');
+    }
   }
 
   return (
@@ -204,7 +246,7 @@ export default function SettleConsignment() {
       {error && <div className="form-error">{error}</div>}
 
       {loading ? (
-        <Spinner label="Loading pending consignments…" />
+        <Spinner label="Loading consignments…" />
       ) : (
         <div className="card">
           <div className="table-scroll">
@@ -230,16 +272,23 @@ export default function SettleConsignment() {
                   </td>
                   <td>₹{c.totalDeliveredValue.toFixed(2)}</td>
                   <td className="actions-cell">
-                    <button className="btn-primary btn-sm" onClick={() => setSettling(c)}>
-                      Settle
-                    </button>
+                    {(c.status === 'DELIVERED' || c.status === 'PARTIAL_SETTLED') && (
+                      <button className="btn-primary btn-sm" onClick={() => setSettling(c)}>
+                        Settle
+                      </button>
+                    )}
+                    {c.status !== 'DELIVERED' && (
+                      <button className="btn-secondary btn-sm" onClick={() => openEditSettlement(c)}>
+                        Edit Last Settlement
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
               {consignments.length === 0 && (
                 <tr>
                   <td colSpan={6}>
-                    <EmptyState icon={ReceiptIcon} message="Nothing pending settlement — every delivery is accounted for." />
+                    <EmptyState icon={ReceiptIcon} message="No consignments yet." />
                   </td>
                 </tr>
               )}
@@ -250,6 +299,15 @@ export default function SettleConsignment() {
       )}
 
       {settling && <SettleForm consignment={settling} onClose={() => setSettling(null)} onSettled={handleSettled} />}
+
+      {editingSettlement && (
+        <SettleForm
+          consignment={editingSettlement.consignment}
+          existingSettlement={editingSettlement.settlement}
+          onClose={() => setEditingSettlement(null)}
+          onSettled={handleSettled}
+        />
+      )}
 
       {result && (
         <BillDetailModal

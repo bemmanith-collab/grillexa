@@ -45,6 +45,7 @@ export default function DeliverToStore() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [storeId, setStoreId] = useState(isScoped ? myStores[0]?.id || '' : '');
   const [date, setDate] = useState(todayStr());
   const [lines, setLines] = useState([]);
@@ -90,16 +91,36 @@ export default function DeliverToStore() {
     }
     setSubmitting(true);
     try {
-      const res = await client.post('/consignments', { storeId: Number(storeId), date, lines: cleanLines });
+      const res = editingId
+        ? await client.patch(`/consignments/${editingId}`, { storeId: Number(storeId), date, lines: cleanLines })
+        : await client.post('/consignments', { storeId: Number(storeId), date, lines: cleanLines });
       setLines([emptyLine(products)]);
       setFormOpen(false);
+      setEditingId(null);
       setDetail(res.data.consignment);
       loadAll();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create consignment.');
+      setError(err.response?.data?.error || `Failed to ${editingId ? 'update' : 'create'} consignment.`);
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function startEdit(c) {
+    setError('');
+    setEditingId(c.id);
+    setStoreId(c.storeId);
+    setDate(c.deliveredAt);
+    setLines(c.items.map((i) => ({ productId: i.productId, quantity: i.deliveredQty, unitPrice: i.pricePerUnit })));
+    setFormOpen(true);
+  }
+
+  function cancelForm() {
+    setFormOpen(false);
+    setEditingId(null);
+    setLines([emptyLine(products)]);
+    setDate(todayStr());
+    setError('');
   }
 
   async function openDetail(id) {
@@ -120,7 +141,11 @@ export default function DeliverToStore() {
             {singleStoreName && <> · {singleStoreName}</>}
           </p>
         </div>
-        <button className="btn-primary" onClick={() => setFormOpen((v) => !v)} disabled={noStoresAssigned}>
+        <button
+          className="btn-primary"
+          onClick={() => (formOpen ? cancelForm() : setFormOpen(true))}
+          disabled={noStoresAssigned}
+        >
           {formOpen ? 'Cancel' : '+ New Delivery'}
         </button>
       </div>
@@ -132,6 +157,7 @@ export default function DeliverToStore() {
 
       {formOpen && (
         <div className="card form-card">
+          {editingId && <p className="modal-help" style={{ marginTop: 0 }}>Editing {consignments.find((c) => c.id === editingId)?.consignmentNo}</p>}
           <form onSubmit={handleSubmit}>
             <div className="bill-form-header">
               {showStorePicker ? (
@@ -162,7 +188,7 @@ export default function DeliverToStore() {
             <LineItemsForm products={products} lines={lines} setLines={setLines} allowReturns={false} />
             <div className="modal-actions">
               <button type="submit" className="btn-primary" disabled={submitting}>
-                {submitting ? 'Delivering…' : 'Create Consignment Note'}
+                {submitting ? 'Saving…' : editingId ? 'Save Changes' : 'Create Consignment Note'}
               </button>
             </div>
           </form>
@@ -198,6 +224,11 @@ export default function DeliverToStore() {
                   </td>
                   <td>₹{c.totalDeliveredValue.toFixed(2)}</td>
                   <td className="actions-cell">
+                    {c.status === 'DELIVERED' && (
+                      <button className="btn-secondary btn-sm" onClick={() => startEdit(c)}>
+                        Edit
+                      </button>
+                    )}
                     <button className="btn-secondary btn-sm" onClick={() => openDetail(c.id)}>
                       View
                     </button>

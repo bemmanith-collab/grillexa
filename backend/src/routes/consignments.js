@@ -13,6 +13,12 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function httpError(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
 function shapeItem(item) {
   return {
     id: item.id,
@@ -79,6 +85,209 @@ const DETAIL_INCLUDE = {
   },
 };
 
+// Validates and normalizes the delivery-line shape shared by create and edit.
+function parseDeliveryLines(lines) {
+  if (!Array.isArray(lines) || lines.length === 0) {
+    throw httpError(400, 'At least one line is required');
+  }
+  return lines.map((l) => {
+    if (!l.productId || !Number.isFinite(Number(l.quantity)) || Number(l.quantity) <= 0) {
+      throw httpError(400, 'Each line needs a productId and a positive quantity');
+    }
+    return {
+      productId: Number(l.productId),
+      deliveredQty: Number(l.quantity),
+      pricePerUnit: Number(l.unitPrice) || 0,
+      totalValue: Number(l.quantity) * (Number(l.unitPrice) || 0),
+    };
+  });
+}
+
+// Applies one settlement pass (fresh or edited) inside an open transaction:
+// stock movement, the generated Sale (created/updated/removed as needed),
+// the Settlement + its lines (created or replaced), the CONSIGNMENT_UNSOLD
+// Return rows, and the consignment's recomputed status. Shared by both
+// POST /:id/settle (existingSettlementId/existingSaleId both null) and
+// PATCH /:id/settlements/:settlementId (both provided, reversal already done).
+async function applySettlement(tx, { consignment, preparedLines, normalizedDate, notes, userId, existingSettlementId, existingSaleId }) {
+  for (const { item, soldQty, returnedQty } of preparedLines) {
+    if (soldQty > 0) {
+      await adjustStock(tx, {
+        storeId: consignment.storeId,
+        productId: item.productId,
+        date: normalizedDate,
+        soldDelta: soldQty,
+        consignmentDelta: -soldQty,
+      });
+    }
+    if (returnedQty > 0) {
+      // Stock physically leaves the store back to HQ — opposite direction
+      // from the customer-facing processReturn(), which credits stock back
+      // INTO the store.
+      await adjustStock(tx, {
+        storeId: consignment.storeId,
+        productId: item.productId,
+        date: normalizedDate,
+        receivedDelta: -returnedQty,
+        consignmentDelta: -returnedQty,
+      });
+    }
+  }
+
+  const soldLines = preparedLines.filter((l) => l.soldQty > 0);
+  let saleId = existingSaleId ?? null;
+  if (soldLines.length > 0) {
+    const saleLineData = soldLines.map(({ item, soldQty }) => ({
+      productId: item.productId,
+      quantity: soldQty,
+      unitPrice: item.pricePerUnit,
+      amount: soldQty * item.pricePerUnit,
+      type: 'SALE',
+    }));
+    const totalAmount = saleLineData.reduce((sum, l) => sum + l.amount, 0);
+    if (existingSaleId) {
+      await tx.saleLine.deleteMany({ where: { saleId: existingSaleId } });
+      await tx.sale.update({
+        where: { id: existingSaleId },
+        data: { date: normalizedDate, totalAmount, lines: { create: saleLineData } },
+      });
+    } else {
+      const createdSale = await tx.sale.create({
+        data: {
+          number: 'PENDING',
+          date: normalizedDate,
+          storeId: consignment.storeId,
+          createdById: userId,
+          totalAmount,
+          consignmentId: consignment.id,
+          lines: { create: saleLineData },
+        },
+      });
+      const numbered = await tx.sale.update({
+        where: { id: createdSale.id },
+        data: { number: `SL-${String(createdSale.id).padStart(6, '0')}` },
+      });
+      saleId = numbered.id;
+    }
+  } else if (existingSaleId) {
+    // The edited settlement no longer has any sold qty — remove the now-empty sale.
+    await tx.saleLine.deleteMany({ where: { saleId: existingSaleId } });
+    await tx.sale.delete({ where: { id: existingSaleId } });
+    saleId = null;
+  }
+
+  let settlementId = existingSettlementId ?? null;
+  const settlementLineData = preparedLines.map(({ item, soldQty, returnedQty }) => ({
+    consignmentItemId: item.id,
+    soldQty,
+    returnedQty,
+  }));
+  if (existingSettlementId) {
+    await tx.settlementLine.deleteMany({ where: { settlementId: existingSettlementId } });
+    await tx.settlement.update({
+      where: { id: existingSettlementId },
+      data: {
+        settledAt: normalizedDate,
+        notes: notes?.trim() || null,
+        saleId,
+        lines: { create: settlementLineData },
+      },
+    });
+  } else {
+    const createdSettlement = await tx.settlement.create({
+      data: {
+        settlementNo: 'PENDING',
+        consignmentId: consignment.id,
+        createdById: userId,
+        settledAt: normalizedDate,
+        notes: notes?.trim() || null,
+        saleId,
+        lines: { create: settlementLineData },
+      },
+    });
+    const numbered = await tx.settlement.update({
+      where: { id: createdSettlement.id },
+      data: { settlementNo: `ST-${String(createdSettlement.id).padStart(6, '0')}` },
+    });
+    settlementId = numbered.id;
+  }
+
+  const returnedLines = preparedLines.filter((l) => l.returnedQty > 0);
+  if (returnedLines.length > 0) {
+    await tx.return.createMany({
+      data: returnedLines.map(({ item, returnedQty }) => ({
+        date: normalizedDate,
+        storeId: consignment.storeId,
+        productId: item.productId,
+        quantity: returnedQty,
+        reason: 'CONSIGNMENT_UNSOLD',
+        reference: consignment.consignmentNo,
+        createdById: userId,
+        settlementId,
+      })),
+    });
+  }
+
+  for (const { item, soldQty, returnedQty } of preparedLines) {
+    await tx.consignmentItem.update({
+      where: { id: item.id },
+      data: { soldQty: { increment: soldQty }, returnedQty: { increment: returnedQty } },
+    });
+  }
+
+  const refreshedItems = await tx.consignmentItem.findMany({ where: { consignmentId: consignment.id } });
+  const totalDelivered = refreshedItems.reduce((sum, i) => sum + i.deliveredQty, 0);
+  const totalSettled = refreshedItems.reduce((sum, i) => sum + i.soldQty + i.returnedQty, 0);
+  const totalSold = refreshedItems.reduce((sum, i) => sum + i.soldQty, 0);
+  let status = 'PARTIAL_SETTLED';
+  if (totalSettled === 0) status = 'DELIVERED';
+  else if (totalSettled >= totalDelivered) status = totalSold === 0 ? 'RETURNED' : 'SETTLED';
+
+  await tx.consignment.update({
+    where: { id: consignment.id },
+    data: { status, settledAt: status === 'SETTLED' || status === 'RETURNED' ? normalizedDate : null },
+  });
+
+  return settlementId;
+}
+
+// Reverses everything a previously-applied settlement pass did: stock
+// movement, the CONSIGNMENT_UNSOLD Return rows it wrote, and the cumulative
+// soldQty/returnedQty it added to each ConsignmentItem. Used only when
+// editing the most recent settlement, right before re-applying the new values.
+async function reverseSettlement(tx, { consignment, settlement }) {
+  for (const line of settlement.lines) {
+    const item = line.consignmentItem;
+    if (line.soldQty > 0) {
+      await adjustStock(tx, {
+        storeId: consignment.storeId,
+        productId: item.productId,
+        date: settlement.settledAt,
+        soldDelta: -line.soldQty,
+        consignmentDelta: line.soldQty,
+      });
+    }
+    if (line.returnedQty > 0) {
+      await adjustStock(tx, {
+        storeId: consignment.storeId,
+        productId: item.productId,
+        date: settlement.settledAt,
+        receivedDelta: line.returnedQty,
+        consignmentDelta: line.returnedQty,
+      });
+    }
+  }
+
+  await tx.return.deleteMany({ where: { settlementId: settlement.id } });
+
+  for (const line of settlement.lines) {
+    await tx.consignmentItem.update({
+      where: { id: line.consignmentItemId },
+      data: { soldQty: { decrement: line.soldQty }, returnedQty: { decrement: line.returnedQty } },
+    });
+  }
+}
+
 router.get('/', async (req, res) => {
   const requestedStoreId = req.query.storeId ? Number(req.query.storeId) : undefined;
   if (req.user.role === 'SALES' && requestedStoreId) {
@@ -138,13 +347,14 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
   if (!storeId) {
     return res.status(400).json({ error: req.user.role === 'SALES' ? 'Your account is not assigned to a store yet' : 'storeId is required' });
   }
-  if (!date || !Array.isArray(lines) || lines.length === 0) {
-    return res.status(400).json({ error: 'date and at least one line are required' });
+  if (!date) {
+    return res.status(400).json({ error: 'date is required' });
   }
-  for (const line of lines) {
-    if (!line.productId || !Number.isFinite(Number(line.quantity)) || Number(line.quantity) <= 0) {
-      return res.status(400).json({ error: 'Each line needs a productId and a positive quantity' });
-    }
+  let preparedItems;
+  try {
+    preparedItems = parseDeliveryLines(lines);
+  } catch (err) {
+    return res.status(err.status || 400).json({ error: err.message });
   }
 
   try {
@@ -165,13 +375,6 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
 
   try {
     const consignment = await prisma.$transaction(async (tx) => {
-      const preparedItems = lines.map((l) => ({
-        productId: Number(l.productId),
-        deliveredQty: Number(l.quantity),
-        pricePerUnit: Number(l.unitPrice) || 0,
-        totalValue: Number(l.quantity) * (Number(l.unitPrice) || 0),
-      }));
-
       const created = await tx.consignment.create({
         data: {
           consignmentNo: 'PENDING',
@@ -205,6 +408,109 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
     res.status(201).json({ consignment: shapeConsignment(consignment) });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || 'Failed to create consignment' });
+  }
+});
+
+// Edit a delivery that hasn't been touched by a settlement yet — fixes a
+// mistyped quantity/price/product/store without leaving stale stock behind.
+// Only allowed while status is still DELIVERED: once any settlement has run
+// against this consignment, soldQty/returnedQty are in play and replacing
+// the delivered lines wholesale would no longer be safe.
+router.patch('/:id', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
+  const consignmentId = Number(req.params.id);
+  const { date, lines, notes } = req.body;
+
+  const consignment = await prisma.consignment.findUnique({ where: { id: consignmentId }, include: { items: true } });
+  if (!consignment) return res.status(404).json({ error: 'Consignment not found' });
+  if (consignment.status !== 'DELIVERED') {
+    return res.status(400).json({ error: 'Cannot edit a delivery once settlement has started — settle or unwind it first' });
+  }
+
+  try {
+    assertStoreAccess(req.user, consignment.storeId);
+  } catch (err) {
+    return res.status(err.status || 403).json({ error: err.message });
+  }
+
+  const storeId =
+    req.body.storeId !== undefined
+      ? req.user.role === 'SALES'
+        ? Number(req.body.storeId) || req.user.storeIds[0]
+        : Number(req.body.storeId)
+      : consignment.storeId;
+  if (!storeId) {
+    return res.status(400).json({ error: 'storeId is required' });
+  }
+  if (!date) {
+    return res.status(400).json({ error: 'date is required' });
+  }
+  let preparedItems;
+  try {
+    preparedItems = parseDeliveryLines(lines);
+  } catch (err) {
+    return res.status(err.status || 400).json({ error: err.message });
+  }
+
+  try {
+    assertStoreAccess(req.user, storeId);
+  } catch (err) {
+    return res.status(err.status || 403).json({ error: err.message });
+  }
+
+  let normalizedDate;
+  try {
+    normalizedDate = normalizeDate(date);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  if (storeId !== consignment.storeId) {
+    const store = await prisma.store.findUnique({ where: { id: storeId } });
+    if (!store) return res.status(404).json({ error: 'Store not found' });
+  }
+
+  try {
+    const updated = await prisma.$transaction(async (tx) => {
+      // Reverse the original delivery's stock effect before applying the new one.
+      for (const item of consignment.items) {
+        await adjustStock(tx, {
+          storeId: consignment.storeId,
+          productId: item.productId,
+          date: consignment.deliveredAt,
+          receivedDelta: -item.deliveredQty,
+          consignmentDelta: -item.deliveredQty,
+        });
+      }
+      await tx.consignmentItem.deleteMany({ where: { consignmentId } });
+
+      await tx.consignmentItem.createMany({
+        data: preparedItems.map((item) => ({ ...item, consignmentId })),
+      });
+
+      for (const item of preparedItems) {
+        await adjustStock(tx, {
+          storeId,
+          productId: item.productId,
+          date: normalizedDate,
+          receivedDelta: item.deliveredQty,
+          consignmentDelta: item.deliveredQty,
+        });
+      }
+
+      return tx.consignment.update({
+        where: { id: consignmentId },
+        data: {
+          storeId,
+          deliveredAt: normalizedDate,
+          notes: notes !== undefined ? notes?.trim() || null : consignment.notes,
+        },
+        include: DETAIL_INCLUDE,
+      });
+    });
+
+    res.json({ consignment: shapeConsignment(updated) });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || 'Failed to update consignment' });
   }
 });
 
@@ -273,121 +579,128 @@ router.post('/:id/settle', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req,
   }
 
   try {
+    const settlementId = await prisma.$transaction((tx) =>
+      applySettlement(tx, {
+        consignment,
+        preparedLines,
+        normalizedDate,
+        notes,
+        userId: req.user.id,
+        existingSettlementId: null,
+        existingSaleId: null,
+      })
+    );
+
+    const settlement = await prisma.settlement.findUnique({
+      where: { id: settlementId },
+      include: {
+        createdBy: true,
+        sale: true,
+        lines: { include: { consignmentItem: { include: { product: true } } } },
+      },
+    });
+    const fullConsignment = await prisma.consignment.findUnique({
+      where: { id: consignment.id },
+      include: DETAIL_INCLUDE,
+    });
+
+    res.status(201).json({ settlement: shapeSettlement(settlement), consignment: shapeConsignment(fullConsignment) });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || 'Failed to settle consignment' });
+  }
+});
+
+// Edit the most recent settlement pass against a consignment — fixes a
+// mistyped sold/returned quantity without leaving stale stock, sale, or
+// return-audit data behind. Only the latest settlement is editable: earlier
+// ones were already validated against remaining quantity as of their own
+// time, and reopening them would let later passes silently double-count.
+router.patch('/:id/settlements/:settlementId', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
+  const consignmentId = Number(req.params.id);
+  const settlementId = Number(req.params.settlementId);
+  const { date, lines, notes } = req.body;
+  if (!Array.isArray(lines) || lines.length === 0) {
+    return res.status(400).json({ error: 'At least one line is required' });
+  }
+  for (const line of lines) {
+    if (!line.consignmentItemId) {
+      return res.status(400).json({ error: 'Each line needs a consignmentItemId' });
+    }
+    const sold = Number(line.soldQty) || 0;
+    const returned = Number(line.returnedQty) || 0;
+    if (sold < 0 || returned < 0) {
+      return res.status(400).json({ error: 'soldQty and returnedQty cannot be negative' });
+    }
+    if (sold === 0 && returned === 0) {
+      return res.status(400).json({ error: 'Each line needs a positive soldQty or returnedQty' });
+    }
+  }
+
+  const consignment = await prisma.consignment.findUnique({
+    where: { id: consignmentId },
+    include: { items: true, settlements: { orderBy: { createdAt: 'desc' }, take: 1 } },
+  });
+  if (!consignment) return res.status(404).json({ error: 'Consignment not found' });
+
+  try {
+    assertStoreAccess(req.user, consignment.storeId);
+  } catch (err) {
+    return res.status(err.status || 403).json({ error: err.message });
+  }
+
+  const latestSettlement = consignment.settlements[0];
+  if (!latestSettlement || latestSettlement.id !== settlementId) {
+    return res.status(400).json({ error: 'Only the most recent settlement on this consignment can be edited' });
+  }
+
+  const settlement = await prisma.settlement.findUnique({
+    where: { id: settlementId },
+    include: { lines: { include: { consignmentItem: true } } },
+  });
+
+  let normalizedDate;
+  try {
+    normalizedDate = normalizeDate(date || settlement.settledAt.toISOString().slice(0, 10));
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  try {
     const result = await prisma.$transaction(async (tx) => {
-      for (const { item, soldQty, returnedQty } of preparedLines) {
-        if (soldQty > 0) {
-          await adjustStock(tx, {
-            storeId: consignment.storeId,
-            productId: item.productId,
-            date: normalizedDate,
-            soldDelta: soldQty,
-            consignmentDelta: -soldQty,
-          });
+      await reverseSettlement(tx, { consignment, settlement });
+
+      const refreshedItems = await tx.consignmentItem.findMany({ where: { consignmentId } });
+      const itemsById = new Map(refreshedItems.map((i) => [i.id, i]));
+      const preparedLines = [];
+      for (const line of lines) {
+        const item = itemsById.get(Number(line.consignmentItemId));
+        if (!item) {
+          throw httpError(400, `Consignment item ${line.consignmentItemId} does not belong to this consignment`);
         }
-        if (returnedQty > 0) {
-          // Stock physically leaves the store back to HQ — opposite
-          // direction from the customer-facing processReturn(), which
-          // credits stock back INTO the store.
-          await adjustStock(tx, {
-            storeId: consignment.storeId,
-            productId: item.productId,
-            date: normalizedDate,
-            receivedDelta: -returnedQty,
-            consignmentDelta: -returnedQty,
-          });
+        const soldQty = Number(line.soldQty) || 0;
+        const returnedQty = Number(line.returnedQty) || 0;
+        const remaining = item.deliveredQty - item.soldQty - item.returnedQty;
+        if (soldQty + returnedQty > remaining) {
+          throw httpError(
+            400,
+            `${soldQty + returnedQty} exceeds the ${remaining} still remaining for this item once this settlement's own quantities are backed out`
+          );
         }
+        preparedLines.push({ item, soldQty, returnedQty });
       }
 
-      const soldLines = preparedLines.filter((l) => l.soldQty > 0);
-      let sale = null;
-      if (soldLines.length > 0) {
-        const saleLineData = soldLines.map(({ item, soldQty }) => ({
-          productId: item.productId,
-          quantity: soldQty,
-          unitPrice: item.pricePerUnit,
-          amount: soldQty * item.pricePerUnit,
-          type: 'SALE',
-        }));
-        const totalAmount = saleLineData.reduce((sum, l) => sum + l.amount, 0);
-        const createdSale = await tx.sale.create({
-          data: {
-            number: 'PENDING',
-            date: normalizedDate,
-            storeId: consignment.storeId,
-            createdById: req.user.id,
-            totalAmount,
-            consignmentId: consignment.id,
-            lines: { create: saleLineData },
-          },
-        });
-        sale = await tx.sale.update({
-          where: { id: createdSale.id },
-          data: { number: `SL-${String(createdSale.id).padStart(6, '0')}` },
-        });
-      }
-
-      const returnedLines = preparedLines.filter((l) => l.returnedQty > 0);
-      if (returnedLines.length > 0) {
-        await tx.return.createMany({
-          data: returnedLines.map(({ item, returnedQty }) => ({
-            date: normalizedDate,
-            storeId: consignment.storeId,
-            productId: item.productId,
-            quantity: returnedQty,
-            reason: 'CONSIGNMENT_UNSOLD',
-            reference: consignment.consignmentNo,
-            createdById: req.user.id,
-          })),
-        });
-      }
-
-      const createdSettlement = await tx.settlement.create({
-        data: {
-          settlementNo: 'PENDING',
-          consignmentId: consignment.id,
-          createdById: req.user.id,
-          settledAt: normalizedDate,
-          notes: notes?.trim() || null,
-          saleId: sale?.id ?? null,
-          lines: {
-            create: preparedLines.map(({ item, soldQty, returnedQty }) => ({
-              consignmentItemId: item.id,
-              soldQty,
-              returnedQty,
-            })),
-          },
-        },
-      });
-      const settlement = await tx.settlement.update({
-        where: { id: createdSettlement.id },
-        data: { settlementNo: `ST-${String(createdSettlement.id).padStart(6, '0')}` },
-      });
-
-      for (const { item, soldQty, returnedQty } of preparedLines) {
-        await tx.consignmentItem.update({
-          where: { id: item.id },
-          data: { soldQty: item.soldQty + soldQty, returnedQty: item.returnedQty + returnedQty },
-        });
-      }
-
-      const refreshedItems = await tx.consignmentItem.findMany({ where: { consignmentId: consignment.id } });
-      const totalDelivered = refreshedItems.reduce((sum, i) => sum + i.deliveredQty, 0);
-      const totalSettled = refreshedItems.reduce((sum, i) => sum + i.soldQty + i.returnedQty, 0);
-      const totalSold = refreshedItems.reduce((sum, i) => sum + i.soldQty, 0);
-      let status = 'PARTIAL_SETTLED';
-      if (totalSettled === 0) status = 'DELIVERED';
-      else if (totalSettled >= totalDelivered) status = totalSold === 0 ? 'RETURNED' : 'SETTLED';
-
-      await tx.consignment.update({
-        where: { id: consignment.id },
-        data: {
-          status,
-          settledAt: status === 'SETTLED' || status === 'RETURNED' ? normalizedDate : null,
-        },
+      await applySettlement(tx, {
+        consignment,
+        preparedLines,
+        normalizedDate,
+        notes: notes !== undefined ? notes : settlement.notes,
+        userId: req.user.id,
+        existingSettlementId: settlementId,
+        existingSaleId: settlement.saleId,
       });
 
       return tx.settlement.findUnique({
-        where: { id: settlement.id },
+        where: { id: settlementId },
         include: {
           createdBy: true,
           sale: true,
@@ -401,9 +714,9 @@ router.post('/:id/settle', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req,
       include: DETAIL_INCLUDE,
     });
 
-    res.status(201).json({ settlement: shapeSettlement(result), consignment: shapeConsignment(fullConsignment) });
+    res.json({ settlement: shapeSettlement(result), consignment: shapeConsignment(fullConsignment) });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || 'Failed to settle consignment' });
+    res.status(err.status || 500).json({ error: err.message || 'Failed to update settlement' });
   }
 });
 
