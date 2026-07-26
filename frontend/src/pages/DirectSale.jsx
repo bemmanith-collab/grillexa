@@ -5,8 +5,10 @@ import LineItemsForm, { emptyLine } from '../components/LineItemsForm';
 import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
-import { ReceiptIcon } from '../components/icons';
+import Toast from '../components/Toast';
+import { ReceiptIcon, RefreshIcon } from '../components/icons';
 import { formatCurrency } from '../lib/format';
+import { filterToCatalog, describeDropped } from '../lib/reorder';
 import { formatDate } from '../utils/date';
 
 function todayStr() {
@@ -33,6 +35,9 @@ export default function DirectSale() {
   const [customerGstin, setCustomerGstin] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [reordering, setReordering] = useState(false);
+  const [reorderWarning, setReorderWarning] = useState('');
+  const [toast, setToast] = useState('');
 
   async function loadAll() {
     setLoading(true);
@@ -66,6 +71,58 @@ export default function DirectSale() {
     setCustomerName('');
     setCustomerPhone('');
     setCustomerGstin('');
+    setReorderWarning('');
+  }
+
+  // Copies the store's most recent walk-in bill into the form, for the very
+  // common repeat order. Only the product lines are copied — the customer
+  // name/phone/GSTIN stay blank, since the next walk-in is a different
+  // person and carrying the last one's details onto their bill would be
+  // both wrong and a privacy leak.
+  async function handleReorder() {
+    if (!storeId) {
+      setError('Pick a store first.');
+      return;
+    }
+    setError('');
+    setReorderWarning('');
+    setReordering(true);
+    try {
+      const res = await client.get(`/sales/latest/${storeId}`, { params: { direct: true } });
+      const last = res.data.sale;
+      // A RETURN line credited the customer who brought that item back —
+      // repeating it here would credit an unrelated walk-in.
+      const saleLines = last.lines.filter((l) => l.type !== 'RETURN');
+      const returnCount = last.lines.length - saleLines.length;
+      const { lines: reordered, dropped } = filterToCatalog(saleLines, products);
+
+      const caveats = [];
+      if (dropped.length > 0) caveats.push(`skipped ${describeDropped(dropped)}`);
+      if (returnCount > 0) {
+        caveats.push(`left out ${returnCount} return ${returnCount === 1 ? 'line' : 'lines'}`);
+      }
+
+      if (reordered.length === 0) {
+        setReorderWarning(
+          `Nothing to reorder from ${last.number} — ${caveats.join(' and ') || 'it has no sale lines'}.`
+        );
+        return;
+      }
+
+      setLines(reordered.map((l) => ({ ...l, type: 'SALE', reason: '' })));
+      if (caveats.length > 0) {
+        setReorderWarning(`Reordered ${last.number}, but ${caveats.join(' and ')}.`);
+      }
+      setToast(`Reordered from ${last.number} · ${formatDate(last.date)}`);
+    } catch (err) {
+      setError(
+        err.response?.status === 404
+          ? 'No past direct sales found'
+          : err.response?.data?.error || 'Failed to load the last sale.'
+      );
+    } finally {
+      setReordering(false);
+    }
   }
 
   async function handleSubmit(e) {
@@ -140,7 +197,13 @@ export default function DirectSale() {
               {showStorePicker ? (
                 <label>
                   Store
-                  <select value={storeId} onChange={(e) => setStoreId(e.target.value)}>
+                  <select
+                    value={storeId}
+                    onChange={(e) => {
+                      setStoreId(e.target.value);
+                      setReorderWarning('');
+                    }}
+                  >
                     {!isScoped && <option value="">Select a store…</option>}
                     {stores.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -173,7 +236,20 @@ export default function DirectSale() {
                 GSTIN <span className="form-optional">(optional)</span>
                 <input type="text" value={customerGstin} onChange={(e) => setCustomerGstin(e.target.value)} />
               </label>
+              <div className="bill-form-action">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleReorder}
+                  disabled={!storeId || reordering}
+                  title="Fill these lines with the same products and quantities as this store's last direct sale"
+                >
+                  <RefreshIcon className={reordering ? 'icon-spin' : undefined} />
+                  {reordering ? 'Loading…' : 'Reorder from Last Sale'}
+                </button>
+              </div>
             </div>
+            {reorderWarning && <div className="form-warning">{reorderWarning}</div>}
             <LineItemsForm products={products} lines={lines} setLines={setLines} />
             <div className="modal-actions">
               <button type="submit" className="btn-primary" disabled={submitting}>
@@ -231,6 +307,8 @@ export default function DirectSale() {
       )}
 
       {detail && <BillDetailModal title="Sale Bill" bill={detail} onClose={() => setDetail(null)} hideCreatedBy={isScoped} />}
+
+      <Toast message={toast} onDone={() => setToast('')} />
     </div>
   );
 }

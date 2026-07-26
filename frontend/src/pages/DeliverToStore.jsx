@@ -7,6 +7,7 @@ import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import Toast from '../components/Toast';
 import { TruckIcon, RefreshIcon } from '../components/icons';
+import { filterToCatalog, describeDropped } from '../lib/reorder';
 import { formatDate } from '../utils/date';
 
 function todayStr() {
@@ -127,26 +128,26 @@ export default function DeliverToStore() {
     try {
       const res = await client.get(`/consignments/latest/${storeId}`);
       const last = res.data.consignment;
-      const inCatalog = (item) => products.some((p) => p.id === item.productId);
-      const available = last.items.filter(inCatalog);
-      const dropped = last.items.filter((i) => !inCatalog(i));
+      const { lines: reordered, dropped } = filterToCatalog(
+        last.items.map((i) => ({
+          productId: i.productId,
+          product: i.product,
+          quantity: i.deliveredQty,
+          unitPrice: i.pricePerUnit,
+        })),
+        products
+      );
 
-      if (available.length === 0) {
+      if (reordered.length === 0) {
         setReorderWarning(
           `${last.consignmentNo} only has products that are no longer in the catalog — nothing to reorder.`
         );
         return;
       }
 
-      setLines(
-        available.map((i) => ({ productId: i.productId, quantity: i.deliveredQty, unitPrice: i.pricePerUnit }))
-      );
+      setLines(reordered);
       if (dropped.length > 0) {
-        setReorderWarning(
-          `Skipped ${dropped.length} discontinued ${dropped.length === 1 ? 'product' : 'products'} from ${
-            last.consignmentNo
-          }: ${dropped.map((i) => i.product).join(', ')}.`
-        );
+        setReorderWarning(`Reordered ${last.consignmentNo}, but skipped ${describeDropped(dropped)}.`);
       }
       setToast(`Reordered from ${last.consignmentNo} · ${formatDate(last.deliveredAt)}`);
     } catch (err) {
