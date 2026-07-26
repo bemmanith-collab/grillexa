@@ -38,6 +38,17 @@ export default function DirectSale() {
   const [reordering, setReordering] = useState(false);
   const [reorderWarning, setReorderWarning] = useState('');
   const [toast, setToast] = useState('');
+  // True while the customer fields hold details a reorder pulled from a past
+  // bill, so switching stores can safely drop them. Any keystroke in those
+  // fields clears it — hand-typed details are never wiped.
+  const [customerFromReorder, setCustomerFromReorder] = useState(false);
+
+  function editCustomer(setField) {
+    return (e) => {
+      setField(e.target.value);
+      setCustomerFromReorder(false);
+    };
+  }
 
   async function loadAll() {
     setLoading(true);
@@ -71,14 +82,16 @@ export default function DirectSale() {
     setCustomerName('');
     setCustomerPhone('');
     setCustomerGstin('');
+    setCustomerFromReorder(false);
     setReorderWarning('');
   }
 
-  // Copies the store's most recent walk-in bill into the form, for the very
-  // common repeat order. Only the product lines are copied — the customer
-  // name/phone/GSTIN stay blank, since the next walk-in is a different
-  // person and carrying the last one's details onto their bill would be
-  // both wrong and a privacy leak.
+  // Copies the store's most recent bill into the form, for the very common
+  // repeat order. The customer name/phone/GSTIN come across too: the bill is
+  // raised in the store's own name, so for a given store those details are
+  // the same every time rather than belonging to a different walk-in person.
+  // They're only reused within one store — see the store picker, which drops
+  // them on a switch so store A's GSTIN can't land on store B's bill.
   async function handleReorder() {
     if (!storeId) {
       setError('Pick a store first.');
@@ -110,6 +123,10 @@ export default function DirectSale() {
       }
 
       setLines(reordered.map((l) => ({ ...l, type: 'SALE', reason: '' })));
+      setCustomerName(last.customerName || '');
+      setCustomerPhone(last.customerPhone || '');
+      setCustomerGstin(last.customerGstin || '');
+      setCustomerFromReorder(true);
       if (caveats.length > 0) {
         setReorderWarning(`Reordered ${last.number}, but ${caveats.join(' and ')}.`);
       }
@@ -202,6 +219,13 @@ export default function DirectSale() {
                     onChange={(e) => {
                       setStoreId(e.target.value);
                       setReorderWarning('');
+                      // These belong to the store we just left.
+                      if (customerFromReorder) {
+                        setCustomerName('');
+                        setCustomerPhone('');
+                        setCustomerGstin('');
+                        setCustomerFromReorder(false);
+                      }
                     }}
                   >
                     {!isScoped && <option value="">Select a store…</option>}
@@ -226,15 +250,15 @@ export default function DirectSale() {
               </label>
               <label>
                 Customer Name <span className="form-optional">(optional)</span>
-                <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Walk-in customer" />
+                <input type="text" value={customerName} onChange={editCustomer(setCustomerName)} placeholder="Walk-in customer" />
               </label>
               <label>
                 Phone <span className="form-optional">(optional)</span>
-                <input type="text" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                <input type="text" value={customerPhone} onChange={editCustomer(setCustomerPhone)} />
               </label>
               <label>
                 GSTIN <span className="form-optional">(optional)</span>
-                <input type="text" value={customerGstin} onChange={(e) => setCustomerGstin(e.target.value)} />
+                <input type="text" value={customerGstin} onChange={editCustomer(setCustomerGstin)} />
               </label>
               <div className="bill-form-action">
                 <button
