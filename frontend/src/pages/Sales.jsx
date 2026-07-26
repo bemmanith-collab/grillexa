@@ -7,6 +7,7 @@ import EmptyState from '../components/EmptyState';
 import { ReceiptIcon } from '../components/icons';
 import { formatCurrency } from '../lib/format';
 import { formatDate } from '../utils/date';
+import { Link } from 'react-router-dom';
 
 export default function Sales() {
   const { user } = useAuth();
@@ -49,10 +50,11 @@ export default function Sales() {
         <div>
           <h1>Sales</h1>
           <p className="page-subtitle">
-            Revenue is only recognized when a consignment is settled — see Settle Consignment to record a new sale
+            Every bill, whether from a Direct Sale or a settled consignment
             {singleStoreName && <> · {singleStoreName}</>}
           </p>
         </div>
+        <Link to="/direct-sale" className="btn-primary">+ New Direct Sale</Link>
       </div>
 
       {error && <div className="form-error">{error}</div>}

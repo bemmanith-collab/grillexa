@@ -10,6 +10,7 @@ const Signup = lazy(() => import('./pages/Signup'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Dispatches = lazy(() => import('./pages/Dispatches'));
 const DeliverToStore = lazy(() => import('./pages/DeliverToStore'));
+const DirectSale = lazy(() => import('./pages/DirectSale'));
 const SettleConsignment = lazy(() => import('./pages/SettleConsignment'));
 const Products = lazy(() => import('./pages/Products'));
 const Sales = lazy(() => import('./pages/Sales'));
@@ -44,6 +45,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Sales />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/direct-sale"
+              element={
+                <ProtectedRoute>
+                  <DirectSale />
                 </ProtectedRoute>
               }
             />

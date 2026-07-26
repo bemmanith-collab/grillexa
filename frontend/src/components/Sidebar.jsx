@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   BarChart3,
   Banknote,
+  Wallet,
   Package,
   PackageCheck,
   Handshake,
@@ -91,6 +92,7 @@ export default function Sidebar() {
           <NavItem to="/" end icon={BarChart3} onNavigate={closeMenu}>Today's Stock</NavItem>
           <NavItem to="/deliver-to-store" icon={PackageCheck} onNavigate={closeMenu}>Deliver to Store</NavItem>
           <NavItem to="/settle-consignment" icon={Handshake} onNavigate={closeMenu}>Settle Consignment</NavItem>
+          <NavItem to="/direct-sale" icon={Wallet} onNavigate={closeMenu}>Direct Sale</NavItem>
           <NavItem to="/sales" icon={Banknote} onNavigate={closeMenu}>Sales</NavItem>
           {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
             <NavItem to="/dispatches" icon={Package} onNavigate={closeMenu}>Dispatches</NavItem>
