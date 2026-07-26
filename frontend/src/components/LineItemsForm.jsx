@@ -50,11 +50,11 @@ export default function LineItemsForm({ products, lines, setLines, allowReturns 
       <table className="data-table">
         <thead>
           <tr>
-            {allowReturns && <th>Type</th>}
-            <th>Product</th>
+            {allowReturns && <th className="col-type">Type</th>}
+            <th className="col-product">Product</th>
             <th>Quantity</th>
             <th>Unit Price</th>
-            {allowReturns && <th>Reason</th>}
+            {allowReturns && <th className="col-reason">Reason</th>}
             <th>Amount</th>
             <th></th>
           </tr>
@@ -66,14 +66,14 @@ export default function LineItemsForm({ products, lines, setLines, allowReturns 
             return (
               <tr key={i} className={isReturn ? 'line-return' : undefined}>
                 {allowReturns && (
-                  <td>
+                  <td className="col-type">
                     <select value={line.type || 'SALE'} onChange={(e) => handleTypeChange(i, e.target.value)}>
                       <option value="SALE">Sale</option>
                       <option value="RETURN">Return</option>
                     </select>
                   </td>
                 )}
-                <td>
+                <td className="col-product">
                   <select value={line.productId} onChange={(e) => handleProductChange(i, e.target.value)}>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -102,7 +102,7 @@ export default function LineItemsForm({ products, lines, setLines, allowReturns 
                   />
                 </td>
                 {allowReturns && (
-                  <td>
+                  <td className="col-reason">
                     {isReturn ? (
                       <select value={line.reason || RETURN_REASONS[0].value} onChange={(e) => updateLine(i, { reason: e.target.value })}>
                         {RETURN_REASONS.map((r) => (

@@ -1280,6 +1280,48 @@ button:disabled {
   width: 100%;
 }
 
+/* The line editor is the one table that has to stay legible on a phone, and
+   auto table-layout gets it backwards there: a number input carries an
+   intrinsic width of roughly 20 characters, so Quantity claims most of the
+   row and the product <select> collapses to "Mixe…" — which makes two
+   similarly-named products ("Mixed Sprouts" vs "Mixed Fruit Bowl")
+   impossible to tell apart.
+   Fixed in two parts. Cap the number inputs, since their intrinsic width is
+   what starved the product column; and floor the product COLUMN so the name
+   stays readable, letting .table-scroll pan across the overflow rather than
+   crushing everything to fit.
+   The floor has to sit on the cell, not the control. A <select> set to
+   width:100% makes no width demand of its own, so the column never grows
+   for it — and a min-width on the <select> doesn't feed into table column
+   sizing either: the control just overflows its cell and gets painted over
+   by the next one. A min-width on the <td>/<th> does participate. */
+.line-items .data-table .col-product {
+  min-width: 176px;
+}
+
+.line-items .data-table .col-type {
+  min-width: 104px;
+}
+
+/* Sized for "Customer Return", the longest label the picker offers. */
+.line-items .data-table .col-reason {
+  min-width: 176px;
+}
+
+.line-items .data-table .line-input {
+  width: 4.75rem;
+  min-width: 4.75rem;
+}
+
+/* Default cell padding (16px a side) is a big share of a 390px-wide phone;
+   the line rows are all controls, so they can afford to be tighter. */
+@media (max-width: 720px) {
+  .line-items .data-table th,
+  .line-items .data-table td {
+    padding: 8px 10px;
+  }
+}
+
 .line-items-footer {
   display: flex;
   align-items: center;
