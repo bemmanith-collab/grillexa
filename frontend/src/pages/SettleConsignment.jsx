@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import client from '../api/client';
+import { Search } from 'lucide-react';
 import { formatCurrency } from '../lib/format';
 import { formatDate } from '../utils/date';
 import BillDetailModal from '../components/BillDetailModal';
@@ -192,6 +193,18 @@ export default function SettleConsignment() {
   const [settling, setSettling] = useState(null);
   const [editingSettlement, setEditingSettlement] = useState(null);
   const [result, setResult] = useState(null);
+  const [search, setSearch] = useState('');
+
+  const filteredConsignments = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return consignments;
+    return consignments.filter(
+      (c) =>
+        c.consignmentNo.toLowerCase().includes(q) ||
+        c.store.toLowerCase().includes(q) ||
+        c.status.replace('_', ' ').toLowerCase().includes(q)
+    );
+  }, [consignments, search]);
 
   async function load() {
     setLoading(true);
@@ -245,6 +258,19 @@ export default function SettleConsignment() {
 
       {error && <div className="form-error">{error}</div>}
 
+      {!loading && (
+        <div className="card form-card">
+          <div className="search-input">
+            <Search size={16} />
+            <input
+              placeholder="Search by consignment #, store or status…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <Spinner label="Loading consignments…" />
       ) : (
@@ -262,7 +288,7 @@ export default function SettleConsignment() {
               </tr>
             </thead>
             <tbody>
-              {consignments.map((c) => (
+              {filteredConsignments.map((c) => (
                 <tr key={c.id}>
                   <td className="cell-mono">{c.consignmentNo}</td>
                   <td className="cell-date">{formatDate(c.deliveredAt)}</td>
@@ -285,10 +311,13 @@ export default function SettleConsignment() {
                   </td>
                 </tr>
               ))}
-              {consignments.length === 0 && (
+              {filteredConsignments.length === 0 && (
                 <tr>
                   <td colSpan={6}>
-                    <EmptyState icon={ReceiptIcon} message="No consignments yet." />
+                    <EmptyState
+                      icon={ReceiptIcon}
+                      message={consignments.length === 0 ? 'No consignments yet.' : 'No consignments match your search.'}
+                    />
                   </td>
                 </tr>
               )}
