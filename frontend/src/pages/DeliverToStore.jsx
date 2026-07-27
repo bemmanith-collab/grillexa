@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { Search } from 'lucide-react';
 import LineItemsForm, { emptyLine } from '../components/LineItemsForm';
 import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
@@ -56,6 +57,22 @@ export default function DeliverToStore() {
   const [reordering, setReordering] = useState(false);
   const [reorderWarning, setReorderWarning] = useState('');
   const [toast, setToast] = useState('');
+  const [search, setSearch] = useState('');
+
+  // "Delivered By" is only a column for unscoped users, so only they can
+  // search on it — a SALES user matching a name they can't see would be
+  // filtering by something invisible.
+  const filteredConsignments = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return consignments;
+    return consignments.filter(
+      (c) =>
+        c.consignmentNo.toLowerCase().includes(q) ||
+        c.store.toLowerCase().includes(q) ||
+        c.status.replace('_', ' ').toLowerCase().includes(q) ||
+        (!isScoped && (c.createdBy || '').toLowerCase().includes(q))
+    );
+  }, [consignments, search, isScoped]);
 
   async function loadAll() {
     setLoading(true);
@@ -276,6 +293,23 @@ export default function DeliverToStore() {
         </div>
       )}
 
+      {!loading && (
+        <div className="card form-card">
+          <div className="search-input">
+            <Search size={16} />
+            <input
+              placeholder={
+                isScoped
+                  ? 'Search by consignment #, store or status…'
+                  : 'Search by consignment #, store, status or delivered by…'
+              }
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <Spinner label="Loading deliveries…" />
       ) : (
@@ -294,7 +328,7 @@ export default function DeliverToStore() {
               </tr>
             </thead>
             <tbody>
-              {consignments.map((c) => (
+              {filteredConsignments.map((c) => (
                 <tr key={c.id}>
                   <td className="cell-mono">{c.consignmentNo}</td>
                   <td className="cell-date">{formatDate(c.deliveredAt)}</td>
@@ -316,10 +350,13 @@ export default function DeliverToStore() {
                   </td>
                 </tr>
               ))}
-              {consignments.length === 0 && (
+              {filteredConsignments.length === 0 && (
                 <tr>
                   <td colSpan={isScoped ? 6 : 7}>
-                    <EmptyState icon={TruckIcon} message="No deliveries yet." />
+                    <EmptyState
+                      icon={TruckIcon}
+                      message={consignments.length === 0 ? 'No deliveries yet.' : 'No deliveries match your search.'}
+                    />
                   </td>
                 </tr>
               )}
