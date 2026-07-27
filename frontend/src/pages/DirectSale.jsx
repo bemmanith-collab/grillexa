@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { Search } from 'lucide-react';
 import LineItemsForm, { emptyLine } from '../components/LineItemsForm';
 import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
@@ -42,6 +43,24 @@ export default function DirectSale() {
   // bill, so switching stores can safely drop them. Any keystroke in those
   // fields clears it — hand-typed details are never wiped.
   const [customerFromReorder, setCustomerFromReorder] = useState(false);
+  const [search, setSearch] = useState('');
+
+  // Phone isn't a column, but "find that walk-in's last bill by their number"
+  // is the common counter request, so it's matched and named in the
+  // placeholder. "Created By" is only matched for unscoped users, since it's
+  // only a column for them.
+  const filteredSales = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return sales;
+    return sales.filter(
+      (s) =>
+        s.number.toLowerCase().includes(q) ||
+        s.store.toLowerCase().includes(q) ||
+        (s.customerName || '').toLowerCase().includes(q) ||
+        (s.customerPhone || '').toLowerCase().includes(q) ||
+        (!isScoped && (s.createdBy || '').toLowerCase().includes(q))
+    );
+  }, [sales, search, isScoped]);
 
   function editCustomer(setField) {
     return (e) => {
@@ -284,6 +303,23 @@ export default function DirectSale() {
         </div>
       )}
 
+      {!loading && (
+        <div className="card form-card">
+          <div className="search-input">
+            <Search size={16} />
+            <input
+              placeholder={
+                isScoped
+                  ? 'Search by bill #, store, customer or phone…'
+                  : 'Search by bill #, store, customer, phone or created by…'
+              }
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <Spinner label="Loading direct sales…" />
       ) : (
@@ -302,7 +338,7 @@ export default function DirectSale() {
               </tr>
             </thead>
             <tbody>
-              {sales.map((s) => (
+              {filteredSales.map((s) => (
                 <tr key={s.id}>
                   <td className="cell-mono">{s.number}</td>
                   <td className="cell-date">{formatDate(s.date)}</td>
@@ -317,10 +353,17 @@ export default function DirectSale() {
                   </td>
                 </tr>
               ))}
-              {sales.length === 0 && (
+              {filteredSales.length === 0 && (
                 <tr>
                   <td colSpan={isScoped ? 6 : 7}>
-                    <EmptyState icon={ReceiptIcon} message="No direct sales recorded yet." />
+                    <EmptyState
+                      icon={ReceiptIcon}
+                      message={
+                        sales.length === 0
+                          ? 'No direct sales recorded yet.'
+                          : 'No direct sales match your search.'
+                      }
+                    />
                   </td>
                 </tr>
               )}
