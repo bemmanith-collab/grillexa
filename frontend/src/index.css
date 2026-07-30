@@ -299,6 +299,20 @@ select {
   color: #fff;
 }
 
+.install-hint {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  background: var(--primary-soft);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 10px 0 0;
+}
+
+.install-hint strong {
+  color: var(--primary);
+}
+
 .sidebar-install {
   display: flex;
   align-items: center;

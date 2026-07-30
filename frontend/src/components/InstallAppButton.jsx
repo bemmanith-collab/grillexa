@@ -10,6 +10,16 @@ import { Download } from 'lucide-react';
 // Renders nothing when there's nothing to offer: already installed, or a
 // browser that doesn't support this (iOS Safari, where the route is
 // Share → Add to Home Screen).
+// iPadOS reports itself as MacIntel, so the touch-point check is what catches
+// an iPad rather than a Mac.
+function isIos() {
+  if (typeof navigator === 'undefined') return false;
+  return (
+    /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
 export default function InstallAppButton({ className = 'btn-secondary' }) {
   // Seeded from the event index.html already caught — by the time React
   // mounts, Chrome has usually fired it and moved on.
@@ -44,7 +54,20 @@ export default function InstallAppButton({ className = 'btn-secondary' }) {
     };
   }, []);
 
-  if (installed || !prompt) return null;
+  if (installed) return null;
+
+  // iOS has no beforeinstallprompt in any browser — every one of them is
+  // WebKit underneath — so there is no prompt to offer and the button would
+  // simply never appear. Safari can still add to the home screen; it just
+  // has to be done by hand, so say how instead of showing nothing.
+  if (!prompt) {
+    return isIos() ? (
+      <p className="install-hint">
+        To install: open this page in <strong>Safari</strong>, tap Share, then{' '}
+        <strong>Add to Home Screen</strong>.
+      </p>
+    ) : null;
+  }
 
   async function install() {
     prompt.prompt();
