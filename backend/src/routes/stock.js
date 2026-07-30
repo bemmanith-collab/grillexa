@@ -1,7 +1,7 @@
 const express = require('express');
 const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
-const { normalizeDate, getOrCreateDailyEntry, adjustStock } = require('../lib/stock');
+const { normalizeDate, todayStr, getOrCreateDailyEntry, adjustStock } = require('../lib/stock');
 const { assertStoreAccess } = require('../lib/scope');
 
 const router = express.Router();
@@ -34,10 +34,6 @@ function shapeEntry(entry) {
     consignmentQty: entry.consignmentQty,
     status: computeStatus(entry),
   };
-}
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 // Today's ledger row for every product at a given store — auto-creates

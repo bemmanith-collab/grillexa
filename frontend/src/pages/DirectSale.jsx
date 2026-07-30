@@ -10,11 +10,7 @@ import Toast from '../components/Toast';
 import { ReceiptIcon, RefreshIcon } from '../components/icons';
 import { formatCurrency } from '../lib/format';
 import { filterToCatalog, describeDropped } from '../lib/reorder';
-import { formatDate } from '../utils/date';
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
+import { formatDate, todayStr } from '../utils/date';
 
 export default function DirectSale() {
   const { user } = useAuth();
@@ -98,6 +94,9 @@ export default function DirectSale() {
 
   function resetForm() {
     setLines([emptyLine(products)]);
+    // Otherwise back-dating one bill silently dates every later bill that
+    // session to the same past day.
+    setDate(todayStr());
     setCustomerName('');
     setCustomerPhone('');
     setCustomerGstin('');

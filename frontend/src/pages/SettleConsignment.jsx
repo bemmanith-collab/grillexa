@@ -2,15 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import client from '../api/client';
 import { Search } from 'lucide-react';
 import { formatCurrency } from '../lib/format';
-import { formatDate } from '../utils/date';
+import { formatDate, todayStr } from '../utils/date';
 import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { ReceiptIcon } from '../components/icons';
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function asSaleBill(settlement, consignment) {
   return {

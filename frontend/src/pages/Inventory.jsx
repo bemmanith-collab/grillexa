@@ -9,17 +9,7 @@ import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { BoxIcon } from '../components/icons';
 import { STATUS_LABEL, STATUS_BADGE_CLASS } from '../lib/stockStatus';
-import { formatDate } from '../utils/date';
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function yesterdayStr() {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
+import { formatDate, todayStr, daysAgoStr } from '../utils/date';
 
 // direction the metric moved, plus the % change (null once previous is 0 —
 // a percentage off a zero baseline isn't meaningful, so we just say "New").
@@ -84,7 +74,7 @@ export default function Inventory() {
       const [todayRes, historyRes, consignmentsRes] = await Promise.all([
         client.get('/stock/today', { params: { storeId: sid, date: todayStr() } }),
         client
-          .get('/stock/history', { params: { storeId: sid, from: yesterdayStr(), to: yesterdayStr() } })
+          .get('/stock/history', { params: { storeId: sid, from: daysAgoStr(1), to: daysAgoStr(1) } })
           .catch(() => ({ data: { entries: [] } })),
         client
           .get('/consignments', { params: { storeId: sid, status: 'DELIVERED,PARTIAL_SETTLED' } })

@@ -5,17 +5,7 @@ import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { HistoryIcon } from '../components/icons';
 import { STATUS_LABEL, STATUS_BADGE_CLASS } from '../lib/stockStatus';
-import { formatDate } from '../utils/date';
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function daysAgoStr(n) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
-}
+import { formatDate, todayStr, daysAgoStr } from '../utils/date';
 
 export default function StockHistory() {
   const { user } = useAuth();

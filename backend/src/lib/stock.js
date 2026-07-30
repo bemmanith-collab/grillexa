@@ -23,6 +23,31 @@ function previousDay(date) {
   return prev;
 }
 
+// The business's calendar day, as YYYY-MM-DD. Not toISOString(): the server
+// runs in UTC, so that rolls over at 05:30 IST and would file an early-morning
+// movement under yesterday. en-CA's short format is already YYYY-MM-DD; the
+// explicit timeZone is what makes this the business's day, not the server's.
+const BUSINESS_TZ = process.env.BUSINESS_TZ || 'Asia/Kolkata';
+
+function todayStr() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: BUSINESS_TZ });
+}
+
+// Re-chains a run of ledger rows onto a new starting balance. Pure, so the
+// arithmetic can be checked without a database — see test/stock-cascade.js.
+// consignmentQty has no formula to recompute from (only the running balance is
+// stored, not the day's delta), so it shifts by whatever this write applied:
+// a delta of X on day D moves the balance for every later day by exactly X.
+function rechain(openingFrom, rows, consignmentDelta = 0) {
+  let opening = openingFrom;
+  return rows.map((row) => {
+    const closing = opening + row.received - row.sold - row.wastage;
+    const rechained = { ...row, opening, closing, consignmentQty: row.consignmentQty + consignmentDelta };
+    opening = closing;
+    return rechained;
+  });
+}
+
 // Returns the ledger row for (date, storeId, productId), creating it (with
 // opening = previous day's closing, or 0 if there's no history yet) if needed.
 // consignmentQty is carried forward the same way opening is — it's a running
@@ -64,10 +89,28 @@ async function adjustStock(tx, { storeId, productId, date, receivedDelta = 0, so
   const closing = entry.opening + received - sold - wastage;
   const consignmentQty = entry.consignmentQty + consignmentDelta;
 
-  return tx.dailyStockEntry.update({
+  const updated = await tx.dailyStockEntry.update({
     where: { id: entry.id },
     data: { received, sold, wastage, closing, consignmentQty },
   });
+
+  // Every later day's opening was snapshotted from this day's closing, so a
+  // write to a past date leaves the whole rest of the chain stale — the app
+  // invites exactly that with a free date picker on every form, and a
+  // settlement edit reverses stock at the *original* settledAt. Without this,
+  // amending yesterday silently invents or destroys stock from today on.
+  const later = await tx.dailyStockEntry.findMany({
+    where: { storeId, productId, date: { gt: date } },
+    orderBy: { date: 'asc' },
+  });
+  for (const row of rechain(closing, later, consignmentDelta)) {
+    await tx.dailyStockEntry.update({
+      where: { id: row.id },
+      data: { opening: row.opening, closing: row.closing, consignmentQty: row.consignmentQty },
+    });
+  }
+
+  return updated;
 }
 
 // A return credits the full quantity back to closing stock. It first
@@ -83,4 +126,4 @@ async function processReturn(tx, { storeId, productId, date, quantity }) {
   return adjustStock(tx, { storeId, productId, date, soldDelta: -soldReduction, receivedDelta: overflow });
 }
 
-module.exports = { normalizeDate, previousDay, getOrCreateDailyEntry, adjustStock, processReturn };
+module.exports = { normalizeDate, previousDay, todayStr, rechain, getOrCreateDailyEntry, adjustStock, processReturn };

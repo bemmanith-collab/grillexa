@@ -2,16 +2,12 @@ const express = require('express');
 const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
-const { normalizeDate, adjustStock } = require('../lib/stock');
+const { normalizeDate, todayStr, adjustStock } = require('../lib/stock');
 const { assertStoreAccess } = require('../lib/scope');
 
 const router = express.Router();
 
 router.use(authenticate);
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function httpError(status, message) {
   const err = new Error(message);

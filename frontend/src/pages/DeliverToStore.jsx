@@ -9,11 +9,7 @@ import EmptyState from '../components/EmptyState';
 import Toast from '../components/Toast';
 import { TruckIcon, RefreshIcon } from '../components/icons';
 import { filterToCatalog, describeDropped } from '../lib/reorder';
-import { formatDate } from '../utils/date';
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
+import { formatDate, todayStr } from '../utils/date';
 
 // Maps a Consignment to the generic {number, date, store, lines, totalAmount}
 // shape BillDetailModal expects, so the delivery note reuses the same
@@ -119,6 +115,10 @@ export default function DeliverToStore() {
       setLines([emptyLine(products)]);
       setFormOpen(false);
       setEditingId(null);
+      // Back to today, like cancelForm does. Without this, editing an old
+      // delivery leaves its date in the field, and the next "+ New Delivery"
+      // (which only reopens the form) is created days in the past.
+      setDate(todayStr());
       setReorderWarning('');
       setDetail(res.data.consignment);
       loadAll();

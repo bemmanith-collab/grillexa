@@ -2,16 +2,12 @@ const express = require('express');
 const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
-const { normalizeDate } = require('../lib/stock');
+const { normalizeDate, todayStr } = require('../lib/stock');
 
 const router = express.Router();
 
 // Reports include financial and cross-store data, so they're limited to Admin and Manager.
 router.use(authenticate, requireRole('ADMIN', 'MANAGER'));
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 router.get('/summary', async (req, res) => {
   const date = normalizeDate(req.query.date || todayStr());

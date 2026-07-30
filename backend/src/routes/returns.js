@@ -1,7 +1,7 @@
 const express = require('express');
 const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
-const { normalizeDate, processReturn } = require('../lib/stock');
+const { normalizeDate, todayStr, processReturn } = require('../lib/stock');
 const { assertStoreAccess } = require('../lib/scope');
 
 const router = express.Router();
@@ -9,10 +9,6 @@ const router = express.Router();
 router.use(authenticate);
 
 const REASONS = ['CUSTOMER_RETURN', 'DAMAGED', 'EXCHANGE', 'OTHER'];
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function shapeReturn(r) {
   return {

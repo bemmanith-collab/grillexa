@@ -8,6 +8,9 @@ RUN npm install
 COPY backend/prisma ./prisma
 RUN npx prisma generate
 COPY backend/src ./src
+# Ships the ledger repair script, so it can be run against the live database
+# over `flyctl ssh console` without a proxy. Dry-run unless given --apply.
+COPY backend/scripts ./scripts
 
 # ---------- Stage 2: frontend (React + Vite) ----------
 FROM node:20-alpine AS frontend-build

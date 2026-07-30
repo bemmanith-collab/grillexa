@@ -1,12 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Flame, RefreshCw } from 'lucide-react';
 import client from '../api/client';
+import { todayStr } from '../utils/date';
 
 const STORAGE_KEY = 'grillexa_daily_quote';
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 // variant: 'prominent' (Sales — they need the motivation) or 'subtle' (Admin/Manager).
 export default function DailyWisdom({ variant = 'subtle' }) {
