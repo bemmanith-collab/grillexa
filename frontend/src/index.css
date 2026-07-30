@@ -1609,6 +1609,14 @@ button:disabled {
     white-space: nowrap;
   }
 
+  /* 16px of side padding per cell costs ~190px across a six-column table —
+     most of a phone's width, spent on gaps. Tightening it here pulls the
+     right-hand columns back toward the screen instead of past it. */
+  .data-table thead th,
+  .data-table tbody td {
+    padding: 11px 9px;
+  }
+
   /* Touch targets: Apple/Google both recommend ~44px minimum. */
   .btn-primary,
   .btn-secondary,

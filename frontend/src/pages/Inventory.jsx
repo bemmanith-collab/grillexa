@@ -171,12 +171,16 @@ export default function Inventory() {
             <div className="table-scroll">
             <table className="data-table data-table-zebra">
               <thead>
+                {/* On Consignment sits right after the product: it's the
+                    figure this business actually works from, and as the
+                    second-to-last column it was the one scrolled off the
+                    right edge of a phone. */}
                 <tr>
                   <th>Product</th>
+                  <th>On Consignment</th>
                   <th>Received</th>
                   <th>Sold</th>
                   <th>Wastage</th>
-                  <th>On Consignment</th>
                   <th></th>
                 </tr>
               </thead>
@@ -184,10 +188,10 @@ export default function Inventory() {
                 {filteredEntries.map((e) => (
                   <tr key={e.id} className="row-clickable" onClick={() => setDetailEntry(e)}>
                     <td className="cell-strong">{e.product}</td>
+                    <td className="cell-strong">{e.consignmentQty}</td>
                     <td>{e.received}</td>
                     <td>{e.sold}</td>
                     <td>{e.wastage}</td>
-                    <td className="cell-strong">{e.consignmentQty}</td>
                     <td className="actions-cell">
                       <button
                         className="btn-secondary btn-sm"

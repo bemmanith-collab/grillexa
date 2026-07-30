@@ -103,10 +103,10 @@ export default function StockHistory() {
                 <th>Date</th>
                 {showStorePicker && <th>Store</th>}
                 <th>Product</th>
+                <th>On Consignment</th>
                 <th>Received</th>
                 <th>Sold</th>
                 <th>Wastage</th>
-                <th>On Consignment</th>
               </tr>
             </thead>
             <tbody>
@@ -115,10 +115,10 @@ export default function StockHistory() {
                   <td className="cell-date">{formatDate(e.date)}</td>
                   {showStorePicker && <td>{e.store}</td>}
                   <td className="cell-strong">{e.product}</td>
+                  <td className="cell-strong">{e.consignmentQty}</td>
                   <td>{e.received}</td>
                   <td>{e.sold}</td>
                   <td>{e.wastage}</td>
-                  <td className="cell-strong">{e.consignmentQty}</td>
                 </tr>
               ))}
               {entries.length === 0 && (
