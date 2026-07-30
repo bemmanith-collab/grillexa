@@ -136,6 +136,11 @@ select {
   display: none;
 }
 
+/* overflow-y matters: an ADMIN has 11 nav links plus the brand and the user
+   footer, which is taller than a short laptop screen and much taller than a
+   phone. Without it the last links (Stores, Users) and Log out sit past the
+   bottom edge with no way to reach them. dvh over vh so mobile browser
+   chrome doesn't eat the last row. */
 .sidebar {
   width: 232px;
   flex-shrink: 0;
@@ -147,6 +152,9 @@ select {
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .sidebar-brand {
@@ -1530,6 +1538,9 @@ button:disabled {
     width: 280px;
     max-width: 85vw;
     height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     z-index: 40;
     transform: translateX(-100%);
     transition: transform 0.25s ease;
