@@ -12,10 +12,9 @@ COPY backend/src ./src
 # ---------- Stage 2: frontend (React + Vite) ----------
 FROM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
-# Relative "/api" is the default and correct value for this image, since
-# Nginx and the backend share one origin (see frontend/.env.example).
-ARG VITE_API_URL=/api
-ENV VITE_API_URL=$VITE_API_URL
+# No build args: the API base URL is not configurable. src/api/client.js
+# hardcodes "/api", which is correct here since Nginx and the backend share
+# one origin. Wire up import.meta.env before adding a VITE_* arg back.
 COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ ./

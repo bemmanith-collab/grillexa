@@ -15,6 +15,16 @@ function signToken(user) {
   });
 }
 
+// Credentials go straight into a Prisma where clause and into bcrypt, both of
+// which throw on a non-string (e.g. {"email": 5}). Reject anything that isn't
+// a non-empty string before it gets there.
+function missingString(fields) {
+  for (const [key, value] of Object.entries(fields)) {
+    if (typeof value !== 'string' || !value) return `${key} is required`;
+  }
+  return null;
+}
+
 function sanitize(user) {
   const { passwordHash, stores, ...rest } = user;
   return { ...rest, stores: (stores || []).map((s) => ({ id: s.id, name: s.name })) };
@@ -22,9 +32,8 @@ function sanitize(user) {
 
 router.post('/signup', async (req, res) => {
   const { name, email, password } = req.body;
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: 'name, email and password are required' });
-  }
+  const missing = missingString({ name, email, password });
+  if (missing) return res.status(400).json({ error: missing });
   if (password.length < 8) {
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
@@ -44,9 +53,8 @@ router.post('/signup', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'email and password are required' });
-  }
+  const missing = missingString({ email, password });
+  if (missing) return res.status(400).json({ error: missing });
   const user = await prisma.user.findUnique({ where: { email }, include: { stores: true } });
   if (!user) {
     return res.status(401).json({ error: 'Invalid email or password' });
@@ -67,9 +75,8 @@ router.get('/me', authenticate, async (req, res) => {
 
 router.post('/change-password', authenticate, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
-  if (!currentPassword || !newPassword) {
-    return res.status(400).json({ error: 'currentPassword and newPassword are required' });
-  }
+  const missing = missingString({ currentPassword, newPassword });
+  if (missing) return res.status(400).json({ error: missing });
   if (newPassword.length < 8) {
     return res.status(400).json({ error: 'New password must be at least 8 characters' });
   }

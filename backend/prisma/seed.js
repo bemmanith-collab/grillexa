@@ -147,6 +147,13 @@ async function backfillHistory(stores, products, adminUser, salesUserByStoreId) 
 }
 
 async function main() {
+  // This creates accounts with a known password and injects randomised sales
+  // history. `npm run seed` picks up whatever DATABASE_URL is in the
+  // environment, which on a deployed machine is the live database.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Refusing to seed: NODE_ENV is production');
+  }
+
   const admin = await upsertUser({ name: 'Admin', email: 'admin@grillexa.local', role: 'ADMIN' });
   await upsertUser({ name: 'Manager', email: 'manager@grillexa.local', role: 'MANAGER' });
 

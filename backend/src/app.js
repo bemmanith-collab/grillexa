@@ -1,4 +1,9 @@
 require('dotenv').config();
+// Express 4 does not forward rejections from async handlers to the error
+// middleware — an unhandled rejection kills the process. This patches the
+// router so they reach the handler at the bottom of this file instead.
+// Remove it if this ever moves to Express 5, which does it natively.
+require('express-async-errors');
 const express = require('express');
 const cors = require('cors');
 
@@ -60,7 +65,11 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
+// err.status marks an error as deliberate and safe to show the user (see
+// lib/scope.js, lib/stock.js). Anything else is a bug: log it, but never
+// return the message, which may carry Prisma model/field internals.
 app.use((err, req, res, next) => {
+  if (err.status) return res.status(err.status).json({ error: err.message });
   console.error(err);
   res.status(500).json({ error: 'Internal server error' });
 });

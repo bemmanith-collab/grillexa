@@ -1,10 +1,19 @@
 // Shared helpers for the daily stock ledger. A "day" is always stored as a
 // UTC-midnight DateTime keyed by (date, storeId, productId).
 
+// Throws with status 400 so a bad date from a query string or body surfaces as
+// a validation error rather than a 500 — several callers pass user input
+// straight in without a try/catch.
+function badRequest(message) {
+  const err = new Error(message);
+  err.status = 400;
+  return err;
+}
+
 function normalizeDate(dateStr) {
-  if (!dateStr) throw new Error('date is required');
+  if (typeof dateStr !== 'string' || !dateStr) throw badRequest('date is required');
   const date = new Date(`${dateStr}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) throw new Error('date must be a valid YYYY-MM-DD string');
+  if (Number.isNaN(date.getTime())) throw badRequest('date must be a valid YYYY-MM-DD string');
   return date;
 }
 

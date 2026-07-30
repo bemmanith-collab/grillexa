@@ -35,7 +35,9 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const { name, email, password, role, storeIds } = req.body;
-  if (!name || !email || !password || !role) {
+  // typeof, not just truthiness: a non-string email throws inside Prisma and a
+  // non-string password throws inside bcrypt.
+  if (![name, email, password, role].every((v) => typeof v === 'string' && v)) {
     return res.status(400).json({ error: 'name, email, password and role are required' });
   }
   if (!ROLES.includes(role)) {
@@ -79,7 +81,7 @@ router.patch('/:id', async (req, res) => {
   if (id === req.user.id && role && role !== 'ADMIN') {
     return res.status(400).json({ error: 'You cannot remove your own admin role' });
   }
-  if (password !== undefined && password.length < 8) {
+  if (password !== undefined && (typeof password !== 'string' || password.length < 8)) {
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
 
@@ -97,17 +99,25 @@ router.patch('/:id', async (req, res) => {
 
   const passwordHash = password !== undefined ? await bcrypt.hash(password, 10) : undefined;
 
-  const user = await prisma.user.update({
-    where: { id },
-    data: {
-      ...(name !== undefined && { name }),
-      ...(email !== undefined && { email }),
-      ...(passwordHash !== undefined && { passwordHash }),
-      role: nextRole,
-      stores: { set: nextRole === 'SALES' ? nextIds.map((sid) => ({ id: sid })) : [] },
-    },
-    include: { stores: true },
-  });
+  let user;
+  try {
+    user = await prisma.user.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(email !== undefined && { email }),
+        ...(passwordHash !== undefined && { passwordHash }),
+        role: nextRole,
+        stores: { set: nextRole === 'SALES' ? nextIds.map((sid) => ({ id: sid })) : [] },
+      },
+      include: { stores: true },
+    });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: 'An account with this email already exists' });
+    }
+    throw err;
+  }
   res.json({ user: sanitize(user) });
 });
 

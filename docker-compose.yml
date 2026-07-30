@@ -1,3 +1,6 @@
+# Local Postgres only. The app itself runs with `npm run dev` in backend/ and
+# frontend/ (see README) — Fly builds the root Dockerfile, so a containerised
+# app here would be a second, drifting runtime with nothing checking it.
 services:
   db:
     image: postgres:16-alpine
@@ -9,26 +12,6 @@ services:
       - db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-
-  backend:
-    build: ./backend
-    depends_on:
-      - db
-    environment:
-      - DATABASE_URL=postgresql://grillexa:grillexa@db:5432/grillexa
-      - JWT_SECRET=${JWT_SECRET:-change-this-to-a-long-random-string}
-      - JWT_EXPIRES_IN=8h
-      - PORT=4000
-      - CORS_ORIGIN=http://localhost:8080
-    ports:
-      - "4000:4000"
-
-  frontend:
-    build: ./frontend
-    depends_on:
-      - backend
-    ports:
-      - "8080:80"
 
 volumes:
   db_data:
