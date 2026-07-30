@@ -8,15 +8,12 @@ const router = express.Router();
 
 router.use(authenticate);
 
-// OK: above the reorder threshold. LOW: at/below threshold but still some
-// stock. CRITICAL: nothing left to sell — the most urgent of the three.
-function computeStatus(entry) {
-  if (!entry.product) return 'OK';
-  if (entry.closing <= 0) return 'CRITICAL';
-  if (entry.closing <= entry.product.threshold) return 'LOW';
-  return 'OK';
-}
-
+// opening/closing are deliberately not exposed. Goods are never booked into
+// the system before they're billed, so the running balance they carry doesn't
+// describe anything real — it drifts negative as a matter of course. The
+// per-day movements below are real (each one is a bill, a delivery or a
+// recorded wastage), as is consignmentQty, which tracks what a store still
+// holds on consignment. The columns stay in the table for audit history.
 function shapeEntry(entry) {
   return {
     id: entry.id,
@@ -25,14 +22,10 @@ function shapeEntry(entry) {
     store: entry.store?.name,
     productId: entry.productId,
     product: entry.product?.name,
-    threshold: entry.product?.threshold,
-    opening: entry.opening,
     received: entry.received,
     sold: entry.sold,
     wastage: entry.wastage,
-    closing: entry.closing,
     consignmentQty: entry.consignmentQty,
-    status: computeStatus(entry),
   };
 }
 

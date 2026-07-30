@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Package, CheckCircle2, XCircle, AlertTriangle, Search, Handshake, ReceiptText, Coins } from 'lucide-react';
+import { CheckCircle2, XCircle, Search, Handshake, ReceiptText, Coins } from 'lucide-react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import WastageModal from '../components/WastageModal';
@@ -8,35 +8,7 @@ import DailyWisdom from '../components/DailyWisdom';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { BoxIcon } from '../components/icons';
-import { STATUS_LABEL, STATUS_BADGE_CLASS } from '../lib/stockStatus';
-import { formatDate, todayStr, daysAgoStr } from '../utils/date';
-
-// direction the metric moved, plus the % change (null once previous is 0 —
-// a percentage off a zero baseline isn't meaningful, so we just say "New").
-function computeTrend(current, previous) {
-  if (!previous) return current > 0 ? { direction: 'up', pct: null } : null;
-  if (current === previous) return { direction: 'flat', pct: 0 };
-  const pct = Math.round((Math.abs(current - previous) / previous) * 100);
-  return { direction: current > previous ? 'up' : 'down', pct };
-}
-
-// sentiment: which direction counts as "good" for this metric, or 'neutral'
-// for metrics (like Units On Hand) where up/down isn't inherently good/bad.
-function StatTrend({ trend, sentiment }) {
-  if (!trend) return null;
-  const arrow = trend.direction === 'up' ? '↑' : trend.direction === 'down' ? '↓' : '→';
-  const amount = trend.pct == null ? 'New today' : `${trend.pct}% from yesterday`;
-  let tone = 'stat-trend-neutral';
-  if (sentiment !== 'neutral' && trend.direction !== 'flat') {
-    const good = sentiment === 'up-is-good' ? trend.direction === 'up' : trend.direction === 'down';
-    tone = good ? 'stat-trend-good' : 'stat-trend-bad';
-  }
-  return (
-    <div className={`stat-trend ${tone}`}>
-      {arrow} {amount}
-    </div>
-  );
-}
+import { formatDate, todayStr } from '../utils/date';
 
 export default function Inventory() {
   const { user } = useAuth();
@@ -46,13 +18,11 @@ export default function Inventory() {
   const [stores, setStores] = useState(isScoped ? myStores : []);
   const [storeId, setStoreId] = useState(isScoped ? myStores[0]?.id || '' : '');
   const [data, setData] = useState(null);
-  const [prevEntries, setPrevEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [wastageTarget, setWastageTarget] = useState(null);
   const [detailEntry, setDetailEntry] = useState(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
   const [pendingConsignments, setPendingConsignments] = useState([]);
 
   useEffect(() => {
@@ -71,17 +41,13 @@ export default function Inventory() {
     setLoading(true);
     setError('');
     try {
-      const [todayRes, historyRes, consignmentsRes] = await Promise.all([
+      const [todayRes, consignmentsRes] = await Promise.all([
         client.get('/stock/today', { params: { storeId: sid, date: todayStr() } }),
-        client
-          .get('/stock/history', { params: { storeId: sid, from: daysAgoStr(1), to: daysAgoStr(1) } })
-          .catch(() => ({ data: { entries: [] } })),
         client
           .get('/consignments', { params: { storeId: sid, status: 'DELIVERED,PARTIAL_SETTLED' } })
           .catch(() => ({ data: { consignments: [] } })),
       ]);
       setData(todayRes.data);
-      setPrevEntries(historyRes.data.entries);
       setPendingConsignments(consignmentsRes.data.consignments);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load stock.');
@@ -102,8 +68,6 @@ export default function Inventory() {
     }));
   }
 
-  const lowCount = data?.entries.filter((e) => e.status !== 'OK').length || 0;
-  const totalClosing = data?.entries.reduce((sum, e) => sum + e.closing, 0) || 0;
   const totalSold = data?.entries.reduce((sum, e) => sum + e.sold, 0) || 0;
   const totalWastage = data?.entries.reduce((sum, e) => sum + e.wastage, 0) || 0;
   const totalOnConsignment = data?.entries.reduce((sum, e) => sum + (e.consignmentQty || 0), 0) || 0;
@@ -113,19 +77,12 @@ export default function Inventory() {
     0
   );
 
-  const prevLowCount = prevEntries.filter((e) => e.status !== 'OK').length;
-  const prevClosing = prevEntries.reduce((sum, e) => sum + e.closing, 0);
-  const prevSold = prevEntries.reduce((sum, e) => sum + e.sold, 0);
-  const prevWastage = prevEntries.reduce((sum, e) => sum + e.wastage, 0);
-
   const filteredEntries = useMemo(() => {
     if (!data) return [];
-    return data.entries.filter((e) => {
-      if (statusFilter !== 'ALL' && e.status !== statusFilter) return false;
-      if (search.trim() && !e.product.toLowerCase().includes(search.trim().toLowerCase())) return false;
-      return true;
-    });
-  }, [data, search, statusFilter]);
+    const q = search.trim().toLowerCase();
+    if (!q) return data.entries;
+    return data.entries.filter((e) => e.product.toLowerCase().includes(q));
+  }, [data, search]);
 
   return (
     <div className="page">
@@ -163,19 +120,10 @@ export default function Inventory() {
         <>
           <div className="stat-grid">
             <div className="stat-card">
-              <div className="stat-icon stat-icon-blue"><Package size={20} strokeWidth={1.8} /></div>
-              <div>
-                <div className="stat-value">{totalClosing}</div>
-                <div className="stat-label">Units On Hand</div>
-                <StatTrend trend={computeTrend(totalClosing, prevClosing)} sentiment="neutral" />
-              </div>
-            </div>
-            <div className="stat-card">
               <div className="stat-icon stat-icon-green"><CheckCircle2 size={20} strokeWidth={1.8} /></div>
               <div>
                 <div className="stat-value">{totalSold}</div>
                 <div className="stat-label">Units Sold Today</div>
-                <StatTrend trend={computeTrend(totalSold, prevSold)} sentiment="up-is-good" />
               </div>
             </div>
             <div className="stat-card">
@@ -183,15 +131,6 @@ export default function Inventory() {
               <div>
                 <div className="stat-value">{totalWastage}</div>
                 <div className="stat-label">Units Wasted Today</div>
-                <StatTrend trend={computeTrend(totalWastage, prevWastage)} sentiment="down-is-good" />
-              </div>
-            </div>
-            <div className={`stat-card${lowCount > 0 ? ' stat-card-alert' : ''}`}>
-              <div className="stat-icon stat-icon-red"><AlertTriangle size={20} strokeWidth={1.8} /></div>
-              <div>
-                <div className="stat-value">{lowCount}</div>
-                <div className="stat-label">Low Stock Alerts</div>
-                <StatTrend trend={computeTrend(lowCount, prevLowCount)} sentiment="down-is-good" />
               </div>
             </div>
             <div className="stat-card">
@@ -218,21 +157,13 @@ export default function Inventory() {
           </div>
 
           <div className="card form-card">
-            <div className="inline-form">
-              <div className="search-input">
-                <Search size={16} />
-                <input
-                  placeholder="Search products…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="ALL">All statuses</option>
-                <option value="OK">In Stock</option>
-                <option value="LOW">Low Stock</option>
-                <option value="CRITICAL">Critical</option>
-              </select>
+            <div className="search-input">
+              <Search size={16} />
+              <input
+                placeholder="Search products…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
           </div>
 
@@ -242,13 +173,10 @@ export default function Inventory() {
               <thead>
                 <tr>
                   <th>Product</th>
-                  <th>Opening</th>
                   <th>Received</th>
                   <th>Sold</th>
                   <th>Wastage</th>
-                  <th>Closing</th>
                   <th>On Consignment</th>
-                  <th>Status</th>
                   <th></th>
                 </tr>
               </thead>
@@ -256,15 +184,10 @@ export default function Inventory() {
                 {filteredEntries.map((e) => (
                   <tr key={e.id} className="row-clickable" onClick={() => setDetailEntry(e)}>
                     <td className="cell-strong">{e.product}</td>
-                    <td>{e.opening}</td>
                     <td>{e.received}</td>
                     <td>{e.sold}</td>
                     <td>{e.wastage}</td>
-                    <td className="cell-strong">{e.closing}</td>
-                    <td>{e.consignmentQty}</td>
-                    <td>
-                      <span className={`badge ${STATUS_BADGE_CLASS[e.status]}`}>{STATUS_LABEL[e.status]}</span>
-                    </td>
+                    <td className="cell-strong">{e.consignmentQty}</td>
                     <td className="actions-cell">
                       <button
                         className="btn-secondary btn-sm"
@@ -280,14 +203,14 @@ export default function Inventory() {
                 ))}
                 {data.entries.length === 0 && (
                   <tr>
-                    <td colSpan={9}>
+                    <td colSpan={6}>
                       <EmptyState icon={BoxIcon} message="No products in the catalog yet." />
                     </td>
                   </tr>
                 )}
                 {data.entries.length > 0 && filteredEntries.length === 0 && (
                   <tr>
-                    <td colSpan={9}>
+                    <td colSpan={6}>
                       <EmptyState icon={Search} message="No products match your search or filter." />
                     </td>
                   </tr>

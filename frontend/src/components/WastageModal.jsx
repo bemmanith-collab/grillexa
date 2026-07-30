@@ -29,7 +29,7 @@ export default function WastageModal({ entry, onClose, onSubmit }) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3>Record Wastage</h3>
         <p className="modal-help">
-          How many units of "{entry.product}" were wasted/discarded today? Available stock: {entry.closing}.
+          How many units of "{entry.product}" were wasted/discarded today?
         </p>
         <form onSubmit={handleSubmit}>
           <label>

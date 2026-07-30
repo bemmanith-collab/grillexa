@@ -12,7 +12,7 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formOpen, setFormOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', sku: '', price: '', costPrice: '', threshold: '10' });
+  const [form, setForm] = useState({ name: '', sku: '', price: '', costPrice: '' });
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -44,9 +44,8 @@ export default function Products() {
         sku: form.sku,
         price: Number(form.price) || 0,
         costPrice: Number(form.costPrice) || 0,
-        threshold: Number(form.threshold) || 0,
       });
-      setForm({ name: '', sku: '', price: '', costPrice: '', threshold: '10' });
+      setForm({ name: '', sku: '', price: '', costPrice: '' });
       setFormOpen(false);
       load();
     } catch (err) {
@@ -58,7 +57,7 @@ export default function Products() {
 
   function startEdit(p) {
     setEditingId(p.id);
-    setEditForm({ name: p.name, sku: p.sku, price: p.price, costPrice: p.costPrice, threshold: p.threshold });
+    setEditForm({ name: p.name, sku: p.sku, price: p.price, costPrice: p.costPrice });
   }
 
   async function handleSaveEdit(id) {
@@ -69,7 +68,6 @@ export default function Products() {
         sku: editForm.sku,
         price: Number(editForm.price) || 0,
         costPrice: Number(editForm.costPrice) || 0,
-        threshold: Number(editForm.threshold) || 0,
       });
       setEditingId(null);
       load();
@@ -134,13 +132,6 @@ export default function Products() {
               value={form.costPrice}
               onChange={(e) => setForm({ ...form, costPrice: e.target.value })}
             />
-            <input
-              placeholder="Low-stock threshold"
-              type="number"
-              min="0"
-              value={form.threshold}
-              onChange={(e) => setForm({ ...form, threshold: e.target.value })}
-            />
             <button type="submit" className="btn-primary" disabled={creating}>
               {creating ? 'Adding…' : 'Add Product'}
             </button>
@@ -160,7 +151,6 @@ export default function Products() {
                 <th>SKU</th>
                 <th>Price</th>
                 <th>Cost Price</th>
-                <th>Low-stock threshold</th>
                 <th></th>
               </tr>
             </thead>
@@ -205,15 +195,6 @@ export default function Products() {
                             onChange={(e) => setEditForm({ ...editForm, costPrice: e.target.value })}
                           />
                         </td>
-                        <td>
-                          <input
-                            className="line-input"
-                            type="number"
-                            min="0"
-                            value={editForm.threshold}
-                            onChange={(e) => setEditForm({ ...editForm, threshold: e.target.value })}
-                          />
-                        </td>
                         <td className="actions-cell">
                           <button className="btn-secondary btn-sm" onClick={() => setEditingId(null)}>
                             Cancel
@@ -229,7 +210,6 @@ export default function Products() {
                         <td className="cell-mono">{p.sku}</td>
                         <td>₹{p.price.toFixed(2)}</td>
                         <td>₹{p.costPrice.toFixed(2)}</td>
-                        <td>{p.threshold}</td>
                         <td className="actions-cell">
                           <button className="btn-secondary btn-sm" onClick={() => startEdit(p)}>
                             Edit
@@ -247,7 +227,7 @@ export default function Products() {
               })}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={5}>
                     <EmptyState icon={BoxIcon} message="No products yet." />
                   </td>
                 </tr>

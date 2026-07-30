@@ -18,24 +18,17 @@ router.get('/summary', async (req, res) => {
     prisma.dispatchInvoice.findMany({ where: { date } }),
   ]);
 
-  const lowStock = entries.filter((e) => e.closing <= e.product.threshold);
-
+  // No stock-on-hand or low-stock figures: nothing is booked into inventory
+  // before it's billed, so a closing balance measures nothing. Everything
+  // below is a real recorded movement or a real amount of money.
   res.json({
     date: date.toISOString().slice(0, 10),
     storesReporting: new Set(entries.map((e) => e.storeId)).size,
-    totalClosingStock: entries.reduce((sum, e) => sum + e.closing, 0),
     totalReceivedToday: entries.reduce((sum, e) => sum + e.received, 0),
     totalSoldToday: entries.reduce((sum, e) => sum + e.sold, 0),
     totalWastageToday: entries.reduce((sum, e) => sum + e.wastage, 0),
     salesRevenueToday: salesToday.reduce((sum, s) => sum + s.totalAmount, 0),
     dispatchValueToday: dispatchesToday.reduce((sum, d) => sum + d.totalAmount, 0),
-    lowStockCount: lowStock.length,
-    lowStock: lowStock.map((e) => ({
-      store: e.store.name,
-      product: e.product.name,
-      closing: e.closing,
-      threshold: e.product.threshold,
-    })),
   });
 });
 
@@ -93,10 +86,13 @@ router.get('/pnl', async (req, res) => {
   });
 });
 
-// Per-store, per-product sales performance over a trailing window, with a
-// simple recommendation (increase / maintain / decrease supply) based on
-// sell-through rate (sold ÷ received) and wastage rate.
-router.get('/recommendations', async (req, res) => {
+// Units moved per product, per store, over a trailing window. This used to
+// also return a supply recommendation derived from sell-through (sold ÷
+// received) — dropped, because goods aren't booked into the system before
+// they're billed, so that ratio divided by a number describing nothing and
+// confidently told you to increase supply on the strength of it. What's left
+// is what was actually recorded.
+router.get('/product-sales', async (req, res) => {
   const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365);
   const to = new Date();
   to.setUTCHours(0, 0, 0, 0);
@@ -129,37 +125,12 @@ router.get('/recommendations', async (req, res) => {
     byProduct.set(key, agg);
   }
 
-  function classify(agg) {
-    const sellThroughRate = agg.totalReceived > 0 ? agg.totalSold / agg.totalReceived : agg.totalSold > 0 ? 1 : 0;
-    const wastageRate = agg.totalReceived > 0 ? agg.totalWastage / agg.totalReceived : 0;
-    let recommendation = 'MAINTAIN';
-    let note = 'Steady performer — maintain current supply.';
-    if (agg.totalReceived === 0 && agg.totalSold === 0) {
-      recommendation = 'NO_DATA';
-      note = 'No dispatch or sales activity in this period.';
-    } else if (wastageRate >= 0.2) {
-      recommendation = 'DECREASE';
-      note = `High wastage (${Math.round(wastageRate * 100)}% of stock received) — reduce supply.`;
-    } else if (sellThroughRate >= 0.8) {
-      recommendation = 'INCREASE';
-      note = `Selling through ${Math.round(sellThroughRate * 100)}% of stock received — consider increasing supply.`;
-    } else if (sellThroughRate <= 0.3) {
-      recommendation = 'DECREASE';
-      note = `Only ${Math.round(sellThroughRate * 100)}% sell-through — consider reducing supply.`;
-    }
-    return { ...agg, sellThroughRate, wastageRate, recommendation, note };
-  }
-
   const result = stores.map((store) => {
     const byProduct = byStore.get(store.id) || new Map();
-    const products = Array.from(byProduct.values()).map(classify).sort((a, b) => b.totalSold - a.totalSold);
-    const withSales = products.filter((p) => p.totalSold > 0);
     return {
       storeId: store.id,
       store: store.name,
-      products,
-      topSeller: withSales[0] || null,
-      lowSeller: withSales.length > 1 ? withSales[withSales.length - 1] : null,
+      products: Array.from(byProduct.values()).sort((a, b) => b.totalSold - a.totalSold),
     };
   });
 

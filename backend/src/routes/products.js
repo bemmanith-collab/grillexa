@@ -7,8 +7,11 @@ const router = express.Router();
 
 router.use(authenticate);
 
-// Product catalog (name/sku/price/cost/reorder threshold). Actual quantities
-// live per-store-per-day in the DailyStockEntry ledger — see routes/stock.js.
+// Product catalog (name/sku/price/cost). Actual quantities live
+// per-store-per-day in the DailyStockEntry ledger — see routes/stock.js.
+// The reorder threshold is gone: it only ever fed the low-stock badge, which
+// was reading a closing balance nothing maintains. The column stays in the
+// schema with its default, so no migration is needed.
 // Financial data (price, costPrice) is stripped for Sales at the API layer,
 // not just hidden in the UI, so the restriction can't be bypassed by calling
 // the API directly. costPrice is margin-sensitive so it's held to the same bar.
@@ -17,7 +20,6 @@ function shapeProduct(product, role) {
     id: product.id,
     name: product.name,
     sku: product.sku,
-    threshold: product.threshold,
   };
   if (role !== 'SALES') {
     base.price = product.price;
@@ -32,7 +34,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
-  const { name, sku, threshold, price, costPrice } = req.body;
+  const { name, sku, price, costPrice } = req.body;
   if (!name || !sku) {
     return res.status(400).json({ error: 'name and sku are required' });
   }
@@ -41,7 +43,6 @@ router.post('/', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
       data: {
         name,
         sku,
-        threshold: threshold != null ? Number(threshold) : 10,
         price: price != null ? Number(price) : 0,
         costPrice: costPrice != null ? Number(costPrice) : 0,
       },
@@ -57,14 +58,13 @@ router.post('/', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
 
 router.patch('/:id', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
   const id = Number(req.params.id);
-  const { name, sku, threshold, price, costPrice } = req.body;
+  const { name, sku, price, costPrice } = req.body;
   try {
     const product = await prisma.product.update({
       where: { id },
       data: {
         ...(name !== undefined && { name }),
         ...(sku !== undefined && { sku }),
-        ...(threshold !== undefined && { threshold: Number(threshold) }),
         ...(price !== undefined && { price: Number(price) }),
         ...(costPrice !== undefined && { costPrice: Number(costPrice) }),
       },

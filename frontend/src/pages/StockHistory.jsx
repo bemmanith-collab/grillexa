@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { HistoryIcon } from '../components/icons';
-import { STATUS_LABEL, STATUS_BADGE_CLASS } from '../lib/stockStatus';
 import { formatDate, todayStr, daysAgoStr } from '../utils/date';
 
 export default function StockHistory() {
@@ -56,7 +55,7 @@ export default function StockHistory() {
       <div className="page-header">
         <div>
           <h1>Stock History</h1>
-          <p className="page-subtitle">Daily opening / received / sold / wastage / closing ledger</p>
+          <p className="page-subtitle">Daily received / sold / wastage movements per store</p>
         </div>
       </div>
 
@@ -104,13 +103,10 @@ export default function StockHistory() {
                 <th>Date</th>
                 {showStorePicker && <th>Store</th>}
                 <th>Product</th>
-                <th>Opening</th>
                 <th>Received</th>
                 <th>Sold</th>
                 <th>Wastage</th>
-                <th>Closing</th>
                 <th>On Consignment</th>
-                <th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -119,20 +115,15 @@ export default function StockHistory() {
                   <td className="cell-date">{formatDate(e.date)}</td>
                   {showStorePicker && <td>{e.store}</td>}
                   <td className="cell-strong">{e.product}</td>
-                  <td>{e.opening}</td>
                   <td>{e.received}</td>
                   <td>{e.sold}</td>
                   <td>{e.wastage}</td>
-                  <td className="cell-strong">{e.closing}</td>
-                  <td>{e.consignmentQty}</td>
-                  <td>
-                    <span className={`badge ${STATUS_BADGE_CLASS[e.status]}`}>{STATUS_LABEL[e.status]}</span>
-                  </td>
+                  <td className="cell-strong">{e.consignmentQty}</td>
                 </tr>
               ))}
               {entries.length === 0 && (
                 <tr>
-                  <td colSpan={showStorePicker ? 10 : 9}>
+                  <td colSpan={showStorePicker ? 6 : 5}>
                     <EmptyState icon={HistoryIcon} message="No stock history for this filter." />
                   </td>
                 </tr>
