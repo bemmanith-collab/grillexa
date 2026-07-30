@@ -21,21 +21,35 @@ const Reports = lazy(() => import('./pages/Reports'));
 // Copies each column heading onto its cells as data-label, which the phone
 // card layout prints beside the value (see .data-table in index.css). Done in
 // one place rather than as data-label="…" repeated across eleven tables: a
-// table added later gets it for nothing, and none can be forgotten. Runs on
-// every render — these tables are tens of rows, not thousands.
+// table added later gets it for nothing, and none can be forgotten.
+//
+// An observer rather than a plain effect: every page is lazily loaded, so its
+// table mounts well after App renders, and a one-shot pass finds an empty
+// document. This catches tables whenever they appear — after a route change,
+// after data loads, after a row is added.
+//
+// Only childList is observed, so writing the attributes below can't retrigger
+// it.
+function stampLabels(root) {
+  for (const table of root.querySelectorAll?.('table.data-table') || []) {
+    const headings = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
+    if (!headings.length) continue;
+    for (const row of table.querySelectorAll('tbody tr')) {
+      [...row.children].forEach((cell, i) => {
+        if (headings[i]) cell.setAttribute('data-label', headings[i]);
+        else cell.removeAttribute('data-label');
+      });
+    }
+  }
+}
+
 function useTableLabels() {
   useEffect(() => {
-    for (const table of document.querySelectorAll('table.data-table')) {
-      const headings = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
-      if (!headings.length) continue;
-      for (const row of table.querySelectorAll('tbody tr')) {
-        [...row.children].forEach((cell, i) => {
-          if (headings[i]) cell.setAttribute('data-label', headings[i]);
-          else cell.removeAttribute('data-label');
-        });
-      }
-    }
-  });
+    stampLabels(document);
+    const observer = new MutationObserver(() => stampLabels(document));
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
 }
 
 export default function App() {
