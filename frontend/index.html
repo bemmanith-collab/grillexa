@@ -12,6 +12,19 @@
     <meta name="theme-color" content="#14161f" />
     <meta name="mobile-web-app-capable" content="yes" />
     <title>Grillexa Inventory</title>
+    <script>
+      // Chrome fires beforeinstallprompt during page load — before React has
+      // mounted and before any component can add a listener. Attaching it in a
+      // useEffect misses the event entirely, and the Install button never
+      // appears. Stash it here, at the earliest point there is, and let the
+      // component pick it up whenever it mounts.
+      window.__installPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__installPrompt = e;
+        window.dispatchEvent(new Event('installpromptready'));
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -11,25 +11,34 @@ import { Download } from 'lucide-react';
 // browser that doesn't support this (iOS Safari, where the route is
 // Share → Add to Home Screen).
 export default function InstallAppButton({ className = 'btn-secondary' }) {
-  const [prompt, setPrompt] = useState(null);
+  // Seeded from the event index.html already caught — by the time React
+  // mounts, Chrome has usually fired it and moved on.
+  const [prompt, setPrompt] = useState(() => (typeof window === 'undefined' ? null : window.__installPrompt));
   const [installed, setInstalled] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches
   );
 
   useEffect(() => {
+    // installpromptready covers the event arriving after mount; the raw event
+    // is still listened for in case this ever runs without the head script.
+    function onReady() {
+      setPrompt(window.__installPrompt);
+    }
     function onAvailable(e) {
-      // Chrome shows its own bar unless the default is prevented; we want the
-      // install to happen on our button instead.
       e.preventDefault();
+      window.__installPrompt = e;
       setPrompt(e);
     }
     function onInstalled() {
       setInstalled(true);
+      window.__installPrompt = null;
       setPrompt(null);
     }
+    window.addEventListener('installpromptready', onReady);
     window.addEventListener('beforeinstallprompt', onAvailable);
     window.addEventListener('appinstalled', onInstalled);
     return () => {
+      window.removeEventListener('installpromptready', onReady);
       window.removeEventListener('beforeinstallprompt', onAvailable);
       window.removeEventListener('appinstalled', onInstalled);
     };
@@ -42,6 +51,7 @@ export default function InstallAppButton({ className = 'btn-secondary' }) {
     const { outcome } = await prompt.userChoice;
     // The event is single-use — Chrome fires a fresh one if they decline and
     // become eligible again.
+    window.__installPrompt = null;
     setPrompt(null);
     if (outcome === 'accepted') setInstalled(true);
   }
