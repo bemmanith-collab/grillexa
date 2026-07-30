@@ -299,6 +299,19 @@ select {
   color: #fff;
 }
 
+.sidebar-install {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 9px 12px;
+  border-radius: 8px;
+}
+
 /* ---------- Cards / tables ---------- */
 
 .card {

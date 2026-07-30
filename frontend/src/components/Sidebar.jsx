@@ -111,6 +111,10 @@ export default function Sidebar() {
           ))}
         </nav>
 
+        {/* Desktop's equivalent of the More sheet's install button — Chrome
+            offers this from an icon in the address bar that is easy to miss. */}
+        <InstallAppButton className="btn-secondary sidebar-install" />
+
         <div className="sidebar-user">
           <div className="avatar">{initials}</div>
           <div className="sidebar-user-info">
