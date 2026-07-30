@@ -236,4 +236,147 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
   }
 });
 
+// Correct a bill that was keyed wrong. Reverses the original's stock effect,
+// replaces the lines, then applies the new one — the same reverse-then-reapply
+// shape as PATCH /consignments/:id. The bill keeps its number, so a customer
+// holding a printed copy can still be matched to it.
+router.patch('/:id', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
+  const id = Number(req.params.id);
+  const existing = await prisma.sale.findUnique({
+    where: { id },
+    include: { lines: true, settlement: true },
+  });
+  if (!existing) return res.status(404).json({ error: 'Sale not found' });
+
+  // A settled consignment owns its bill: the Settlement, the ConsignmentItem
+  // counters and this Sale have to agree. Editing the bill alone would break
+  // that, so send them to the settlement, which knows how to move all three.
+  if (existing.consignmentId || existing.settlement) {
+    return res.status(409).json({
+      error: 'This bill came from settling a consignment. Edit it from Settle Consignment instead.',
+    });
+  }
+
+  const { date, lines, customerName, customerPhone, customerGstin } = req.body;
+  const storeId =
+    req.user.role === 'SALES'
+      ? Number(req.body.storeId) || existing.storeId
+      : Number(req.body.storeId) || existing.storeId;
+
+  if (!Array.isArray(lines) || lines.length === 0) {
+    return res.status(400).json({ error: 'At least one line is required' });
+  }
+  for (const line of lines) {
+    if (!line.productId || !Number.isFinite(Number(line.quantity)) || Number(line.quantity) <= 0) {
+      return res.status(400).json({ error: 'Each line needs a productId and a positive quantity' });
+    }
+    if (line.type === 'RETURN' && !RETURN_REASONS.includes(line.reason)) {
+      return res.status(400).json({ error: `Return lines need a reason (one of ${RETURN_REASONS.join(', ')})` });
+    }
+  }
+
+  try {
+    // Both the store it's moving from and the store it's moving to.
+    assertStoreAccess(req.user, existing.storeId);
+    assertStoreAccess(req.user, storeId);
+  } catch (err) {
+    return res.status(err.status || 403).json({ error: err.message });
+  }
+
+  let normalizedDate;
+  try {
+    normalizedDate = normalizeDate(date || existing.date.toISOString().slice(0, 10));
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  const store = await prisma.store.findUnique({ where: { id: storeId } });
+  if (!store) return res.status(404).json({ error: 'Store not found' });
+
+  try {
+    const sale = await prisma.$transaction(async (tx) => {
+      // Reverse the original at its original store and date, so a bill moved
+      // to a different day or store leaves nothing behind on the old one.
+      for (const line of existing.lines) {
+        if (line.type === 'RETURN') {
+          // ponytail: reverses the closing balance exactly, but not the
+          // sold/received split processReturn chose at the time — that split
+          // depended on how much had sold that day and isn't recorded. Store
+          // the split on SaleLine if "Units Sold Today" ever has to be exact
+          // across an edited return.
+          await adjustStock(tx, {
+            storeId: existing.storeId,
+            productId: line.productId,
+            date: existing.date,
+            receivedDelta: -line.quantity,
+          });
+        } else {
+          await adjustStock(tx, {
+            storeId: existing.storeId,
+            productId: line.productId,
+            date: existing.date,
+            soldDelta: -line.quantity,
+          });
+        }
+      }
+
+      await tx.saleLine.deleteMany({ where: { saleId: id } });
+      // The audit rows were written against this bill's number; they're
+      // rebuilt below from whatever the corrected lines turn out to be.
+      await tx.return.deleteMany({ where: { reference: existing.number } });
+
+      const preparedLines = lines.map((l) => ({
+        productId: Number(l.productId),
+        quantity: Number(l.quantity),
+        unitPrice: Number(l.unitPrice) || 0,
+        amount: Number(l.quantity) * (Number(l.unitPrice) || 0),
+        type: l.type === 'RETURN' ? 'RETURN' : 'SALE',
+        reason: l.type === 'RETURN' ? l.reason : null,
+      }));
+      const totalAmount = preparedLines.reduce((sum, l) => sum + (l.type === 'RETURN' ? -l.amount : l.amount), 0);
+
+      for (const line of preparedLines) {
+        if (line.type === 'RETURN') {
+          await processReturn(tx, { storeId, productId: line.productId, date: normalizedDate, quantity: line.quantity });
+        } else {
+          await adjustStock(tx, { storeId, productId: line.productId, date: normalizedDate, soldDelta: line.quantity });
+        }
+      }
+
+      const returnLines = preparedLines.filter((l) => l.type === 'RETURN');
+      if (returnLines.length > 0) {
+        await tx.return.createMany({
+          data: returnLines.map((l) => ({
+            date: normalizedDate,
+            storeId,
+            productId: l.productId,
+            quantity: l.quantity,
+            reason: l.reason,
+            reference: existing.number,
+            createdById: req.user.id,
+          })),
+        });
+      }
+
+      return tx.sale.update({
+        where: { id },
+        data: {
+          date: normalizedDate,
+          storeId,
+          totalAmount,
+          customerName: customerName?.trim() || null,
+          customerPhone: customerPhone?.trim() || null,
+          customerGstin: customerGstin?.trim() || null,
+          lines: { create: preparedLines },
+        },
+        include: { store: true, createdBy: true, lines: { include: { product: true } } },
+      });
+    });
+
+    res.json({ sale: shapeSale(sale) });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || 'Failed to update sale' });
+  }
+});
+
 module.exports = router;

@@ -183,6 +183,46 @@ const tests = {
     assert.strictEqual(day(tx, '2026-07-03').consignmentQty, 0, 'the -40 and +40 cancel out');
   },
 
+  // PATCH /sales/:id reverses the original bill's stock before applying the
+  // corrected one. If the reversal isn't exact, editing a bill quietly
+  // invents or destroys stock — so: sell, reverse, and expect to land back
+  // exactly where we started.
+  'reversing a bill returns stock to where it was': async () => {
+    const tx = fakeTx([
+      { date: '2026-07-20', storeId: 1, productId: 1, opening: 0, received: 50, closing: 50 },
+      { date: '2026-07-21', storeId: 1, productId: 1, opening: 50, closing: 50 },
+    ]);
+    const at = { storeId: 1, productId: 1, date: normalizeDate('2026-07-20') };
+
+    // A bill for 12, then the same bill reversed.
+    await adjustStock(tx, { ...at, soldDelta: 12 });
+    assert.strictEqual(day(tx, '2026-07-20').closing, 38, 'sold 12 of 50');
+    assert.strictEqual(day(tx, '2026-07-21').opening, 38, 'cascaded to the next day');
+
+    await adjustStock(tx, { ...at, soldDelta: -12 });
+    assert.strictEqual(day(tx, '2026-07-20').closing, 50, 'closing restored');
+    assert.strictEqual(day(tx, '2026-07-20').sold, 0, 'sold restored, not left at 12');
+    assert.strictEqual(day(tx, '2026-07-21').opening, 50, 'later days restored too');
+  },
+
+  // Editing a bill onto a different day must leave nothing behind on the old
+  // one — the reversal happens at the original date, not the new one.
+  'moving a bill to another day empties the day it left': async () => {
+    const tx = fakeTx([
+      { date: '2026-07-20', storeId: 1, productId: 1, opening: 0, received: 50, sold: 12, closing: 38 },
+      { date: '2026-07-22', storeId: 1, productId: 1, opening: 38, closing: 38 },
+    ]);
+
+    await adjustStock(tx, { storeId: 1, productId: 1, date: normalizeDate('2026-07-20'), soldDelta: -12 });
+    await adjustStock(tx, { storeId: 1, productId: 1, date: normalizeDate('2026-07-22'), soldDelta: 12 });
+
+    assert.strictEqual(day(tx, '2026-07-20').sold, 0, 'nothing sold on the 20th any more');
+    assert.strictEqual(day(tx, '2026-07-20').closing, 50);
+    assert.strictEqual(day(tx, '2026-07-22').opening, 50);
+    assert.strictEqual(day(tx, '2026-07-22').sold, 12, 'the sale now lands on the 22nd');
+    assert.strictEqual(day(tx, '2026-07-22').closing, 38, 'same stock overall');
+  },
+
   'rechain is a no-op on an already-consistent chain': async () => {
     const rows = [
       { opening: 20, received: 0, sold: 5, wastage: 0, closing: 15, consignmentQty: 3 },
