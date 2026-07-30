@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import logo from '../assets/grillexa-logo.png';
@@ -64,9 +64,6 @@ export default function Login() {
           <button type="submit" className="btn-primary btn-block" disabled={submitting}>
             {submitting ? 'Logging in…' : 'Log in'}
           </button>
-          <p className="auth-switch">
-            No account? <Link to="/signup">Sign up</Link>
-          </p>
         </form>
       </div>
     </div>

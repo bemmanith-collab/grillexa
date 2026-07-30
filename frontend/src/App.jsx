@@ -6,7 +6,6 @@ import { useAuth } from './context/AuthContext';
 import Spinner from './components/Spinner';
 
 const Login = lazy(() => import('./pages/Login'));
-const Signup = lazy(() => import('./pages/Signup'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Dispatches = lazy(() => import('./pages/Dispatches'));
 const DeliverToStore = lazy(() => import('./pages/DeliverToStore'));
@@ -31,7 +30,6 @@ export default function App() {
         <Suspense fallback={<Spinner />}>
           <Routes>
             <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
-            <Route path="/signup" element={user ? <Navigate to="/" replace /> : <Signup />} />
             <Route
               path="/"
               element={

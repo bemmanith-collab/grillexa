@@ -26,19 +26,13 @@ export function AuthProvider({ children }) {
     setUser(res.data.user);
   }
 
-  async function signup(name, email, password) {
-    const res = await client.post('/auth/signup', { name, email, password });
-    localStorage.setItem('token', res.data.token);
-    setUser(res.data.user);
-  }
-
   function logout() {
     localStorage.removeItem('token');
     setUser(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

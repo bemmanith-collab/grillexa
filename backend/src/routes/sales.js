@@ -3,6 +3,7 @@ const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
 const { normalizeDate, adjustStock, processReturn } = require('../lib/stock');
+const { resolveLines } = require('../lib/pricing');
 const { assertStoreAccess } = require('../lib/scope');
 
 const router = express.Router();
@@ -171,11 +172,11 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
 
   try {
     const sale = await prisma.$transaction(async (tx) => {
-      const preparedLines = lines.map((l) => ({
-        productId: Number(l.productId),
-        quantity: Number(l.quantity),
-        unitPrice: Number(l.unitPrice) || 0,
-        amount: Number(l.quantity) * (Number(l.unitPrice) || 0),
+      const preparedLines = (await resolveLines(tx, lines, req.user.role)).map((l) => ({
+        productId: l.productId,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        amount: l.quantity * l.unitPrice,
         type: l.type === 'RETURN' ? 'RETURN' : 'SALE',
         reason: l.type === 'RETURN' ? l.reason : null,
       }));
@@ -325,11 +326,11 @@ router.patch('/:id', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) 
       // rebuilt below from whatever the corrected lines turn out to be.
       await tx.return.deleteMany({ where: { reference: existing.number } });
 
-      const preparedLines = lines.map((l) => ({
-        productId: Number(l.productId),
-        quantity: Number(l.quantity),
-        unitPrice: Number(l.unitPrice) || 0,
-        amount: Number(l.quantity) * (Number(l.unitPrice) || 0),
+      const preparedLines = (await resolveLines(tx, lines, req.user.role)).map((l) => ({
+        productId: l.productId,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        amount: l.quantity * l.unitPrice,
         type: l.type === 'RETURN' ? 'RETURN' : 'SALE',
         reason: l.type === 'RETURN' ? l.reason : null,
       }));

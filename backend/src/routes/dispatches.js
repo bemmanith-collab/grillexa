@@ -3,6 +3,7 @@ const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
 const { normalizeDate, adjustStock } = require('../lib/stock');
+const { resolveLines } = require('../lib/pricing');
 
 const router = express.Router();
 
@@ -77,11 +78,11 @@ router.post('/', async (req, res) => {
 
   try {
     const invoice = await prisma.$transaction(async (tx) => {
-      const preparedLines = lines.map((l) => ({
-        productId: Number(l.productId),
-        quantity: Number(l.quantity),
-        unitPrice: Number(l.unitPrice) || 0,
-        amount: Number(l.quantity) * (Number(l.unitPrice) || 0),
+      const preparedLines = (await resolveLines(tx, lines, req.user.role)).map((l) => ({
+        productId: l.productId,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        amount: l.quantity * l.unitPrice,
       }));
       const totalAmount = preparedLines.reduce((sum, l) => sum + l.amount, 0);
 

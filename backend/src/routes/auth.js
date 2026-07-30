@@ -30,26 +30,10 @@ function sanitize(user) {
   return { ...rest, stores: (stores || []).map((s) => ({ id: s.id, name: s.name })) };
 }
 
-router.post('/signup', async (req, res) => {
-  const { name, email, password } = req.body;
-  const missing = missingString({ name, email, password });
-  if (missing) return res.status(400).json({ error: missing });
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters' });
-  }
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return res.status(409).json({ error: 'An account with this email already exists' });
-  }
-  const passwordHash = await bcrypt.hash(password, 10);
-  // Public signup always creates a SALES account; an Admin must promote via the Users page.
-  const user = await prisma.user.create({
-    data: { name, email, passwordHash, role: 'SALES' },
-    include: { stores: true },
-  });
-  const token = signToken(user);
-  res.status(201).json({ token, user: sanitize(user) });
-});
+// Public signup was removed. It was unauthenticated and linked from the login
+// page, so anyone who found the URL could mint a valid token and read every
+// store name, address and product in the catalogue. Admins create accounts
+// through POST /api/users, which validates properly and assigns stores.
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;

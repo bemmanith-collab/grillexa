@@ -1,0 +1,19 @@
+{
+  "name": "Grillexa Inventory",
+  "short_name": "Grillexa",
+  "description": "Deliveries, consignment settlements and billing for Grillexa stores.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14161f",
+  "theme_color": "#14161f",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "240x240",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

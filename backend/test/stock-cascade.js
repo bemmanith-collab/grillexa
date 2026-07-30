@@ -46,9 +46,24 @@ function fakeTx(seed = []) {
         rows.push(row);
         return row;
       },
+      // Understands Prisma's { increment: n } as well as a plain value —
+      // adjustStock writes increments so concurrent movements can't clobber
+      // each other, and a fake that ignored that would test nothing real.
       async update({ where: { id }, data }) {
         const row = rows.find((r) => r.id === id);
-        Object.assign(row, data);
+        for (const [field, value] of Object.entries(data)) {
+          row[field] =
+            value && typeof value === 'object' && 'increment' in value
+              ? (row[field] || 0) + value.increment
+              : value;
+        }
+        return row;
+      },
+      async upsert({ where: { dailyEntryKey: k }, create }) {
+        const found = rows.find((r) => match(r, k.storeId, k.productId) && +r.date === +k.date);
+        if (found) return found;
+        const row = { id: nextId++, ...create };
+        rows.push(row);
         return row;
       },
     },

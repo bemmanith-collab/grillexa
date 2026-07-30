@@ -3,6 +3,7 @@ const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
 const { normalizeDate, todayStr, adjustStock } = require('../lib/stock');
+const { resolveLines } = require('../lib/pricing');
 const { assertStoreAccess } = require('../lib/scope');
 
 const router = express.Router();
@@ -82,21 +83,19 @@ const DETAIL_INCLUDE = {
 };
 
 // Validates and normalizes the delivery-line shape shared by create and edit.
-function parseDeliveryLines(lines) {
+// Prices come from the catalogue via resolveLines, never from the request —
+// see lib/pricing.js for why trusting the client zeroed out real revenue.
+async function parseDeliveryLines(tx, lines, role) {
   if (!Array.isArray(lines) || lines.length === 0) {
     throw httpError(400, 'At least one line is required');
   }
-  return lines.map((l) => {
-    if (!l.productId || !Number.isFinite(Number(l.quantity)) || Number(l.quantity) <= 0) {
-      throw httpError(400, 'Each line needs a productId and a positive quantity');
-    }
-    return {
-      productId: Number(l.productId),
-      deliveredQty: Number(l.quantity),
-      pricePerUnit: Number(l.unitPrice) || 0,
-      totalValue: Number(l.quantity) * (Number(l.unitPrice) || 0),
-    };
-  });
+  const resolved = await resolveLines(tx, lines, role);
+  return resolved.map((l) => ({
+    productId: l.productId,
+    deliveredQty: l.quantity,
+    pricePerUnit: l.unitPrice,
+    totalValue: l.quantity * l.unitPrice,
+  }));
 }
 
 // Applies one settlement pass (fresh or edited) inside an open transaction:
@@ -378,7 +377,7 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
   }
   let preparedItems;
   try {
-    preparedItems = parseDeliveryLines(lines);
+    preparedItems = await parseDeliveryLines(prisma, lines, req.user.role);
   } catch (err) {
     return res.status(err.status || 400).json({ error: err.message });
   }
@@ -472,7 +471,7 @@ router.patch('/:id', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) 
   }
   let preparedItems;
   try {
-    preparedItems = parseDeliveryLines(lines);
+    preparedItems = await parseDeliveryLines(prisma, lines, req.user.role);
   } catch (err) {
     return res.status(err.status || 400).json({ error: err.message });
   }

@@ -76,7 +76,6 @@ async function main() {
     ['login with a numeric email', '/api/auth/login', { email: 5, password: 'x' }],
     ['login with an object password', '/api/auth/login', { email: 'a@b.c', password: {} }],
     ['login with a missing body', '/api/auth/login', {}],
-    ['signup with a numeric password', '/api/auth/signup', { name: 'A', email: 'a@b.c', password: 12345678 }],
     ['change-password with a null current', '/api/auth/change-password', { currentPassword: null, newPassword: 'abcdefgh' }],
   ];
 
@@ -94,6 +93,13 @@ async function main() {
       );
     });
   }
+
+  // Public signup was removed — anyone who found the URL could mint a token.
+  // Asserted here so a future refactor can't quietly restore it.
+  await check('public signup is gone', async () => {
+    const res = await post('/api/auth/signup', { name: 'A', email: 'a@b.c', password: 'abcdefgh' });
+    assert.strictEqual(res.status, 404, 'signup must not exist');
+  });
 
   await check('server is still alive after all of the above', async () => {
     const res = await fetch(`${base}/api/health`);

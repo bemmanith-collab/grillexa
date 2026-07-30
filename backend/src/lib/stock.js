@@ -71,8 +71,15 @@ async function getOrCreateDailyEntry(tx, storeId, productId, date) {
   const opening = prevEntry ? prevEntry.closing : 0;
   const consignmentQty = prevEntry ? prevEntry.consignmentQty : 0;
 
-  return tx.dailyStockEntry.create({
-    data: { date, storeId, productId, opening, received: 0, sold: 0, wastage: 0, closing: opening, consignmentQty },
+  // upsert, not create: two first-bills-of-the-day for the same product at
+  // one store both miss the findUnique above, and the loser of the race hits
+  // the dailyEntryKey unique constraint — rolling back its whole transaction
+  // and losing a bill that was already rung up. `update: {}` makes the
+  // conflict a no-op read instead.
+  return tx.dailyStockEntry.upsert({
+    where: { dailyEntryKey: { date, storeId, productId } },
+    create: { date, storeId, productId, opening, received: 0, sold: 0, wastage: 0, closing: opening, consignmentQty },
+    update: {},
   });
 }
 
@@ -87,16 +94,23 @@ async function getOrCreateDailyEntry(tx, storeId, productId, date) {
 // and /consignments routes for how it's used).
 async function adjustStock(tx, { storeId, productId, date, receivedDelta = 0, soldDelta = 0, wastageDelta = 0, consignmentDelta = 0 }) {
   const entry = await getOrCreateDailyEntry(tx, storeId, productId, date);
-  const received = entry.received + receivedDelta;
-  const sold = entry.sold + soldDelta;
-  const wastage = entry.wastage + wastageDelta;
-  const closing = entry.opening + received - sold - wastage;
-  const consignmentQty = entry.consignmentQty + consignmentDelta;
 
+  // Written as increments rather than absolute totals. Read-then-write loses
+  // one of two concurrent movements: both transactions read sold=0, both
+  // write sold=qty, and the second silently overwrites the first — two bills
+  // recorded, one deduction. The closing formula is linear in the deltas, so
+  // incrementing it by the same amount keeps it exact.
   const updated = await tx.dailyStockEntry.update({
     where: { id: entry.id },
-    data: { received, sold, wastage, closing, consignmentQty },
+    data: {
+      received: { increment: receivedDelta },
+      sold: { increment: soldDelta },
+      wastage: { increment: wastageDelta },
+      consignmentQty: { increment: consignmentDelta },
+      closing: { increment: receivedDelta - soldDelta - wastageDelta },
+    },
   });
+  const closing = updated.closing;
 
   // Every later day's opening was snapshotted from this day's closing, so a
   // write to a past date leaves the whole rest of the chain stale — the app
@@ -130,4 +144,4 @@ async function processReturn(tx, { storeId, productId, date, quantity }) {
   return adjustStock(tx, { storeId, productId, date, soldDelta: -soldReduction, receivedDelta: overflow });
 }
 
-module.exports = { normalizeDate, previousDay, todayStr, rechain, getOrCreateDailyEntry, adjustStock, processReturn };
+module.exports = { badRequest, normalizeDate, previousDay, todayStr, rechain, getOrCreateDailyEntry, adjustStock, processReturn };
