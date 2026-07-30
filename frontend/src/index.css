@@ -1629,6 +1629,17 @@ button:disabled {
     color: var(--primary);
   }
 
+  /* Full width and above the row of secondary actions — this is the reason
+     most people open the sheet the first time. */
+  .more-install {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 10px;
+  }
+
   .more-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import logoIcon from '../assets/grillexa-icon.png';
 import ChangePasswordModal from './ChangePasswordModal';
+import InstallAppButton from './InstallAppButton';
 
 const ROLE_LABELS = {
   ADMIN: 'Admin',
@@ -181,6 +182,8 @@ export default function Sidebar() {
                 </NavLink>
               ))}
             </div>
+
+            <InstallAppButton className="btn-primary more-install" />
 
             <div className="more-actions">
               <button type="button" className="btn-secondary" onClick={() => { setMoreOpen(false); setChangePasswordOpen(true); }}>
