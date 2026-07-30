@@ -1,25 +1,44 @@
+/* The login screen's petrol gradient and the flame in the logo were the only
+   two places the brand appeared; inside the app everything went grey, so it
+   read as two different products. Both now run throughout: petrol as the
+   ground, flame as the accent for anything that needs attention or action.
+   Cards stay near-white — dense rows of rupee figures have to stay readable,
+   and that is not negotiable for a billing tool. */
 :root {
-  --bg: #f4f5f9;
+  --deep: #052a33;
+  --deep-2: #0a4351;
+  --teal: #12889b;
+  --teal-soft: #e3f3f6;
+
+  --bg: #f2f6f7;
   --surface: #ffffff;
-  --border: #e5e7eb;
-  --text: #14161f;
-  --text-muted: #6b7280;
-  --primary: #4f46e5;
-  --primary-hover: #4338ca;
-  --primary-soft: #eef2ff;
-  --danger: #dc2626;
-  --danger-soft: #fef2f2;
-  --success: #16a34a;
-  --success-soft: #f0fdf4;
-  --warn: #d97706;
-  --warn-soft: #fffbeb;
-  --info: #2563eb;
-  --info-soft: #eff6ff;
-  --sidebar-bg: #14161f;
-  --sidebar-text: #cbd0dc;
-  --sidebar-active: #1f2233;
-  --radius: 10px;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --border: #dde7ea;
+  --border-soft: #edf3f4;
+  --text: #06222a;
+  --text-muted: #5d7a82;
+
+  /* Flame is the primary action colour. Buttons carry the gradient; flat
+     --primary is for text, borders and focus rings where a gradient can't go. */
+  --primary: #e2551b;
+  --primary-hover: #c94915;
+  --primary-grad: linear-gradient(150deg, #ff8a4c, #f0642b);
+  --primary-soft: #fdeee5;
+
+  --danger: #d92d20;
+  --danger-soft: #fef3f2;
+  --success: #0e8f6f;
+  --success-soft: #e3f5ef;
+  --warn: #b54708;
+  --warn-soft: #fdf3e3;
+  --info: #12889b;
+  --info-soft: #e3f3f6;
+
+  --sidebar-bg: #04222a;
+  --sidebar-text: #9fc4cc;
+  --sidebar-active: rgba(240, 100, 43, 0.16);
+
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(5, 42, 51, 0.05), 0 10px 28px -18px rgba(5, 42, 51, 0.35);
 }
 
 * {
@@ -39,18 +58,36 @@ html {
 body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  /* A cropped, texture-only strip of the Grillexa mood-board art (circuit
-     lines + flame/leaf gradient — no mockup text/UI in frame), tiled and
-     faded under a near-opaque tint so it reads as ambient texture behind
-     the content instead of competing with dense tables/cards. */
-  background: linear-gradient(rgba(244, 245, 249, 0.93), rgba(244, 245, 249, 0.93)), url('./assets/dashboard-bg.jpg');
-  background-size: auto, 640px auto;
-  background-position: center top;
-  background-repeat: no-repeat, repeat;
-  background-attachment: fixed, fixed;
+  /* Same ground as the login screen: a petrol gradient warmed by a cyan glow
+     off the top-right, so signing in and using the app feel continuous. */
+  background:
+    radial-gradient(1100px 620px at 78% -12%, rgba(26, 168, 190, 0.32), transparent 62%),
+    linear-gradient(158deg, var(--deep) 0%, #073a46 46%, var(--deep-2) 100%);
+  background-attachment: fixed;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+}
+
+/* The faint grid from the login page, faded out toward the bottom so it never
+   competes with a dense table. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(1200px 700px at 60% 0%, #000 35%, transparent 78%);
+}
+
+/* Everything sits above the grid. */
+.app-shell {
+  position: relative;
+  z-index: 1;
 }
 
 h1 {
@@ -135,6 +172,18 @@ select {
   display: none;
 }
 
+/* Page headings sit directly on the petrol ground, so they're light. */
+.page > .page-header h1,
+.page > .page-header .page-subtitle,
+.page > .section-title {
+  color: #eaf6f8;
+}
+
+.page > .page-header .page-subtitle,
+.page > .section-title {
+  color: #a9cdd4;
+}
+
 /* overflow-y matters: an ADMIN has 11 nav links plus the brand and the user
    footer, which is taller than a short laptop screen and much taller than a
    phone. Without it the last links (Stores, Users) and Log out sit past the
@@ -143,7 +192,7 @@ select {
 .sidebar {
   width: 232px;
   flex-shrink: 0;
-  background: var(--sidebar-bg);
+  background: linear-gradient(170deg, #04222a, #063540);
   color: var(--sidebar-text);
   display: flex;
   flex-direction: column;
@@ -208,13 +257,14 @@ select {
 
 .sidebar-link.active {
   background: var(--sidebar-active);
-  color: #fff;
-  border-left-color: var(--primary);
+  color: #ff8a4c;
+  border-left-color: #ff8a4c;
+  font-weight: 600;
 }
 
 .sidebar-link.active .sidebar-link-icon {
   opacity: 1;
-  color: #818cf8;
+  color: #ff8a4c;
 }
 
 .sidebar-user {
@@ -816,14 +866,14 @@ select {
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: var(--primary-grad);
   color: #fff;
-  box-shadow: 0 1px 2px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 1px 2px rgba(226, 85, 27, 0.28);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--primary-hover);
-  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+  filter: brightness(1.06);
+  box-shadow: 0 4px 14px -4px rgba(226, 85, 27, 0.5);
 }
 
 .btn-primary:active:not(:disabled) {
@@ -1705,43 +1755,109 @@ button:disabled {
     gap: 6px;
   }
 
-  /* A row's Name + Address (or SKU/Price/etc.) text used to be free to grow
-     as wide as the content needed, which routinely pushed the Edit/Delete
-     buttons several hundred pixels past the edge of the phone screen.
-     Truncating the non-action columns keeps a row's total width close to
-     the viewport, so reaching those buttons takes little or no horizontal
-     scrolling. Doesn't apply while a cell is showing an edit <input> — the
-     input has its own width/scroll behavior and the value shouldn't look
-     cut off while someone is actively editing it. */
-  .data-table td.cell-strong:not(:has(input)) {
-    max-width: 13ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .data-table td:not(.cell-strong):not(.actions-cell):not(.cell-date):not(:has(input)) {
-    max-width: 10ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* Full date, never truncated — sized to fit "24/07/2026" with a little
-     breathing room, and exempt from the ellipsis rule above. */
+  /* The 13ch/10ch truncation that used to live here is gone with the table
+     layout it existed to rescue. Nothing is cut off in a card — "Moosarambag
+     Store" and "A.N milk /beauty parlour" print in full. */
+  .data-table td.cell-strong,
   .data-table td.cell-date {
     max-width: none;
-    min-width: 120px;
     overflow: visible;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
-  /* 16px of side padding per cell costs ~190px across a six-column table —
-     most of a phone's width, spent on gaps. Tightening it here pulls the
-     right-hand columns back toward the screen instead of past it. */
-  .data-table thead th,
+  /* A table never fits a phone. Six columns plus an action button runs to
+     ~640px on a ~390px screen, so something always ends up past the right
+     edge — which is how On Consignment, the one figure this business works
+     from, became invisible. Each row becomes a card instead: label on the
+     left, value on the right, nothing to scroll sideways for.
+     The labels come from data-label, stamped from the column headings in
+     App.jsx. */
+  .data-table {
+    display: block;
+    min-width: 0;
+  }
+
+  .data-table thead {
+    display: none;
+  }
+
+  .data-table tbody,
+  .data-table tbody tr,
   .data-table tbody td {
-    padding: 11px 9px;
+    display: block;
+    width: 100%;
+  }
+
+  .data-table tbody tr {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 10px;
+    padding: 4px 14px;
+  }
+
+  .data-table tbody tr:hover {
+    background: var(--surface);
+  }
+
+  .data-table tbody td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border-soft);
+    text-align: right;
+  }
+
+  .data-table tbody td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    text-align: left;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* Cells with no heading — the actions column — get no label and sit full
+     width so the buttons have room. */
+  .data-table tbody td:not([data-label]) {
+    justify-content: flex-end;
+    border-bottom: 0;
+  }
+
+  .data-table tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  /* The row's headline: bigger, left-aligned, no label above it. */
+  .data-table tbody td.cell-strong:first-child {
+    display: block;
+    text-align: left;
+    font-size: 1rem;
+    font-weight: 700;
+    padding-top: 12px;
+  }
+
+  .data-table tbody td.cell-strong:first-child::before {
+    display: none;
+  }
+
+  /* Money and counts line up as figures even in card form. */
+  .data-table tbody td.cell-mono,
+  .data-table tbody td.cell-date {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The bounded-height scroller fought the card layout: cards need the page
+     to scroll, not a nested box. */
+  .page .table-scroll {
+    max-height: none;
+    overflow: visible;
   }
 
   /* Touch targets: Apple/Google both recommend ~44px minimum. */

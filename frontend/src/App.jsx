@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -18,8 +18,29 @@ const Users = lazy(() => import('./pages/Users'));
 const Stores = lazy(() => import('./pages/Stores'));
 const Reports = lazy(() => import('./pages/Reports'));
 
+// Copies each column heading onto its cells as data-label, which the phone
+// card layout prints beside the value (see .data-table in index.css). Done in
+// one place rather than as data-label="…" repeated across eleven tables: a
+// table added later gets it for nothing, and none can be forgotten. Runs on
+// every render — these tables are tens of rows, not thousands.
+function useTableLabels() {
+  useEffect(() => {
+    for (const table of document.querySelectorAll('table.data-table')) {
+      const headings = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
+      if (!headings.length) continue;
+      for (const row of table.querySelectorAll('tbody tr')) {
+        [...row.children].forEach((cell, i) => {
+          if (headings[i]) cell.setAttribute('data-label', headings[i]);
+          else cell.removeAttribute('data-label');
+        });
+      }
+    }
+  });
+}
+
 export default function App() {
   const { user, loading } = useAuth();
+  useTableLabels();
 
   if (loading) return <Spinner />;
 
