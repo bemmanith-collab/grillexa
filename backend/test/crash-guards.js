@@ -9,7 +9,7 @@ const assert = require('assert');
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
 
-const { normalizeDate } = require('../src/lib/stock');
+const { normalizeDate, todayStr } = require('../src/lib/stock');
 const app = require('../src/app');
 
 function check(name, fn) {
@@ -35,9 +35,28 @@ function testNormalizeDate() {
   assert.strictEqual(normalizeDate('2026-07-30').toISOString(), '2026-07-30T00:00:00.000Z');
 }
 
+// todayStr feeds normalizeDate directly wherever a route has no date in the
+// request (the wastage endpoint, /reports/summary). It was briefly built on
+// toLocaleDateString('en-CA'), which returns ISO on a full-ICU Node and
+// US-style "7/30/2026" on the deployed image — 400ing those endpoints in
+// production while every local test passed. Assert the shape, not the locale.
+function testTodayStr() {
+  const t = todayStr();
+  assert.match(t, /^\d{4}-\d{2}-\d{2}$/, `todayStr() must be YYYY-MM-DD, got ${JSON.stringify(t)}`);
+  assert.doesNotThrow(() => normalizeDate(t), 'todayStr() must be parseable by normalizeDate');
+  // Within a day of the server's own UTC date — catches a wrong offset sign.
+  const utcDay = new Date().toISOString().slice(0, 10);
+  assert.ok(
+    Math.abs(Date.parse(t) - Date.parse(utcDay)) <= 86400000,
+    `todayStr() ${t} is more than a day from UTC ${utcDay}`
+  );
+}
+
 async function main() {
   testNormalizeDate();
   console.log('ok   normalizeDate rejects bad input with status 400');
+  testTodayStr();
+  console.log('ok   todayStr is ISO and round-trips through normalizeDate');
 
   const server = app.listen(0);
   await new Promise((resolve) => server.once('listening', resolve));

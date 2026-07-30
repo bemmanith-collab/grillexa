@@ -12,7 +12,11 @@ primary_region = "sin"
   force_https = true
   auto_stop_machines = true
   auto_start_machines = true
-  min_machines_running = 0
+  # Kept warm deliberately. Cold boot is ~26s (entrypoint.sh runs
+  # `prisma migrate deploy` before nginx binds), and once the app is
+  # installed to a phone home screen that delay is a blank splash screen
+  # staff read as "broken". Costs ~$1.30/mo more than scaling to zero.
+  min_machines_running = 1
   processes = ["app"]
 
   [[http_service.checks]]

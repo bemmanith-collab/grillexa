@@ -23,14 +23,18 @@ function previousDay(date) {
   return prev;
 }
 
-// The business's calendar day, as YYYY-MM-DD. Not toISOString(): the server
-// runs in UTC, so that rolls over at 05:30 IST and would file an early-morning
-// movement under yesterday. en-CA's short format is already YYYY-MM-DD; the
-// explicit timeZone is what makes this the business's day, not the server's.
-const BUSINESS_TZ = process.env.BUSINESS_TZ || 'Asia/Kolkata';
+// The business's calendar day, as YYYY-MM-DD. A bare toISOString() would give
+// the server's UTC day, which rolls over at 05:30 IST and files an
+// early-morning delivery under yesterday — so shift by the offset first.
+//
+// Deliberately arithmetic rather than toLocaleDateString('en-CA', {timeZone}):
+// the runtime image installs Alpine's nodejs, whose ICU carries no en-CA data,
+// so that call silently returns US-style "7/30/2026" and every date-taking
+// endpoint 400s. India has never observed DST, so a fixed offset is exact.
+const BUSINESS_UTC_OFFSET_MINUTES = Number(process.env.BUSINESS_UTC_OFFSET_MINUTES) || 330;
 
 function todayStr() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: BUSINESS_TZ });
+  return new Date(Date.now() + BUSINESS_UTC_OFFSET_MINUTES * 60000).toISOString().slice(0, 10);
 }
 
 // Re-chains a run of ledger rows onto a new starting balance. Pure, so the
