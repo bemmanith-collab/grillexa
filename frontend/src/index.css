@@ -58,36 +58,46 @@ html {
 body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  /* Same ground as the login screen: a petrol gradient warmed by a cyan glow
-     off the top-right, so signing in and using the app feel continuous. */
-  background:
-    radial-gradient(1100px 620px at 78% -12%, rgba(26, 168, 190, 0.32), transparent 62%),
-    linear-gradient(158deg, var(--deep) 0%, #073a46 46%, var(--deep-2) 100%);
-  background-attachment: fixed;
+  /* Flat fallback; the gradient itself is painted by ::before below. */
+  background: var(--deep);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 
-/* The faint grid from the login page, faded out toward the bottom so it never
-   competes with a dense table. */
-body::before {
+/* The login screen's ground — petrol gradient warmed by a cyan glow — plus its
+   faint grid, so signing in and using the app feel continuous.
+   Painted by a fixed pseudo-element rather than background-attachment: fixed,
+   which iOS has never supported properly and renders as a flat fill or a
+   mis-scaled gradient.
+   z-index: -1 puts it behind every element without needing a stacking context
+   on the content. That matters because the logged-out wrapper carries no
+   class at all, so it creates none — and a positioned z-index: 0 layer would
+   paint over the login form. */
+body::before,
+body::after {
   content: '';
   position: fixed;
   inset: 0;
+  z-index: -1;
   pointer-events: none;
-  z-index: 0;
+}
+
+body::before {
+  background:
+    radial-gradient(1100px 620px at 78% -12%, rgba(26, 168, 190, 0.32), transparent 62%),
+    linear-gradient(158deg, var(--deep) 0%, #073a46 46%, var(--deep-2) 100%);
+}
+
+body::after {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
   background-size: 46px 46px;
+  /* Prefixed first: Safari below 15.4 only understands the -webkit- form, and
+     without it the grid covers the whole viewport unmasked. */
+  -webkit-mask-image: radial-gradient(1200px 700px at 60% 0%, #000 35%, transparent 78%);
   mask-image: radial-gradient(1200px 700px at 60% 0%, #000 35%, transparent 78%);
-}
-
-/* Everything sits above the grid. */
-.app-shell {
-  position: relative;
-  z-index: 1;
 }
 
 h1 {
