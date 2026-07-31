@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 import Spinner from './components/Spinner';
+import RouteErrorBoundary from './components/RouteErrorBoundary';
 
 const Login = lazy(() => import('./pages/Login'));
 const Inventory = lazy(() => import('./pages/Inventory'));
@@ -62,6 +63,7 @@ export default function App() {
     <div className={user ? 'app-shell' : ''}>
       {user && <Sidebar />}
       <main className={user ? 'app-main' : ''}>
+        <RouteErrorBoundary>
         <Suspense fallback={<Spinner />}>
           <Routes>
             <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
@@ -156,6 +158,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
+        </RouteErrorBoundary>
       </main>
     </div>
   );
