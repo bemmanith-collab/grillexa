@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { Search } from 'lucide-react';
@@ -69,6 +69,15 @@ export default function DeliverToStore() {
         (!isScoped && (c.createdBy || '').toLowerCase().includes(q))
     );
   }, [consignments, search, isScoped]);
+
+
+  // The form renders above the list, and the list is long now that tables are
+  // no longer capped to a fixed height. Tapping Edit on a row far down opened
+  // the form off-screen above, so it looked like the button did nothing.
+  const formRef = useRef(null);
+  useEffect(() => {
+    if (formOpen) formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [formOpen, editingId]);
 
   async function loadAll() {
     setLoading(true);
@@ -235,7 +244,7 @@ export default function DeliverToStore() {
       )}
 
       {formOpen && (
-        <div className="card form-card">
+        <div className="card form-card" ref={formRef}>
           {editingId && <p className="modal-help" style={{ marginTop: 0 }}>Editing {consignments.find((c) => c.id === editingId)?.consignmentNo}</p>}
           <form onSubmit={handleSubmit}>
             <div className="bill-form-header">
