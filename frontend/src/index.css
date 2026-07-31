@@ -404,16 +404,18 @@ select {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Page-level tables (Stores, Products, Users, …) can run to 50+ rows, which
-   used to push the "Add" button and page header off-screen and force
-   scrolling the whole page to reach the bottom row. Cap the table to a
-   viewport-relative height with its own scrollbar instead, so the header
-   and controls stay put on both phone and desktop. Scoped to `.page` so
-   modal-embedded tables (line items, bill details) — already bounded by
-   the modal's own scroll — aren't affected. */
+/* Page tables used to be capped to a viewport-relative height with their own
+   scrollbar, to keep the page header and "Add" button on screen. It hid data:
+   29 consignments in a 435px box is 1,200px of rows below the fold, reachable
+   only through a thin scrollbar against the card's edge — so scrolling the
+   page did nothing and the older ones looked like they had been deleted.
+   The page scrolls now instead. The column headers scroll away with it —
+   .table-scroll still needs overflow-x for wide tables, and that makes it the
+   scroll container, so `position: sticky` on the headers can't reach the
+   viewport. A header that scrolls off is a smaller problem than rows nobody
+   can find. */
 .page .table-scroll {
-  max-height: calc(100vh - 260px);
-  overflow-y: auto;
+  overflow-y: visible;
 }
 
 .data-table thead th {
