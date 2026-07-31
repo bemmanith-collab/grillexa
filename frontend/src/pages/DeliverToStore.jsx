@@ -329,7 +329,7 @@ export default function DeliverToStore() {
         </div>
       )}
 
-      {!loading && !searching && <DatePager pager={pager} noun="delivery" />}
+      {!loading && !searching && <DatePager pager={pager} noun="delivery" plural="deliveries" />}
 
       {loading ? (
         <Spinner label="Loading deliveries…" />

@@ -43,7 +43,9 @@ export function useDatePages(items, getDate) {
   };
 }
 
-export default function DatePager({ pager, noun = 'record' }) {
+// "delivery" + "s" is "deliverys". Callers pass the plural where the -s rule
+// doesn't hold, rather than this guessing at English.
+export default function DatePager({ pager, noun = 'record', plural = `${noun}s` }) {
   const { dates, date, index, visible, older, newer, goTo } = pager;
   if (!date || dates.length <= 1) return null;
 
@@ -66,8 +68,7 @@ export default function DatePager({ pager, noun = 'record' }) {
           </select>
         </label>
         <span className="date-pager-count">
-          {count} {noun}
-          {count === 1 ? '' : 's'} · day {index + 1} of {dates.length}
+          {count} {count === 1 ? noun : plural} · day {index + 1} of {dates.length}
         </span>
       </div>
 
