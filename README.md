@@ -1,43 +1,65 @@
-# Grillexa — Multi-Store Stock & Sales Management
+# Grillexa — Consignment, Billing & Stock
 
-A full-stack stock management app for a distributed retail business (sprouts, fruit bowls, etc.) selling through 20+ retail stores. Tracks a daily per-store stock ledger, generates dispatch invoices (HQ → store) and retail sales bills (store → customer), and surfaces per-store product recommendations.
+Stock and billing for a distributed retail business (sprouts, fruit bowls, bananas) supplying 50+ kirana stores. Goods go out to a store **on consignment** — not a sale until the store settles and says what actually sold. Also handles cash sales to walk-in customers, returns, wastage, and a daily per-store ledger.
 
-- **Backend**: Node.js + Express, Prisma ORM, JWT auth, bcrypt password hashing
-- **Frontend**: React (Vite)
+- **Backend**: Node.js + Express, Prisma ORM, JWT auth, bcrypt
+- **Frontend**: React (Vite), installable as an Android app (PWA)
 - **Database**: PostgreSQL
+- **Hosted**: Fly.io, region `sin`
 
-## How stock is tracked
+## The consignment model
 
-Every (date, store, product) combination has one ledger row:
+This is the core of the app. Everything else supports it.
+
+1. **Deliver to Store** — goods go to a store on consignment. A Consignment Note is raised with line items and prices. **No revenue is recognised.** The stock is now sitting in the store, still owned by you.
+2. **Settle Consignment** — later, the store reports what sold and what is coming back unsold. Settling generates a **Sale** for the sold portion (this is where revenue and GST are recognised) and a **Return** for the unsold portion. A consignment can be settled in more than one pass; `soldQty + returnedQty` can never exceed `deliveredQty`, and the database enforces that with a CHECK constraint.
+3. **Direct Sale** — a cash bill straight to a walk-in customer. Billed and paid immediately, no consignment behind it. Can include RETURN lines, which credit the customer and subtract from the bill.
+
+`Dispatches` is the pre-consignment HQ→store transfer flow. It is read-only history; new deliveries go through Deliver to Store.
+
+## How the ledger works, and what it is not
+
+Every (date, store, product) has one row:
 
 ```
-opening → + received (from dispatch invoices) → − sold (from sales bills) → − wastage → closing
+opening → + received → − sold → − wastage → closing
 ```
 
-`closing` becomes next day's `opening` automatically. Three things move the ledger:
+`closing` carries into the next day's `opening`, and a write to a past date re-chains every later day forward.
 
-1. **Dispatch Invoice** — Admin/Manager sends stock from HQ to a store (a "bill" with line items, quantities and unit price). Increases `received`.
-2. **Sale Bill** — a store bills a customer (line items, quantities, retail price). Increases `sold`. Rejected outright if any line would oversell the day's available stock.
-3. **Wastage entry** — a store records spoiled/discarded/returned stock for the day. Increases `wastage`.
+**`opening` and `closing` are not displayed anywhere, deliberately.** Goods are never booked into the system before they are billed, so the running balance drifts negative as a matter of course and describes nothing real. What the business actually works from is **`consignmentQty`** — how much of a store's stock is still out on consignment, delivered but not yet settled.
+
+The per-day movements (`received`, `sold`, `wastage`) *are* real: each one is a delivery, a bill, or a recorded wastage. Those are what the UI shows.
+
+`backend/scripts/recompute-ledger.js` rebuilds `opening`/`closing` from the recorded movements and `consignmentQty` from the consignment tables. Dry run by default; `--apply` writes in one transaction.
+
+## Prices
+
+Unit prices are resolved **server-side from the product catalogue** (`backend/src/lib/pricing.js`), never trusted from the request. `GET /api/products` hides `price` from Sales accounts, so a Sales user's form has nothing to send back — trusting the client meant bills saved at ₹0.00 with stock correctly deducted and no error. Admin and Manager may override a price for a negotiated rate; a Sales account always gets the catalogue price. Negative prices and fractional quantities are rejected.
 
 ## Roles & permissions
 
-| Action                                  | Admin | Manager | Sales (store staff) |
-|-------------------------------------------|:-----:|:-------:|:--------------------:|
-| View today's stock / stock history         | ✅ (any store) | ✅ (any store) | ✅ (own store only) |
-| View product catalog price                 | ✅    | ✅      | ❌ |
-| View reports & recommendations             | ✅    | ✅      | ❌ |
-| Create Dispatch Invoice (send stock to store) | ✅ | ✅      | ❌ |
-| Create Sale Bill                            | ✅ (any store) | ✅ (any store) | ✅ (own store only) |
-| Record wastage                              | ✅ (any store) | ✅ (any store) | ✅ (own store only) |
-| Add/edit products                           | ✅    | ✅      | ❌ |
-| Delete products                             | ✅    | ❌      | ❌ |
-| Manage stores                               | ✅    | ❌      | ❌ |
-| Manage users (add/edit role & store/delete) | ✅    | ❌      | ❌ |
+| Action | Admin | Manager | Sales |
+|---|:--:|:--:|:--:|
+| Today's Stock, Stock History | ✅ any store | ✅ any store | ✅ own stores |
+| Deliver to Store (create / edit consignment) | ✅ any | ✅ any | ✅ own stores |
+| Settle Consignment (incl. edit last settlement) | ✅ any | ✅ any | ✅ own stores |
+| Direct Sale (create / **edit** a bill) | ✅ any | ✅ any | ✅ own stores |
+| Record wastage, record returns | ✅ any | ✅ any | ✅ own stores |
+| See product prices | ✅ | ✅ | ❌ |
+| Reports (P&L, product sales) | ✅ | ✅ | ❌ |
+| Dispatches (historical) | ✅ | ✅ | ❌ |
+| Add / edit products | ✅ | ✅ | ❌ |
+| Delete products | ✅ | ❌ | ❌ |
+| Manage stores | ✅ | ❌ | ❌ |
+| Manage users, reset passwords | ✅ | ❌ | ❌ |
+| Change own password | ✅ | ✅ | ✅ |
 
-Every one of these rules is enforced **server-side**, not just hidden in the UI. Role and store assignment are re-read from the database on *every* request (not cached in the JWT), so if an admin changes someone's role or store, it takes effect immediately — not just after their next login.
+Enforced **server-side**, not merely hidden in the UI. Role and store assignments are re-read from the database on *every* request rather than trusted from the JWT, so a change takes effect immediately instead of at next login.
 
-Sales accounts are locked to exactly one store (`storeId` on the user). New public signups start as unassigned Sales accounts; an Admin assigns them to a store (and can promote to Manager/Admin) from the Users page.
+A Sales account can be assigned **several** stores. **There is no public signup** — an Admin creates every account from the Users page.
+
+A Direct Sale bill can be corrected after the fact (`PATCH /api/sales/:id`): the original's stock effect is reversed and the corrected version applied, keeping the same bill number so a printed copy still matches. Bills generated by settling a consignment are refused — edit those from Settle Consignment, so the settlement and the consignment counters stay in agreement.
 
 ## Project structure
 
@@ -45,55 +67,61 @@ Sales accounts are locked to exactly one store (`storeId` on the user). New publ
 grillexa/
 ├── backend/
 │   ├── prisma/
-│   │   ├── schema.prisma     User, Store, Product, DailyStockEntry,
-│   │   │                     DispatchInvoice(+Line), Sale(+Line)
-│   │   └── seed.js
+│   │   ├── schema.prisma   User, Store, Product, DailyStockEntry,
+│   │   │                   Consignment(+Item), Settlement(+Line),
+│   │   │                   Sale(+Line), Return,
+│   │   │                   DispatchInvoice(+Line)
+│   │   ├── migrations/     10 migrations
+│   │   └── seed.js         local only — refuses to run with NODE_ENV=production
+│   ├── scripts/
+│   │   └── recompute-ledger.js   ledger repair, dry run unless --apply
 │   ├── src/
-│   │   ├── lib/          stock.js (ledger math), scope.js (store access)
-│   │   ├── middleware/   auth.js, role.js
-│   │   ├── routes/       auth, users, products, stores, stock,
-│   │   │                 dispatches, sales, reports
+│   │   ├── lib/         stock.js (ledger + cascade), pricing.js (catalogue
+│   │   │                prices), scope.js (store access)
+│   │   ├── middleware/  auth.js, role.js
+│   │   ├── routes/      auth, users, products, stores, stock, consignments,
+│   │   │                sales, returns, dispatches, reports, quotes
 │   │   ├── app.js
 │   │   └── index.js
-│   ├── .env.example
-│   └── Dockerfile             local-dev-only image (used by docker-compose)
+│   ├── test/            crash-guards.js, stock-cascade.js  (npm test)
+│   └── .env.example
 ├── frontend/
+│   ├── public/          manifest.json, sw.js, icons (PWA)
 │   ├── src/
 │   │   ├── api/client.js
 │   │   ├── context/AuthContext.jsx
-│   │   ├── components/   Sidebar, ProtectedRoute, LineItemsForm,
-│   │   │                 BillDetailModal, WastageModal
-│   │   └── pages/        Login, Signup, Inventory (Today's Stock),
-│   │                     Dispatches, Sales, StockHistory, Reports,
-│   │                     Users, Stores
-│   ├── .env.example
-│   ├── nginx.conf             local-dev-only config (used by docker-compose)
-│   └── Dockerfile             local-dev-only image (used by docker-compose)
-├── Dockerfile                 production image for Fly.io (multi-stage: backend + frontend + Nginx)
-├── entrypoint.sh              runs `prisma migrate deploy`, then backend + Nginx together
-├── nginx.conf                 production Nginx config (proxies /api, /health to the backend)
-├── fly.toml                   Fly.io app config (region: bom, internal_port: 4000)
-├── .dockerignore
-├── docker-compose.yml         local dev only — not used by Fly.io
+│   │   ├── components/  Sidebar (desktop rail + phone tab bar), LineItemsForm,
+│   │   │                BillDetailModal, WastageModal, StockDetailModal,
+│   │   │                StoreAssignModal, ChangePasswordModal,
+│   │   │                ResetPasswordModal, InstallAppButton,
+│   │   │                RouteErrorBoundary, Toast, Spinner, EmptyState
+│   │   └── pages/       Login, Inventory (Today's Stock), DeliverToStore,
+│   │                    SettleConsignment, DirectSale, Sales, Dispatches,
+│   │                    Products, StockHistory, Reports, Stores, Users
+│   └── vite.config.js
+├── Dockerfile        production image for Fly (backend + frontend + Nginx)
+├── entrypoint.sh     runs `prisma migrate deploy`, then Node + Nginx
+├── nginx.conf        production Nginx (serves the SPA, proxies /api and /health)
+├── fly.toml          Fly config — region sin, internal_port 4000
+├── docker-compose.yml  local Postgres only
 └── README.md
 ```
 
-## Local development (no Docker)
+Fly builds **only** the root `Dockerfile`, `nginx.conf` and `entrypoint.sh`. There are no other Dockerfiles or nginx configs; earlier duplicates under `backend/` and `frontend/` were removed because editing the wrong one silently did nothing.
 
-Requires Node.js 20+ and a reachable Postgres instance (e.g. `docker run -p 5432:5432 -e POSTGRES_USER=grillexa -e POSTGRES_PASSWORD=grillexa -e POSTGRES_DB=grillexa postgres:16-alpine`).
+## Local development
 
-**1. Backend**
+Node 20+ and a reachable Postgres. `docker compose up -d` starts one on `localhost:5432`.
 
 ```bash
 cd backend
-cp .env.example .env       # point DATABASE_URL at your Postgres instance; edit JWT_SECRET before deploying anywhere real
+cp .env.example .env        # set DATABASE_URL and JWT_SECRET
 npm install
 npx prisma migrate deploy
-npm run seed
+npm run seed                # optional demo data
 npm run dev                 # http://localhost:4000
+npm test                    # no database needed
 ```
-
-**2. Frontend** (in a second terminal)
 
 ```bash
 cd frontend
@@ -101,90 +129,95 @@ npm install
 npm run dev                 # http://localhost:5173
 ```
 
-Open http://localhost:5173. The seed script creates the product catalog (Green Sprouts, Mixed Sprouts, Single Fruit Bowl, Mixed Fruit Bowl), six sample stores, and one login per store plus HQ roles (password `ChangeMe123!` for all):
-
-| Email                          | Role    | Store |
-|---------------------------------|---------|-------|
-| admin@grillexa.local            | Admin   | — |
-| manager@grillexa.local          | Manager | — |
-| mgroadstore@grillexa.local      | Sales   | MG Road Store |
-| koramangalastore@grillexa.local | Sales   | Koramangala Store |
-| indiranagarstore@grillexa.local | Sales   | Indiranagar Store |
-| whitefieldstore@grillexa.local  | Sales   | Whitefield Store |
-| hsrlayoutstore@grillexa.local   | Sales   | HSR Layout Store |
-| jayanagarstore@grillexa.local   | Sales   | Jayanagar Store |
-
-The seed also backfills 14 days of demo dispatch/sales/wastage history so Reports and Stock History aren't empty on first login. Add your remaining stores from the **Stores** page (Admin) and create the rest of your store staff logins from the **Users** page.
-
-Change these passwords (or delete the seeded accounts) before using this anywhere beyond local testing.
-
-## Running with Docker (local dev)
+To check UI changes on a phone over the LAN without running Postgres locally, point the dev server at the deployed API:
 
 ```bash
-docker compose up --build
+VITE_API_PROXY=https://grillexa.fly.dev npm run dev
 ```
 
-- Frontend: http://localhost:8080
-- Backend API: http://localhost:4000
-- Postgres: localhost:5432 (data persisted in the `db_data` volume)
+That talks to the **real database** — browse freely, but don't test billing through it.
 
-On first boot the backend runs `prisma migrate deploy` automatically; run the seed manually once if you want the sample data:
+### Seed data
 
-```bash
-docker compose exec backend npm run seed
-```
+`npm run seed` creates a demo catalogue, six sample stores, and logins with the password `ChangeMe123!` (`admin@grillexa.local`, `manager@grillexa.local`, one per store). It also backfills 14 days of randomised history.
 
-Set a real `JWT_SECRET` before deploying anywhere reachable by others:
-
-```bash
-JWT_SECRET="$(openssl rand -hex 32)" docker compose up --build -d
-```
-
-This `docker-compose.yml` setup is for local development only — it is not used when deploying to Fly.io (see below).
+It **refuses to run when `NODE_ENV=production`**, because `npm run seed` picks up whatever `DATABASE_URL` is in the environment. Delete or change these accounts before any real use.
 
 ## Deploying to Fly.io
 
-The root `Dockerfile` builds a single production image (backend + frontend + Nginx) — see `fly.toml`, `entrypoint.sh`, and `nginx.conf` at the repo root.
-
 ```bash
-fly launch --no-deploy               # first time only; it will detect fly.toml — don't overwrite it
-fly postgres create                  # or attach an existing Postgres cluster
-fly secrets set DATABASE_URL="postgresql://..." JWT_SECRET="$(openssl rand -hex 32)" JWT_EXPIRES_IN="8h" CORS_ORIGIN="https://grillexa.fly.dev"
-fly deploy
+flyctl deploy -a grillexa      # from the repo root — fly.toml points at ./Dockerfile
 ```
 
-`prisma migrate deploy` runs automatically on every container start (see `entrypoint.sh`), applying the migration in `backend/prisma/migrations/`.
+`entrypoint.sh` runs `prisma migrate deploy` on every container start, before Nginx binds. A migration that fails therefore stops the app from starting: it will not roll back on its own, and needs `flyctl ssh console` and `npx prisma migrate resolve`. Before deploying anything with a migration, know your restore path:
+
+```bash
+flyctl mpg list --org personal                 # cluster id
+flyctl mpg backup list <cluster-id>            # continuous automated backups
+flyctl mpg restore --help
+```
+
+Database is Fly Managed Postgres (`grillexa-db`, region `sin`, Basic plan), with continuous automated backups. The app image is stateless and holds no volume, so replacing the machine cannot lose data.
+
+`min_machines_running = 1` is deliberate: a cold boot is ~26 seconds because `prisma migrate deploy` runs before Nginx binds, and once the app is installed to a phone home screen that delay is a blank splash screen.
+
+## Installing on a phone
+
+The app is a PWA. On **Android**, Chrome offers **Install app** — there is also a button inside the app under **More**. It installs as a real WebAPK: home-screen icon, no address bar, and it updates itself on deploy. No store account, no APK to distribute.
+
+On **iPhone** there is no install prompt in any browser (they are all WebKit); use **Safari → Share → Add to Home Screen**.
+
+The service worker caches nothing, deliberately — this app writes bills, and a cached page showing yesterday's consignments as current is worse than a plain connection error.
 
 ## Environment variables (backend)
 
-| Variable         | Description                                      |
-|-------------------|--------------------------------------------------|
-| `DATABASE_URL`    | Prisma Postgres connection string — set as a Fly secret in production, never committed |
-| `JWT_SECRET`      | Secret used to sign JWTs — must be a long random string in production |
-| `JWT_EXPIRES_IN`  | Token lifetime, e.g. `8h`                         |
-| `PORT`            | Port the Node process listens on (`4000` for local/docker-compose; `4001` inside the Fly image, where Nginx owns the externally exposed `4000`) |
-| `CORS_ORIGIN`     | Comma-separated list of allowed browser origins (defaults to `*`); not needed in the Fly image since Nginx serves frontend and API from one origin |
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | Postgres connection string. A Fly secret in production, never committed |
+| `JWT_SECRET` | Signing secret. The app refuses to start without it |
+| `JWT_EXPIRES_IN` | Token lifetime, default `8h` |
+| `PORT` | Node's port — `4000` locally, `4001` inside the Fly image where Nginx owns `4000` |
+| `CORS_ORIGIN` | Comma-separated allowed origins, defaults to `*`. Not needed on Fly, where Nginx serves the app and API from one origin |
+| `BUSINESS_UTC_OFFSET_MINUTES` | Business day offset, default `330` (IST). Both the server and the browser resolve "today" with this, so a device in another timezone can't disagree with the ledger |
 
-All of these are read from the environment / `.env` file — nothing sensitive is hardcoded.
+Read from the environment or `.env`. One exception worth knowing: the business's own name, address and FSSAI licence number are hardcoded in `frontend/src/lib/businessInfo.js` because they are printed on every invoice. Not secret, but they are per-business and would need changing for anyone else.
 
 ## API overview
 
-| Method | Path                                    | Access                          |
-|--------|-------------------------------------------|----------------------------------|
-| POST   | `/api/auth/signup`                        | Public (creates unassigned Sales user) |
-| POST   | `/api/auth/login`                         | Public                           |
-| GET    | `/api/auth/me`                            | Authenticated                    |
-| GET/POST/PATCH/DELETE | `/api/users`, `/api/users/:id`   | Admin                            |
-| GET    | `/api/products`                           | Authenticated (price hidden for Sales) |
-| POST/PATCH `/api/products`, `/api/products/:id` | Admin, Manager     |
-| DELETE | `/api/products/:id`                       | Admin                            |
-| GET/POST/PATCH `/api/stores`, `/api/stores/:id` | GET: Authenticated · POST/PATCH: Admin |
-| GET    | `/api/stock/today?storeId=`               | Authenticated, store-scoped for Sales |
-| GET    | `/api/stock/history?storeId=&productId=&from=&to=` | Authenticated, store-scoped for Sales |
-| POST   | `/api/stock/:storeId/:productId/wastage`  | Authenticated, store-scoped for Sales |
-| GET/POST `/api/dispatches`                | GET: store-scoped read for Sales · POST: Admin, Manager |
-| GET    | `/api/dispatches/:id`                     | Authenticated, store-scoped for Sales |
-| GET/POST `/api/sales`                     | Authenticated, store-scoped for Sales |
-| GET    | `/api/sales/:id`                          | Authenticated, store-scoped for Sales |
-| GET    | `/api/reports/summary`                    | Admin, Manager                   |
-| GET    | `/api/reports/recommendations?days=`      | Admin, Manager                   |
+| Method | Path | Access |
+|---|---|---|
+| POST | `/api/auth/login` | Public |
+| GET | `/api/auth/me` | Authenticated |
+| POST | `/api/auth/change-password` | Authenticated |
+| GET/POST/PATCH/DELETE | `/api/users`, `/api/users/:id` | Admin |
+| GET | `/api/products` | Authenticated (price hidden from Sales) |
+| POST/PATCH | `/api/products`, `/api/products/:id` | Admin, Manager |
+| DELETE | `/api/products/:id` | Admin |
+| GET | `/api/stores` | Authenticated |
+| POST/PATCH/DELETE | `/api/stores`, `/api/stores/:id` | Admin |
+| GET | `/api/stock/today?storeId=&date=` | Authenticated, store-scoped |
+| GET | `/api/stock/history?storeId=&productId=&from=&to=` | Authenticated, store-scoped |
+| POST | `/api/stock/:storeId/:productId/wastage` | Authenticated, store-scoped |
+| GET | `/api/consignments`, `/api/consignments/:id` | Authenticated, store-scoped |
+| GET | `/api/consignments/latest/:storeId` | Authenticated, store-scoped |
+| POST/PATCH | `/api/consignments`, `/api/consignments/:id` | Admin, Manager, Sales |
+| POST | `/api/consignments/:id/settle` | Admin, Manager, Sales |
+| PATCH | `/api/consignments/:id/settlements/:settlementId` | Admin, Manager, Sales |
+| GET | `/api/sales`, `/api/sales/:id`, `/api/sales/latest/:storeId` | Authenticated, store-scoped |
+| POST/PATCH | `/api/sales`, `/api/sales/:id` | Admin, Manager, Sales |
+| GET/POST | `/api/returns` | Authenticated, store-scoped |
+| GET | `/api/dispatches`, `/api/dispatches/:id` | Admin, Manager |
+| POST | `/api/dispatches` | Admin, Manager |
+| GET | `/api/reports/summary`, `/pnl?days=`, `/product-sales?days=` | Admin, Manager |
+| GET | `/api/quotes/random` | Authenticated |
+
+## Tests
+
+```bash
+cd backend && npm test
+```
+
+Two files, no framework and no database:
+
+- `test/crash-guards.js` — malformed request bodies return 400 rather than killing the process (an unhandled rejection in an async handler exits Node on Express 4), `todayStr` is ISO and round-trips, and public signup stays gone.
+- `test/stock-cascade.js` — the ledger cascade against an in-memory Prisma stub: back-dated writes re-chain later days, moving a document between dates leaves nothing behind, and reversing a bill restores stock exactly.
