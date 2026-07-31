@@ -23,18 +23,21 @@ export default class RouteErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error) {
-    // Reloading fetches the current index.html and the chunks it names, which
-    // resolves it. Once only: the flag stops a genuine, repeatable failure
-    // turning into a reload loop.
-    if (isStaleChunk(error) && !sessionStorage.getItem(RELOAD_FLAG)) {
-      sessionStorage.setItem(RELOAD_FLAG, '1');
-      window.location.reload();
-    }
-  }
+    if (!isStaleChunk(error)) return;
 
-  componentDidMount() {
-    // Got here without erroring, so any earlier reload did its job.
-    sessionStorage.removeItem(RELOAD_FLAG);
+    // A timestamp, not a boolean that gets cleared elsewhere. Clearing it on
+    // mount looked right but componentDidMount runs on this boundary's own
+    // mount whether or not the children threw — so it wiped the flag that had
+    // just been set, and every reload re-armed the next one. That is an
+    // endless reload loop, which on a phone looks like the app not opening.
+    //
+    // Refusing to retry within the window can't loop: the second failure in
+    // that window falls through to the message below.
+    const lastAttempt = Number(sessionStorage.getItem(RELOAD_FLAG)) || 0;
+    if (Date.now() - lastAttempt < 30000) return;
+
+    sessionStorage.setItem(RELOAD_FLAG, String(Date.now()));
+    window.location.reload();
   }
 
   render() {
