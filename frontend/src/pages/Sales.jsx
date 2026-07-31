@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
+import DatePager, { useDatePages } from '../components/DatePager';
 import { ReceiptIcon } from '../components/icons';
 import { formatCurrency } from '../lib/format';
 import { formatDate } from '../utils/date';
@@ -44,6 +45,9 @@ export default function Sales() {
 
   const singleStoreName = isScoped && myStores.length === 1 ? myStores[0].name : null;
 
+
+  const pager = useDatePages(sales, (i) => i.date);
+  const shown = pager.visible;
   return (
     <div className="page">
       <div className="page-header">
@@ -71,6 +75,8 @@ export default function Sales() {
         </div>
       </div>
 
+      {!salesLoading && <DatePager pager={pager} noun="bill" />}
+
       {salesLoading ? (
         <Spinner label="Loading sales…" />
       ) : (
@@ -88,7 +94,7 @@ export default function Sales() {
               </tr>
             </thead>
             <tbody>
-              {sales.map((s) => (
+              {shown.map((s) => (
                 <tr key={s.id}>
                   <td className="cell-mono">{s.number}</td>
                   <td className="cell-date">{formatDate(s.date)}</td>
@@ -102,7 +108,7 @@ export default function Sales() {
                   </td>
                 </tr>
               ))}
-              {sales.length === 0 && (
+              {shown.length === 0 && (
                 <tr>
                   <td colSpan={isScoped ? 5 : 6}>
                     <EmptyState

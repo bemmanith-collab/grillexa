@@ -6,6 +6,7 @@ import { formatDate, todayStr } from '../utils/date';
 import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
+import DatePager, { useDatePages } from '../components/DatePager';
 import { ReceiptIcon } from '../components/icons';
 
 function asSaleBill(settlement, consignment) {
@@ -243,6 +244,10 @@ export default function SettleConsignment() {
     }
   }
 
+
+  const pager = useDatePages(filteredConsignments, (i) => i.deliveredAt);
+  const searching = Boolean(search.trim());
+  const shown = searching ? filteredConsignments : pager.visible;
   return (
     <div className="page">
       <div className="page-header">
@@ -267,6 +272,8 @@ export default function SettleConsignment() {
         </div>
       )}
 
+      {!loading && !searching && <DatePager pager={pager} noun="consignment" />}
+
       {loading ? (
         <Spinner label="Loading consignments…" />
       ) : (
@@ -284,7 +291,7 @@ export default function SettleConsignment() {
               </tr>
             </thead>
             <tbody>
-              {filteredConsignments.map((c) => (
+              {shown.map((c) => (
                 <tr key={c.id}>
                   <td className="cell-mono">{c.consignmentNo}</td>
                   <td className="cell-date">{formatDate(c.deliveredAt)}</td>
@@ -307,7 +314,7 @@ export default function SettleConsignment() {
                   </td>
                 </tr>
               ))}
-              {filteredConsignments.length === 0 && (
+              {shown.length === 0 && (
                 <tr>
                   <td colSpan={6}>
                     <EmptyState

@@ -6,6 +6,7 @@ import LineItemsForm, { emptyLine } from '../components/LineItemsForm';
 import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
+import DatePager, { useDatePages } from '../components/DatePager';
 import Toast from '../components/Toast';
 import { TruckIcon, RefreshIcon } from '../components/icons';
 import { filterToCatalog, describeDropped } from '../lib/reorder';
@@ -219,6 +220,10 @@ export default function DeliverToStore() {
   const noStoresAssigned = isScoped && myStores.length === 0;
   const singleStoreName = isScoped && myStores.length === 1 ? myStores[0].name : null;
 
+
+  const pager = useDatePages(filteredConsignments, (i) => i.deliveredAt);
+  const searching = Boolean(search.trim());
+  const shown = searching ? filteredConsignments : pager.visible;
   return (
     <div className="page">
       <div className="page-header">
@@ -324,6 +329,8 @@ export default function DeliverToStore() {
         </div>
       )}
 
+      {!loading && !searching && <DatePager pager={pager} noun="delivery" />}
+
       {loading ? (
         <Spinner label="Loading deliveries…" />
       ) : (
@@ -342,7 +349,7 @@ export default function DeliverToStore() {
               </tr>
             </thead>
             <tbody>
-              {filteredConsignments.map((c) => (
+              {shown.map((c) => (
                 <tr key={c.id}>
                   <td className="cell-mono">{c.consignmentNo}</td>
                   <td className="cell-date">{formatDate(c.deliveredAt)}</td>
@@ -364,7 +371,7 @@ export default function DeliverToStore() {
                   </td>
                 </tr>
               ))}
-              {filteredConsignments.length === 0 && (
+              {shown.length === 0 && (
                 <tr>
                   <td colSpan={isScoped ? 6 : 7}>
                     <EmptyState

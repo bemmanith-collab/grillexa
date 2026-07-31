@@ -6,6 +6,7 @@ import LineItemsForm, { emptyLine } from '../components/LineItemsForm';
 import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
+import DatePager, { useDatePages } from '../components/DatePager';
 import Toast from '../components/Toast';
 import { ReceiptIcon, RefreshIcon } from '../components/icons';
 import { formatCurrency } from '../lib/format';
@@ -252,6 +253,10 @@ export default function DirectSale() {
   const noStoresAssigned = isScoped && myStores.length === 0;
   const singleStoreName = isScoped && myStores.length === 1 ? myStores[0].name : null;
 
+
+  const pager = useDatePages(filteredSales, (i) => i.date);
+  const searching = Boolean(search.trim());
+  const shown = searching ? filteredSales : pager.visible;
   return (
     <div className="page">
       <div className="page-header">
@@ -376,6 +381,8 @@ export default function DirectSale() {
         </div>
       )}
 
+      {!loading && !searching && <DatePager pager={pager} noun="bill" />}
+
       {loading ? (
         <Spinner label="Loading direct sales…" />
       ) : (
@@ -394,7 +401,7 @@ export default function DirectSale() {
               </tr>
             </thead>
             <tbody>
-              {filteredSales.map((s) => (
+              {shown.map((s) => (
                 <tr key={s.id}>
                   <td className="cell-mono">{s.number}</td>
                   <td className="cell-date">{formatDate(s.date)}</td>
@@ -416,7 +423,7 @@ export default function DirectSale() {
                   </td>
                 </tr>
               ))}
-              {filteredSales.length === 0 && (
+              {shown.length === 0 && (
                 <tr>
                   <td colSpan={isScoped ? 6 : 7}>
                     <EmptyState
