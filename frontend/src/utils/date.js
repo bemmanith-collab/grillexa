@@ -12,23 +12,26 @@ export function formatDate(date) {
   return `${day}/${month}/${year}`;
 }
 
-// "2026-07-30" for <input type="date"> and API params. The mirror image of
-// formatDate above: that formats a stored calendar day, this asks what day it
-// is *here*, so it must read local fields. toISOString() converts the current
-// instant to UTC, which east of UTC (IST is +5:30) returns yesterday until
-// mid-morning — enough to file an early delivery under the wrong ledger day.
-function localDayStr(d) {
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${month}-${day}`;
+// "2026-07-30" for <input type="date"> and API params.
+//
+// The business's day, not the device's. It must match what the server
+// considers today (see backend/src/lib/stock.js, same offset) — otherwise a
+// laptop set to another timezone disagrees with the ledger: date pickers
+// default to yesterday, "Today's Stock" asks for the wrong day, and Stock
+// History quietly excludes everything recorded since IST midnight.
+//
+// India has never observed DST, so a fixed offset is exact, and arithmetic
+// avoids depending on locale data being present.
+const BUSINESS_UTC_OFFSET_MINUTES = 330;
+
+function businessDayStr(ms) {
+  return new Date(ms + BUSINESS_UTC_OFFSET_MINUTES * 60000).toISOString().slice(0, 10);
 }
 
 export function todayStr() {
-  return localDayStr(new Date());
+  return businessDayStr(Date.now());
 }
 
 export function daysAgoStr(n) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return localDayStr(d);
+  return businessDayStr(Date.now() - n * 86400000);
 }
