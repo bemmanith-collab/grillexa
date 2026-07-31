@@ -16,6 +16,7 @@ import {
   LogOut,
   KeyRound,
   MoreHorizontal,
+  Menu,
   X,
 } from 'lucide-react';
 import logoIcon from '../assets/grillexa-icon.png';
@@ -55,11 +56,16 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
+  // Browser tabs get the website's sidebar as a drawer; the installed app gets
+  // the bottom tab bar instead. CSS picks between them on display-mode, so
+  // both are always rendered.
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   // Close the More sheet on any route change, including the back button.
   useEffect(() => {
     setMoreOpen(false);
+    setDrawerOpen(false);
   }, [location.pathname]);
 
   if (!user) return null;
@@ -84,14 +90,25 @@ export default function Sidebar() {
   return (
     <>
       <div className="mobile-topbar">
+        <button
+          type="button"
+          className="hamburger-btn"
+          aria-label={drawerOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={drawerOpen}
+          onClick={() => setDrawerOpen((v) => !v)}
+        >
+          {drawerOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
         <div className="sidebar-brand">
           <img src={logoIcon} alt="" className="sidebar-logo" />
           <span className="sidebar-brand-name">Grillexa</span>
         </div>
       </div>
 
-      {/* Desktop only — the phone gets the tab bar below instead. */}
-      <aside className="sidebar">
+      {drawerOpen && <div className="sidebar-backdrop" onClick={() => setDrawerOpen(false)} />}
+
+      {/* Desktop rail, and — in a phone browser tab — the slide-in drawer. */}
+      <aside className={`sidebar${drawerOpen ? ' sidebar-mobile-open' : ''}`}>
         <div className="sidebar-brand">
           <img src={logoIcon} alt="" className="sidebar-logo" />
           <span className="sidebar-brand-name">Grillexa</span>

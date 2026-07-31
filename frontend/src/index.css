@@ -1582,8 +1582,6 @@ button:disabled {
     flex-direction: column;
   }
 
-  /* Slim brand bar. The hamburger is gone: navigation lives in the tab bar
-     at the bottom, within thumb reach, instead of behind a drawer. */
   .mobile-topbar {
     display: flex;
     align-items: center;
@@ -1592,7 +1590,7 @@ button:disabled {
     top: 0;
     z-index: 30;
     height: 52px;
-    padding: 0 14px;
+    padding: 0 8px 0 4px;
     background: var(--sidebar-bg);
     color: var(--sidebar-text);
   }
@@ -1601,9 +1599,36 @@ button:disabled {
     padding: 0;
   }
 
-  /* The old off-canvas drawer is retired on phones. */
+  /* Two different navigations on a phone, chosen by how the app was opened.
+     In a browser tab it is a website, so it keeps the website's sidebar,
+     reached from a hamburger. Installed to the home screen it is an app, so
+     it gets a bottom tab bar within thumb reach and no browser chrome above
+     it. Both are always rendered; the two display-mode blocks below decide
+     which one is visible. */
   .sidebar {
     display: none;
+  }
+
+  .hamburger-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+  }
+
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 34, 42, 0.55);
+    z-index: 35;
+    animation: fade-in 0.15s ease;
   }
 
   .tabbar {
@@ -1940,6 +1965,70 @@ button:disabled {
     width: 100%;
   }
 
+}
+
+/* ---------- Phone: opened in a browser tab ---------- */
+/* It is a website here, so it keeps the website's navigation: the sidebar,
+   slid in from a hamburger. No bottom tab bar — the browser already owns the
+   bottom of the screen, and stacking our bar above its toolbar wastes two
+   rows of a small screen. */
+@media (max-width: 720px) and (display-mode: browser) {
+  .hamburger-btn {
+    display: flex;
+  }
+
+  .hamburger-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .sidebar {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 280px;
+    max-width: 85vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+  }
+
+  .sidebar.sidebar-mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    display: block;
+  }
+
+  .sidebar-link {
+    min-height: 46px;
+  }
+
+  .tabbar {
+    display: none;
+  }
+
+  /* No fixed bar to clear. */
+  .app-main {
+    padding: 16px;
+  }
+}
+
+/* ---------- Phone: installed to the home screen ---------- */
+/* An app now, with the whole screen to itself, so navigation goes to a bottom
+   tab bar. The hamburger and drawer stay hidden. */
+@media (max-width: 720px) and (display-mode: standalone) {
+  .hamburger-btn,
+  .sidebar,
+  .sidebar-backdrop {
+    display: none;
+  }
 }
 
 /* ---------- Printing a bill (Sale/Dispatch) ---------- */
