@@ -37,8 +37,13 @@ function stampLabels(root) {
     if (!headings.length) continue;
     for (const row of table.querySelectorAll('tbody tr')) {
       [...row.children].forEach((cell, i) => {
-        if (headings[i]) cell.setAttribute('data-label', headings[i]);
-        else cell.removeAttribute('data-label');
+        // Only write when it differs: this runs on every DOM mutation, and
+        // rewriting ~1,700 attributes per keystroke invalidates a
+        // ::before content rule for each one — visible lag on a phone.
+        if (!headings[i]) cell.removeAttribute('data-label');
+        else if (cell.getAttribute('data-label') !== headings[i]) {
+          cell.setAttribute('data-label', headings[i]);
+        }
       });
     }
   }

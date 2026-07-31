@@ -170,7 +170,10 @@ export default function DirectSale() {
       .map((l) => ({
         productId: Number(l.productId),
         quantity: Number(l.quantity),
-        unitPrice: Number(l.unitPrice) || 0,
+        // A blank price means "use the catalogue price", so the key is
+        // omitted rather than sent as 0 — the server treats an explicit 0
+        // as a deliberate override and would save the bill at zero.
+        ...(l.unitPrice === '' || l.unitPrice == null ? {} : { unitPrice: Number(l.unitPrice) }),
         type: l.type === 'RETURN' ? 'RETURN' : 'SALE',
         reason: l.type === 'RETURN' ? l.reason : undefined,
       }));

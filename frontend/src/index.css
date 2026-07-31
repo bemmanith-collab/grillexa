@@ -1142,7 +1142,14 @@ button:disabled {
   padding: 24px 26px;
   width: 100%;
   max-width: 380px;
-  max-height: calc(100vh - 32px);
+  /* 100% of the backdrop, not 100vh. WebKit resolves vh against the large
+     viewport (toolbars retracted) while laying the fixed backdrop out against
+     the visible one, so a 100vh-tall modal is taller than its own parent,
+     align-items:center splits the overflow, and the buttons at the bottom —
+     Record Wastage, Settle Consignment, Change Password — end up off-screen
+     with nothing able to scroll them into view. The backdrop already supplies
+     the right height and its own 16px padding. */
+  max-height: 100%;
   overflow-y: auto;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 }
@@ -1640,11 +1647,6 @@ button:disabled {
     outline-offset: -3px;
   }
 
-  /* Content has to clear the fixed bar, or the last row sits under it. */
-  .app-main {
-    padding-bottom: 76px;
-  }
-
   .more-backdrop {
     display: flex;
     align-items: flex-end;
@@ -1753,8 +1755,12 @@ button:disabled {
     min-height: 44px;
   }
 
+  /* The bottom padding clears the fixed tab bar (56px + safe area). It has to
+     live in this shorthand: a separate padding-bottom rule earlier in the file
+     was silently reset here, leaving the last card — and on the entry forms
+     the submit button — permanently underneath the bar. */
   .app-main {
-    padding: 16px;
+    padding: 16px 16px 76px;
   }
 
   .page-header .btn-primary,
@@ -1934,13 +1940,6 @@ button:disabled {
     width: 100%;
   }
 
-  /* Smaller viewport + the sticky 56px topbar + a taller, wrapped page
-     header eat into the available height more than on desktop, so use a
-     bigger offset — but never let the table shrink to uselessness. */
-  .page .table-scroll {
-    max-height: calc(100vh - 320px);
-    min-height: 220px;
-  }
 }
 
 /* ---------- Printing a bill (Sale/Dispatch) ---------- */

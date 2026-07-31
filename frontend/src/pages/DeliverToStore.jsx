@@ -102,7 +102,12 @@ export default function DeliverToStore() {
     setError('');
     const cleanLines = lines
       .filter((l) => l.productId && Number(l.quantity) > 0)
-      .map((l) => ({ productId: Number(l.productId), quantity: Number(l.quantity), unitPrice: Number(l.unitPrice) || 0 }));
+      .map((l) => ({
+        productId: Number(l.productId),
+        quantity: Number(l.quantity),
+        // Blank means "catalogue price"; an explicit 0 is a real override.
+        ...(l.unitPrice === '' || l.unitPrice == null ? {} : { unitPrice: Number(l.unitPrice) }),
+      }));
     if (!storeId || cleanLines.length === 0) {
       setError('Pick a store and at least one product line with a quantity.');
       return;
