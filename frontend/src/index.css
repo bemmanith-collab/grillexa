@@ -1284,6 +1284,29 @@ button:disabled {
   text-overflow: ellipsis;
 }
 
+/* The login greeting: a card on the backdrop, no buttons — it dismisses
+   itself, so there is nothing to reach for. */
+.greeting-modal {
+  max-width: 340px;
+  text-align: center;
+}
+
+.greeting-modal h2 {
+  margin: 14px 0 6px;
+  font-size: 1.35rem;
+}
+
+.greeting-modal p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.greeting-logo {
+  width: 120px;
+  max-width: 60%;
+  height: auto;
+}
+
 .toast {
   position: fixed;
   left: 50%;

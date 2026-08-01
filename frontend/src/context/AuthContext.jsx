@@ -22,6 +22,9 @@ export function AuthProvider({ children }) {
   async function login(email, password) {
     const res = await client.post('/auth/login', { email, password });
     setUser(res.data.user);
+    // Returned as well as stored: the caller needs to know who just logged in
+    // before the context state has propagated to it.
+    return res.data.user;
   }
 
   async function logout() {
