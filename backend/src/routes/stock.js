@@ -38,6 +38,18 @@ function shapeEntry(entry) {
   };
 }
 
+// The day's takings from walk-in bills: sales with no consignment behind them,
+// the same `direct` filter the Direct Sale page lists by. A settlement's sale
+// is money recognized against stock delivered earlier, so it isn't counted
+// here. Already net of return lines — a bill's totalAmount subtracts them.
+async function directSaleRevenue(where) {
+  const { _sum } = await prisma.sale.aggregate({
+    where: { ...where, consignmentId: null },
+    _sum: { totalAmount: true },
+  });
+  return _sum.totalAmount || 0;
+}
+
 // productId -> units returned on this date, for whichever stores are in scope.
 async function returnsByProduct(where) {
   const rows = await prisma.return.groupBy({ by: ['productId'], where, _sum: { quantity: true } });
@@ -132,15 +144,17 @@ router.get('/today', async (req, res) => {
     return rows;
   });
 
-  const [returned, { unitsByProduct, ...consignment }] = await Promise.all([
+  const [returned, { unitsByProduct, ...consignment }, directRevenue] = await Promise.all([
     returnsByProduct({ date, storeId }),
     consignmentSummary({ storeId }),
+    directSaleRevenue({ date, storeId }),
   ]);
 
   res.json({
     date: date.toISOString().slice(0, 10),
     store: store.name,
     ...consignment,
+    directRevenue,
     entries: entries.map((e) =>
       shapeEntry({
         ...e,
@@ -163,7 +177,7 @@ async function todayAcrossStores(req, res) {
   // ADMIN/MANAGER see the whole route; SALES only the stores they're on.
   const scope = req.user.role === 'SALES' ? { storeId: { in: req.user.storeIds } } : {};
 
-  const [products, entries, storesReporting, returned, { unitsByProduct, ...consignment }] =
+  const [products, entries, storesReporting, returned, { unitsByProduct, ...consignment }, directRevenue] =
     await Promise.all([
       prisma.product.findMany({ orderBy: { name: 'asc' } }),
       // received/sold/wastage are that day's movements, so only today's rows count.
@@ -180,6 +194,7 @@ async function todayAcrossStores(req, res) {
       // idle today is still holding stock, and unlike a daily ledger row that
       // has to be carried forward, an open consignment item says so directly.
       consignmentSummary(scope),
+      directSaleRevenue({ date, ...scope }),
     ]);
 
   res.json({
@@ -187,6 +202,7 @@ async function todayAcrossStores(req, res) {
     store: 'All Stores',
     storeCount: storesReporting.length,
     ...consignment,
+    directRevenue,
     entries: rollUp({ products, date, movements: entries, onConsignment: unitsByProduct, returned }),
   });
 }

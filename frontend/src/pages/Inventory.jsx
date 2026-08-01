@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, XCircle, Search, Handshake, ReceiptText, Coins, Truck, Undo2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Search, Handshake, ReceiptText, Coins, Truck, Undo2, Wallet } from 'lucide-react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import WastageModal from '../components/WastageModal';
@@ -169,6 +169,13 @@ export default function Inventory() {
               <div>
                 <div className="stat-value">{formatCurrency(data.consignmentValue)}</div>
                 <div className="stat-label">Consignment Value</div>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon stat-icon-green"><Wallet size={20} strokeWidth={1.8} /></div>
+              <div>
+                <div className="stat-value">{formatCurrency(data.directRevenue)}</div>
+                <div className="stat-label">Direct Sale Revenue</div>
               </div>
             </div>
           </div>
