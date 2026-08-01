@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, XCircle, Search, Handshake, ReceiptText, Coins } from 'lucide-react';
+import { CheckCircle2, XCircle, Search, Handshake, ReceiptText, Coins, Truck, Undo2 } from 'lucide-react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import WastageModal from '../components/WastageModal';
@@ -16,7 +16,10 @@ export default function Inventory() {
   const myStores = isScoped ? user.stores : [];
   const showStorePicker = !isScoped || myStores.length > 1;
   const [stores, setStores] = useState(isScoped ? myStores : []);
-  const [storeId, setStoreId] = useState(isScoped ? myStores[0]?.id || '' : '');
+  // "all" is the default: after a day of supplying thirty stores you want one
+  // set of totals, not thirty tabs. Picking a single store is still how you
+  // record wastage, which has to land on one specific store's ledger row.
+  const [storeId, setStoreId] = useState(isScoped && myStores.length === 1 ? myStores[0].id : 'all');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,10 +30,7 @@ export default function Inventory() {
 
   useEffect(() => {
     if (isScoped) return;
-    client.get('/stores').then((res) => {
-      setStores(res.data.stores);
-      setStoreId((current) => current || res.data.stores[0]?.id || '');
-    });
+    client.get('/stores').then((res) => setStores(res.data.stores));
   }, [isScoped]);
 
   async function load(sid) {
@@ -41,10 +41,11 @@ export default function Inventory() {
     setLoading(true);
     setError('');
     try {
+      const storeParam = sid === 'all' ? {} : { storeId: sid };
       const [todayRes, consignmentsRes] = await Promise.all([
         client.get('/stock/today', { params: { storeId: sid, date: todayStr() } }),
         client
-          .get('/consignments', { params: { storeId: sid, status: 'DELIVERED,PARTIAL_SETTLED' } })
+          .get('/consignments', { params: { ...storeParam, status: 'DELIVERED,PARTIAL_SETTLED' } })
           .catch(() => ({ data: { consignments: [] } })),
       ]);
       setData(todayRes.data);
@@ -68,9 +69,13 @@ export default function Inventory() {
     }));
   }
 
-  const totalSold = data?.entries.reduce((sum, e) => sum + e.sold, 0) || 0;
-  const totalWastage = data?.entries.reduce((sum, e) => sum + e.wastage, 0) || 0;
-  const totalOnConsignment = data?.entries.reduce((sum, e) => sum + (e.consignmentQty || 0), 0) || 0;
+  const isAllStores = storeId === 'all';
+  const sumOf = (field) => data?.entries.reduce((sum, e) => sum + (e[field] || 0), 0) || 0;
+  const totalSupplied = sumOf('received');
+  const totalSold = sumOf('sold');
+  const totalReturned = sumOf('returned');
+  const totalWastage = sumOf('wastage');
+  const totalOnConsignment = sumOf('consignmentQty');
   const pendingSettlementsCount = pendingConsignments.length;
   const consignmentValue = pendingConsignments.reduce(
     (sum, c) => sum + (c.items?.reduce((s, i) => s + i.remainingQty * i.pricePerUnit, 0) || 0),
@@ -92,11 +97,18 @@ export default function Inventory() {
           <p className="page-subtitle">
             {data ? formatDate(data.date) : ''}
             {data?.store && <> · {data.store}</>}
+            {isAllStores && data?.storeCount != null && (
+              <> · {data.storeCount} {data.storeCount === 1 ? 'store' : 'stores'} reported today</>
+            )}
           </p>
         </div>
         <div className="page-header-actions">
           {showStorePicker && stores.length > 0 && (
-            <select value={storeId} onChange={(e) => setStoreId(Number(e.target.value))}>
+            <select
+              value={storeId}
+              onChange={(e) => setStoreId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+            >
+              <option value="all">All Stores</option>
               {stores.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -120,10 +132,24 @@ export default function Inventory() {
         <>
           <div className="stat-grid">
             <div className="stat-card">
+              <div className="stat-icon stat-icon-blue"><Truck size={20} strokeWidth={1.8} /></div>
+              <div>
+                <div className="stat-value">{totalSupplied}</div>
+                <div className="stat-label">Units Supplied Today</div>
+              </div>
+            </div>
+            <div className="stat-card">
               <div className="stat-icon stat-icon-green"><CheckCircle2 size={20} strokeWidth={1.8} /></div>
               <div>
                 <div className="stat-value">{totalSold}</div>
                 <div className="stat-label">Units Sold Today</div>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon stat-icon-amber"><Undo2 size={20} strokeWidth={1.8} /></div>
+              <div>
+                <div className="stat-value">{totalReturned}</div>
+                <div className="stat-label">Units Returned Today</div>
               </div>
             </div>
             <div className="stat-card">
@@ -178,43 +204,54 @@ export default function Inventory() {
                 <tr>
                   <th>Product</th>
                   <th>On Consignment</th>
-                  <th>Received</th>
+                  <th>Supplied</th>
                   <th>Sold</th>
+                  <th>Returned</th>
                   <th>Wastage</th>
-                  <th></th>
+                  {!isAllStores && <th></th>}
                 </tr>
               </thead>
               <tbody>
                 {filteredEntries.map((e) => (
-                  <tr key={e.id} className="row-clickable" onClick={() => setDetailEntry(e)}>
+                  // An all-store row is a total, not a ledger row: there's no
+                  // single store to record wastage against and no per-store
+                  // history to drill into, so both are left to the store view.
+                  <tr
+                    key={e.id}
+                    className={isAllStores ? undefined : 'row-clickable'}
+                    onClick={isAllStores ? undefined : () => setDetailEntry(e)}
+                  >
                     <td className="cell-strong">{e.product}</td>
                     <td className="cell-strong">{e.consignmentQty}</td>
                     <td>{e.received}</td>
                     <td>{e.sold}</td>
+                    <td>{e.returned}</td>
                     <td>{e.wastage}</td>
-                    <td className="actions-cell">
-                      <button
-                        className="btn-secondary btn-sm"
-                        onClick={(ev) => {
-                          ev.stopPropagation();
-                          setWastageTarget(e);
-                        }}
-                      >
-                        Record Wastage
-                      </button>
-                    </td>
+                    {!isAllStores && (
+                      <td className="actions-cell">
+                        <button
+                          className="btn-secondary btn-sm"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            setWastageTarget(e);
+                          }}
+                        >
+                          Record Wastage
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
                 {data.entries.length === 0 && (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={isAllStores ? 6 : 7}>
                       <EmptyState icon={BoxIcon} message="No products in the catalog yet." />
                     </td>
                   </tr>
                 )}
                 {data.entries.length > 0 && filteredEntries.length === 0 && (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={isAllStores ? 6 : 7}>
                       <EmptyState icon={Search} message="No products match your search or filter." />
                     </td>
                   </tr>

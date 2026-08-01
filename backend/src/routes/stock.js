@@ -25,14 +25,27 @@ function shapeEntry(entry) {
     received: entry.received,
     sold: entry.sold,
     wastage: entry.wastage,
+    // What came back today, from the Return ledger: unsold consignment stock
+    // going back to HQ plus customer returns. `received` is already net of
+    // the former (settlement books it as a negative receipt), so this is the
+    // gross figure telling you why received is down, not a second deduction.
+    returned: entry.returned || 0,
     consignmentQty: entry.consignmentQty,
   };
+}
+
+// productId -> units returned on this date, for whichever stores are in scope.
+async function returnsByProduct(where) {
+  const rows = await prisma.return.groupBy({ by: ['productId'], where, _sum: { quantity: true } });
+  return new Map(rows.map((r) => [r.productId, r._sum.quantity || 0]));
 }
 
 // Today's ledger row for every product at a given store — auto-creates
 // missing rows (opening carried over from the prior day) so the page
 // always shows all products even before anything happens today.
 router.get('/today', async (req, res) => {
+  if (req.query.storeId === 'all') return todayAcrossStores(req, res);
+
   const storeId = req.query.storeId
     ? Number(req.query.storeId)
     : req.user.role === 'SALES'
@@ -61,12 +74,85 @@ router.get('/today', async (req, res) => {
     return rows;
   });
 
+  const returned = await returnsByProduct({ date, storeId });
+
   res.json({
     date: date.toISOString().slice(0, 10),
     store: store.name,
-    entries: entries.map(shapeEntry),
+    entries: entries.map((e) => shapeEntry({ ...e, returned: returned.get(e.productId) })),
   });
 });
+
+// One day's totals per product across every store in scope — the end-of-day
+// view for someone who supplied thirty stores and wants one sheet, not thirty.
+// Read-only on purpose: it doesn't auto-create today's rows the way the
+// single-store view does (that would write products × stores rows on every
+// page load), so a store that had no movement simply contributes nothing.
+async function todayAcrossStores(req, res) {
+  const date = normalizeDate(req.query.date || todayStr());
+  // ADMIN/MANAGER see the whole route; SALES only the stores they're on.
+  const scope = req.user.role === 'SALES' ? { storeId: { in: req.user.storeIds } } : {};
+
+  const [products, entries, storesReporting, outstanding, returned] = await Promise.all([
+    prisma.product.findMany({ orderBy: { name: 'asc' } }),
+    // received/sold/wastage are that day's movements, so only today's rows count.
+    prisma.dailyStockEntry.groupBy({
+      by: ['productId'],
+      where: { date, ...scope },
+      _sum: { received: true, sold: true, wastage: true },
+    }),
+    // How many stores actually have a row today — tells you at a glance
+    // whether every stop on the route got recorded.
+    prisma.dailyStockEntry.groupBy({ by: ['storeId'], where: { date, ...scope } }),
+    // consignmentQty is a running balance, not a daily movement: a store with
+    // no activity today has no row today but is still holding stock. Take each
+    // store/product's most recent row up to this date — the same carry-forward
+    // the single-store view gets from getOrCreateDailyEntry, without writing
+    // a row for every product at every store just to read it.
+    prisma.dailyStockEntry.findMany({
+      where: { date: { lte: date }, ...scope },
+      orderBy: [{ date: 'desc' }],
+      distinct: ['storeId', 'productId'],
+      select: { productId: true, consignmentQty: true },
+    }),
+    returnsByProduct({ date, ...scope }),
+  ]);
+
+  res.json({
+    date: date.toISOString().slice(0, 10),
+    store: 'All Stores',
+    storeCount: storesReporting.length,
+    entries: rollUp({ products, date, movements: entries, outstanding, returned }),
+  });
+}
+
+// The arithmetic half of the all-stores view, split out so it can be checked
+// without a database: every product gets a row (zero-filled if nothing moved),
+// day movements come from the grouped totals, and the consignment balance is
+// summed over each store's carried-forward row.
+function rollUp({ products, date, movements, outstanding, returned }) {
+  const totals = new Map(movements.map((m) => [m.productId, m._sum]));
+  const onConsignment = new Map();
+  for (const row of outstanding) {
+    onConsignment.set(row.productId, (onConsignment.get(row.productId) || 0) + row.consignmentQty);
+  }
+
+  return products.map((product) => {
+    const t = totals.get(product.id) || {};
+    return shapeEntry({
+      // No DailyStockEntry backs an aggregated row, so key on the product.
+      id: `all-${product.id}`,
+      date,
+      productId: product.id,
+      product,
+      received: t.received || 0,
+      sold: t.sold || 0,
+      wastage: t.wastage || 0,
+      consignmentQty: onConsignment.get(product.id) || 0,
+      returned: returned.get(product.id),
+    });
+  });
+}
 
 // Historical ledger, filterable by store/product/date range.
 router.get('/history', async (req, res) => {
@@ -136,3 +222,4 @@ router.post('/:storeId/:productId/wastage', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.rollUp = rollUp;
