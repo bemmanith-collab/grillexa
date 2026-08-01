@@ -40,6 +40,35 @@ async function returnsByProduct(where) {
   return new Map(rows.map((r) => [r.productId, r._sum.quantity || 0]));
 }
 
+const OPEN_CONSIGNMENT = ['DELIVERED', 'PARTIAL_SETTLED'];
+
+// Money still out on consignment, and how many deliveries are waiting to be
+// settled. Both are read from the consignment items themselves rather than
+// from a page of the consignments list — that list is capped at 200 rows, and
+// a cap on a total is a number that quietly goes wrong as the route grows.
+//
+// Priced at each item's own pricePerUnit, which is what settlement will
+// actually bill (see applySettlement), not today's catalogue price — those
+// two differ the moment a product's price is edited after delivery.
+async function consignmentSummary(scope) {
+  const open = { status: { in: OPEN_CONSIGNMENT }, ...scope };
+  const [items, pendingSettlements] = await Promise.all([
+    prisma.consignmentItem.findMany({
+      where: { consignment: open },
+      select: { deliveredQty: true, soldQty: true, returnedQty: true, pricePerUnit: true },
+    }),
+    prisma.consignment.count({ where: open }),
+  ]);
+
+  return { consignmentValue: valueOf(items), pendingSettlements };
+}
+
+// Split out so it can be checked without a database: what's left of each
+// delivered line, at the price that line will settle at.
+function valueOf(items) {
+  return items.reduce((sum, i) => sum + (i.deliveredQty - i.soldQty - i.returnedQty) * i.pricePerUnit, 0);
+}
+
 // Today's ledger row for every product at a given store — auto-creates
 // missing rows (opening carried over from the prior day) so the page
 // always shows all products even before anything happens today.
@@ -74,11 +103,15 @@ router.get('/today', async (req, res) => {
     return rows;
   });
 
-  const returned = await returnsByProduct({ date, storeId });
+  const [returned, consignment] = await Promise.all([
+    returnsByProduct({ date, storeId }),
+    consignmentSummary({ storeId }),
+  ]);
 
   res.json({
     date: date.toISOString().slice(0, 10),
     store: store.name,
+    ...consignment,
     entries: entries.map((e) => shapeEntry({ ...e, returned: returned.get(e.productId) })),
   });
 });
@@ -93,7 +126,7 @@ async function todayAcrossStores(req, res) {
   // ADMIN/MANAGER see the whole route; SALES only the stores they're on.
   const scope = req.user.role === 'SALES' ? { storeId: { in: req.user.storeIds } } : {};
 
-  const [products, entries, storesReporting, outstanding, returned] = await Promise.all([
+  const [products, entries, storesReporting, outstanding, returned, consignment] = await Promise.all([
     prisma.product.findMany({ orderBy: { name: 'asc' } }),
     // received/sold/wastage are that day's movements, so only today's rows count.
     prisma.dailyStockEntry.groupBy({
@@ -116,12 +149,14 @@ async function todayAcrossStores(req, res) {
       select: { productId: true, consignmentQty: true },
     }),
     returnsByProduct({ date, ...scope }),
+    consignmentSummary(scope),
   ]);
 
   res.json({
     date: date.toISOString().slice(0, 10),
     store: 'All Stores',
     storeCount: storesReporting.length,
+    ...consignment,
     entries: rollUp({ products, date, movements: entries, outstanding, returned }),
   });
 }
@@ -223,3 +258,4 @@ router.post('/:storeId/:productId/wastage', async (req, res) => {
 
 module.exports = router;
 module.exports.rollUp = rollUp;
+module.exports.valueOf = valueOf;

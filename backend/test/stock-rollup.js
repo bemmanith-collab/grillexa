@@ -12,7 +12,7 @@ const assert = require('assert');
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
 
 const { normalizeDate } = require('../src/lib/stock');
-const { rollUp } = require('../src/routes/stock');
+const { rollUp, valueOf } = require('../src/routes/stock');
 
 const date = normalizeDate('2026-08-01');
 const products = [
@@ -91,6 +91,36 @@ const tests = {
     const row = entries.find((e) => e.productId === 3);
     assert.strictEqual(row.received, 31);
     assert.strictEqual(row.returned, 9);
+  },
+
+  'consignment value counts only what is still unsettled': () => {
+    // 20 delivered, 12 sold, 3 returned to HQ -> 5 still out at 40.00.
+    assert.strictEqual(
+      valueOf([{ deliveredQty: 20, soldQty: 12, returnedQty: 3, pricePerUnit: 40 }]),
+      200
+    );
+  },
+
+  'a fully settled line is worth nothing, never negative': () => {
+    assert.strictEqual(
+      valueOf([
+        { deliveredQty: 10, soldQty: 10, returnedQty: 0, pricePerUnit: 55.5 },
+        { deliveredQty: 8, soldQty: 0, returnedQty: 8, pricePerUnit: 12.25 },
+      ]),
+      0
+    );
+  },
+
+  'value sums across every open line, at each line\'s own price': () => {
+    // The point of the fix: this is the whole set, not a capped page of it,
+    // and each line keeps the price it was delivered at.
+    const items = Array.from({ length: 250 }, () => ({
+      deliveredQty: 6,
+      soldQty: 2,
+      returnedQty: 0,
+      pricePerUnit: 10,
+    }));
+    assert.strictEqual(valueOf(items), 250 * 4 * 10);
   },
 };
 
