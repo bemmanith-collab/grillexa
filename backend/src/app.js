@@ -6,6 +6,8 @@ require('dotenv').config();
 require('express-async-errors');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -20,6 +22,30 @@ const quoteRoutes = require('./routes/quotes');
 const consignmentRoutes = require('./routes/consignments');
 
 const app = express();
+
+// Nginx is the only hop in front of Node (see nginx.conf, which sets
+// X-Forwarded-For). Without this every request looks like it came from
+// 127.0.0.1, so the rate limiter below would count the whole shop as one
+// client and lock everyone out together.
+app.set('trust proxy', 1);
+
+// Security headers on API responses. CSP is left to Nginx, which serves the
+// HTML — a policy on a JSON response protects nothing and only confuses the
+// picture when debugging.
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+
+// Login is the one unauthenticated endpoint that guesses a secret, so it is
+// the one worth limiting. Deliberately generous, and counting failures only:
+// a whole shop shares one connection, and staff logging in successfully must
+// never eat into the budget that stops someone guessing passwords.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  skipSuccessfulRequests: true,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many failed attempts. Wait a few minutes and try again.' },
+});
 
 // CORS_ORIGIN accepts a comma-separated list of allowed origins (e.g. the
 // Fly.io app URL plus a custom domain). Falls back to "*" so the app still
@@ -49,7 +75,7 @@ app.use(express.json());
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/stores', storeRoutes);

@@ -129,7 +129,9 @@ router.post('/:storeId/:productId/wastage', async (req, res) => {
     const store = await prisma.store.findUnique({ where: { id: storeId } });
     res.json({ entry: shapeEntry({ ...updated, product, store }) });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || 'Failed to record wastage' });
+    res.status(err.status || 500).json({
+        error: err.status ? err.message : 'Failed to record wastage',
+      });
   }
 });
 

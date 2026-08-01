@@ -7,12 +7,22 @@ const router = express.Router();
 
 router.use(authenticate);
 
+// A SALES account sees only its own stores, and never who else is assigned to
+// them. This used to return every store's name and address plus the names of
+// all sales staff to anyone logged in — the whole customer list and the staff
+// directory, to an account that can only bill for one shop. Admin and Manager
+// work across stores, so they still get everything.
 router.get('/', async (req, res) => {
-  const stores = await prisma.store.findMany({ include: { salesUsers: true }, orderBy: { name: 'asc' } });
+  const scoped = req.user.role === 'SALES';
+  const stores = await prisma.store.findMany({
+    where: scoped ? { id: { in: req.user.storeIds } } : {},
+    include: { salesUsers: !scoped },
+    orderBy: { name: 'asc' },
+  });
   res.json({
     stores: stores.map(({ salesUsers, ...s }) => ({
       ...s,
-      salesUsers: salesUsers.map((u) => ({ id: u.id, name: u.name })),
+      ...(scoped ? {} : { salesUsers: (salesUsers || []).map((u) => ({ id: u.id, name: u.name })) }),
     })),
   });
 });

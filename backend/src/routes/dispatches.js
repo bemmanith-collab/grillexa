@@ -116,7 +116,9 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({ invoice: shapeInvoice(invoice) });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || 'Failed to create dispatch invoice' });
+    res.status(err.status || 500).json({
+        error: err.status ? err.message : 'Failed to create dispatch invoice',
+      });
   }
 });
 

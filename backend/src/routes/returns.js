@@ -115,7 +115,9 @@ router.post('/', async (req, res) => {
     });
     res.status(201).json({ return: shapeReturn(created) });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || 'Failed to process return' });
+    res.status(err.status || 500).json({
+        error: err.status ? err.message : 'Failed to process return',
+      });
   }
 });
 

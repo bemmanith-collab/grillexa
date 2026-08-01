@@ -432,7 +432,9 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
 
     res.status(201).json({ consignment: shapeConsignment(consignment) });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || 'Failed to create consignment' });
+    res.status(err.status || 500).json({
+        error: err.status ? err.message : 'Failed to create consignment',
+      });
   }
 });
 
@@ -535,7 +537,9 @@ router.patch('/:id', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) 
 
     res.json({ consignment: shapeConsignment(updated) });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || 'Failed to update consignment' });
+    res.status(err.status || 500).json({
+        error: err.status ? err.message : 'Failed to update consignment',
+      });
   }
 });
 
@@ -631,7 +635,9 @@ router.post('/:id/settle', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req,
 
     res.status(201).json({ settlement: shapeSettlement(settlement), consignment: shapeConsignment(fullConsignment) });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || 'Failed to settle consignment' });
+    res.status(err.status || 500).json({
+        error: err.status ? err.message : 'Failed to settle consignment',
+      });
   }
 });
 
@@ -741,7 +747,9 @@ router.patch('/:id/settlements/:settlementId', requireRole('ADMIN', 'MANAGER', '
 
     res.json({ settlement: shapeSettlement(result), consignment: shapeConsignment(fullConsignment) });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || 'Failed to update settlement' });
+    res.status(err.status || 500).json({
+        error: err.status ? err.message : 'Failed to update settlement',
+      });
   }
 });
 

@@ -233,7 +233,9 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
 
     res.status(201).json({ sale: shapeSale(sale) });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || 'Failed to create sale' });
+    res.status(err.status || 500).json({
+        error: err.status ? err.message : 'Failed to create sale',
+      });
   }
 });
 
@@ -376,7 +378,9 @@ router.patch('/:id', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) 
 
     res.json({ sale: shapeSale(sale) });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || 'Failed to update sale' });
+    res.status(err.status || 500).json({
+        error: err.status ? err.message : 'Failed to update sale',
+      });
   }
 });
 
