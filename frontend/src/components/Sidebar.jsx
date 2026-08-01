@@ -82,8 +82,10 @@ export default function Sidebar() {
     .slice(0, 2)
     .toUpperCase();
 
-  function handleLogout() {
-    logout();
+  // Awaited: logout now clears the cookie server-side, and navigating before
+  // that lands would leave a valid session cookie behind on the device.
+  async function handleLogout() {
+    await logout();
     navigate('/login');
   }
 

@@ -101,6 +101,25 @@ async function main() {
     assert.strictEqual(res.status, 404, 'signup must not exist');
   });
 
+  // The session moved from localStorage to an httpOnly cookie. These two hold
+  // that line: a readable token, or a logout the server does not honour, would
+  // both quietly undo it.
+  await check('logout clears the session cookie, httpOnly and server-side', async () => {
+    const res = await post('/api/auth/logout', {});
+    assert.strictEqual(res.status, 200);
+    const setCookie = res.headers.get('set-cookie') || '';
+    assert.match(setCookie, /grillexa_session=/, 'must clear the session cookie');
+    assert.match(setCookie, /HttpOnly/i, 'the cookie must stay unreadable by scripts');
+  });
+
+  await check('an unauthenticated request is refused without a cookie', async () => {
+    const res = await fetch(`${base}/api/auth/me`);
+    assert.strictEqual(res.status, 401);
+    const json = await res.json();
+    assert.ok(json.error, 'expected a JSON error body');
+    assert.ok(!/token|jwt|bearer/i.test(json.error), `must not hint at the mechanism: ${json.error}`);
+  });
+
   await check('server is still alive after all of the above', async () => {
     const res = await fetch(`${base}/api/health`);
     assert.strictEqual(res.status, 200);

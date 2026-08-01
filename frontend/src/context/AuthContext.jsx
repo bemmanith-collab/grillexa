@@ -7,28 +7,32 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // The session is an httpOnly cookie, so the page cannot inspect it to decide
+  // whether it is signed in — asking the server is the only way to know, and
+  // it is the honest one: a token that exists is not the same as a token that
+  // is still valid.
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     client
       .get('/auth/me')
       .then((res) => setUser(res.data.user))
-      .catch(() => localStorage.removeItem('token'))
+      .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
 
   async function login(email, password) {
     const res = await client.post('/auth/login', { email, password });
-    localStorage.setItem('token', res.data.token);
     setUser(res.data.user);
   }
 
-  function logout() {
-    localStorage.removeItem('token');
-    setUser(null);
+  async function logout() {
+    // Server-side: the browser will not let a script delete a cookie it cannot
+    // read. The local state is cleared regardless, so a failed request still
+    // signs the user out of this tab rather than stranding them.
+    try {
+      await client.post('/auth/logout');
+    } finally {
+      setUser(null);
+    }
   }
 
   return (

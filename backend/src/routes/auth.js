@@ -2,9 +2,13 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../db');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, TOKEN_COOKIE, cookieOptions } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Matches the JWT's own lifetime, so the cookie cannot outlive the token it
+// carries and leave the user looking signed in until their next request.
+const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
 
 // The token only needs to prove identity — role/storeId are read fresh from
 // the database on every request (see middleware/auth.js) so permission
@@ -47,8 +51,22 @@ router.post('/login', async (req, res) => {
   if (!valid) {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
-  const token = signToken(user);
-  res.json({ token, user: sanitize(user) });
+  // The token goes out as an httpOnly cookie and is deliberately NOT in the
+  // response body: anything the body carries, a script on the page can read,
+  // which is the exposure this change exists to remove.
+  res.cookie(TOKEN_COOKIE, signToken(user), {
+    ...cookieOptions(),
+    maxAge: EIGHT_HOURS_MS,
+  });
+  res.json({ user: sanitize(user) });
+});
+
+// Clearing an httpOnly cookie has to happen server-side — the browser will not
+// let a script delete what it cannot read. Logout used to be purely local,
+// which meant "logged out" was a claim the client made about itself.
+router.post('/logout', (req, res) => {
+  res.clearCookie(TOKEN_COOKIE, cookieOptions());
+  res.json({ ok: true });
 });
 
 router.get('/me', authenticate, async (req, res) => {

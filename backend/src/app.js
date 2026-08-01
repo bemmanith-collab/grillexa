@@ -7,6 +7,7 @@ require('express-async-errors');
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -57,11 +58,18 @@ const allowedOrigins = (process.env.CORS_ORIGIN || '*')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// credentials: true is required now that the session is a cookie — without it
+// the browser will not send it on cross-origin calls. That also rules out a
+// literal '*' origin, which browsers reject alongside credentials; `true`
+// reflects the caller's origin instead, which is valid.
+// In production none of this is exercised: Nginx serves the app and the API
+// from one origin, so nothing is cross-origin.
 app.use(
   cors({
+    credentials: true,
     origin:
       allowedOrigins.includes('*')
-        ? '*'
+        ? true
         : (origin, callback) => {
             if (!origin || allowedOrigins.includes(origin)) {
               callback(null, true);
@@ -71,6 +79,7 @@ app.use(
           },
   })
 );
+app.use(cookieParser());
 app.use(express.json());
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
