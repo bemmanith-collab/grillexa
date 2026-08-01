@@ -11,8 +11,17 @@ const { badRequest } = require('./stock');
 // posted that subtracted from the day's takings.
 //
 // ADMIN/MANAGER can still override for a negotiated price, but only with a
-// finite, non-negative number. SALES always gets the catalogue price.
-async function resolveLines(tx, lines, role) {
+// finite, non-negative number.
+//
+// billedPrices is what this bill already charged for a product, passed in by
+// an edit. Correcting a phone number on a bill must not silently change what
+// the customer was charged: the bill keeps its number, so a printed copy in
+// someone's hand has to keep matching it. Without this, a SALES edit repriced
+// every line to the catalogue and quietly erased a negotiated discount. It's
+// read from the saved bill, never from the request, so it can't be used to
+// smuggle a price past the SALES rule. A product that wasn't on the bill
+// before is new, and prices from the catalogue.
+async function resolveLines(tx, lines, role, billedPrices = new Map()) {
   const ids = [...new Set(lines.map((l) => Number(l.productId)))];
   if (ids.some((id) => !Number.isInteger(id) || id <= 0)) {
     throw badRequest('Each line needs a valid productId');
@@ -33,7 +42,7 @@ async function resolveLines(tx, lines, role) {
       throw badRequest(`${product.name}: quantity must be a whole number greater than zero`);
     }
 
-    let unitPrice = product.price;
+    let unitPrice = billedPrices.has(productId) ? billedPrices.get(productId) : product.price;
     const supplied = l.unitPrice;
     const wantsOverride = supplied !== undefined && supplied !== null && supplied !== '';
     if (wantsOverride && role !== 'SALES') {
@@ -48,4 +57,18 @@ async function resolveLines(tx, lines, role) {
   });
 }
 
-module.exports = { resolveLines };
+// The prices a saved bill already charged, for handing back to resolveLines
+// on an edit. First line wins if the same product appears twice: only
+// ADMIN/MANAGER can put one product on a bill at two different prices, and
+// their edit sends both prices explicitly anyway.
+// ponytail: match on line id instead if per-line prices ever have to survive
+// a SALES edit — the edit form would have to start sending line ids.
+function billedPricesOf(lines) {
+  const byProduct = new Map();
+  for (const line of lines) {
+    if (!byProduct.has(line.productId)) byProduct.set(line.productId, line.unitPrice);
+  }
+  return byProduct;
+}
+
+module.exports = { resolveLines, billedPricesOf };

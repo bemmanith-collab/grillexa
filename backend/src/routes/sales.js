@@ -3,7 +3,7 @@ const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
 const { normalizeDate, adjustStock, processReturn } = require('../lib/stock');
-const { resolveLines } = require('../lib/pricing');
+const { resolveLines, billedPricesOf } = require('../lib/pricing');
 const { assertStoreAccess } = require('../lib/scope');
 
 const router = express.Router();
@@ -328,7 +328,11 @@ router.patch('/:id', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) 
       // rebuilt below from whatever the corrected lines turn out to be.
       await tx.return.deleteMany({ where: { reference: existing.number } });
 
-      const preparedLines = (await resolveLines(tx, lines, req.user.role)).map((l) => ({
+      // Keep charging what this bill already charged — the customer's printed
+      // copy carries the same number and has to keep matching it.
+      const preparedLines = (
+        await resolveLines(tx, lines, req.user.role, billedPricesOf(existing.lines))
+      ).map((l) => ({
         productId: l.productId,
         quantity: l.quantity,
         unitPrice: l.unitPrice,

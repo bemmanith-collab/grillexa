@@ -30,6 +30,10 @@ function shapeEntry(entry) {
     // the former (settlement books it as a negative receipt), so this is the
     // gross figure telling you why received is down, not a second deduction.
     returned: entry.returned || 0,
+    // Today's views pass this in from consignmentSummary(), the same read the
+    // value card uses. /history keeps the ledger's own consignmentQty: it
+    // answers "what was out on 12 July", and an open consignment item only
+    // knows about now.
     consignmentQty: entry.consignmentQty,
   };
 }
@@ -42,31 +46,56 @@ async function returnsByProduct(where) {
 
 const OPEN_CONSIGNMENT = ['DELIVERED', 'PARTIAL_SETTLED'];
 
-// Money still out on consignment, and how many deliveries are waiting to be
-// settled. Both are read from the consignment items themselves rather than
-// from a page of the consignments list — that list is capped at 200 rows, and
-// a cap on a total is a number that quietly goes wrong as the route grows.
+// Everything the stock views say about consignment — units per product, the
+// money still out, and how many deliveries are waiting to be settled — comes
+// from this one read of the consignment items.
 //
-// Priced at each item's own pricePerUnit, which is what settlement will
-// actually bill (see applySettlement), not today's catalogue price — those
-// two differ the moment a product's price is edited after delivery.
+// One source on purpose. The units used to come from the daily ledger's
+// consignmentQty and the value from these items: two counters incremented by
+// the same two events, agreeing right up until the day they didn't, with
+// nothing on screen saying which one to believe. Read together, the units
+// column and the value card cannot disagree.
+//
+// Not capped: a page of the consignments list would silently stop counting
+// past 200 rows. Priced at each item's own pricePerUnit, which is what
+// settlement actually bills (see applySettlement), not today's catalogue
+// price — those diverge the moment a product is repriced after delivery.
 async function consignmentSummary(scope) {
   const open = { status: { in: OPEN_CONSIGNMENT }, ...scope };
   const [items, pendingSettlements] = await Promise.all([
     prisma.consignmentItem.findMany({
       where: { consignment: open },
-      select: { deliveredQty: true, soldQty: true, returnedQty: true, pricePerUnit: true },
+      select: {
+        productId: true,
+        deliveredQty: true,
+        soldQty: true,
+        returnedQty: true,
+        pricePerUnit: true,
+      },
     }),
     prisma.consignment.count({ where: open }),
   ]);
 
-  return { consignmentValue: valueOf(items), pendingSettlements };
+  return { unitsByProduct: unitsOf(items), consignmentValue: valueOf(items), pendingSettlements };
 }
 
-// Split out so it can be checked without a database: what's left of each
-// delivered line, at the price that line will settle at.
+// What's left of a delivered line: never settled twice, never negative.
+function remainingOf(item) {
+  return item.deliveredQty - item.soldQty - item.returnedQty;
+}
+
+// Split out so both can be checked without a database. They walk the same
+// items, so units × price and the value total are the same arithmetic.
+function unitsOf(items) {
+  const byProduct = new Map();
+  for (const item of items) {
+    byProduct.set(item.productId, (byProduct.get(item.productId) || 0) + remainingOf(item));
+  }
+  return byProduct;
+}
+
 function valueOf(items) {
-  return items.reduce((sum, i) => sum + (i.deliveredQty - i.soldQty - i.returnedQty) * i.pricePerUnit, 0);
+  return items.reduce((sum, item) => sum + remainingOf(item) * item.pricePerUnit, 0);
 }
 
 // Today's ledger row for every product at a given store — auto-creates
@@ -103,7 +132,7 @@ router.get('/today', async (req, res) => {
     return rows;
   });
 
-  const [returned, consignment] = await Promise.all([
+  const [returned, { unitsByProduct, ...consignment }] = await Promise.all([
     returnsByProduct({ date, storeId }),
     consignmentSummary({ storeId }),
   ]);
@@ -112,7 +141,15 @@ router.get('/today', async (req, res) => {
     date: date.toISOString().slice(0, 10),
     store: store.name,
     ...consignment,
-    entries: entries.map((e) => shapeEntry({ ...e, returned: returned.get(e.productId) })),
+    entries: entries.map((e) =>
+      shapeEntry({
+        ...e,
+        returned: returned.get(e.productId),
+        // Same source as the value card, so the store view and the all-stores
+        // view are answering with the same counter too.
+        consignmentQty: unitsByProduct.get(e.productId) || 0,
+      })
+    ),
   });
 });
 
@@ -126,51 +163,39 @@ async function todayAcrossStores(req, res) {
   // ADMIN/MANAGER see the whole route; SALES only the stores they're on.
   const scope = req.user.role === 'SALES' ? { storeId: { in: req.user.storeIds } } : {};
 
-  const [products, entries, storesReporting, outstanding, returned, consignment] = await Promise.all([
-    prisma.product.findMany({ orderBy: { name: 'asc' } }),
-    // received/sold/wastage are that day's movements, so only today's rows count.
-    prisma.dailyStockEntry.groupBy({
-      by: ['productId'],
-      where: { date, ...scope },
-      _sum: { received: true, sold: true, wastage: true },
-    }),
-    // How many stores actually have a row today — tells you at a glance
-    // whether every stop on the route got recorded.
-    prisma.dailyStockEntry.groupBy({ by: ['storeId'], where: { date, ...scope } }),
-    // consignmentQty is a running balance, not a daily movement: a store with
-    // no activity today has no row today but is still holding stock. Take each
-    // store/product's most recent row up to this date — the same carry-forward
-    // the single-store view gets from getOrCreateDailyEntry, without writing
-    // a row for every product at every store just to read it.
-    prisma.dailyStockEntry.findMany({
-      where: { date: { lte: date }, ...scope },
-      orderBy: [{ date: 'desc' }],
-      distinct: ['storeId', 'productId'],
-      select: { productId: true, consignmentQty: true },
-    }),
-    returnsByProduct({ date, ...scope }),
-    consignmentSummary(scope),
-  ]);
+  const [products, entries, storesReporting, returned, { unitsByProduct, ...consignment }] =
+    await Promise.all([
+      prisma.product.findMany({ orderBy: { name: 'asc' } }),
+      // received/sold/wastage are that day's movements, so only today's rows count.
+      prisma.dailyStockEntry.groupBy({
+        by: ['productId'],
+        where: { date, ...scope },
+        _sum: { received: true, sold: true, wastage: true },
+      }),
+      // How many stores actually have a row today — tells you at a glance
+      // whether every stop on the route got recorded.
+      prisma.dailyStockEntry.groupBy({ by: ['storeId'], where: { date, ...scope } }),
+      returnsByProduct({ date, ...scope }),
+      // Consignment units and value both come from here — a store that was
+      // idle today is still holding stock, and unlike a daily ledger row that
+      // has to be carried forward, an open consignment item says so directly.
+      consignmentSummary(scope),
+    ]);
 
   res.json({
     date: date.toISOString().slice(0, 10),
     store: 'All Stores',
     storeCount: storesReporting.length,
     ...consignment,
-    entries: rollUp({ products, date, movements: entries, outstanding, returned }),
+    entries: rollUp({ products, date, movements: entries, onConsignment: unitsByProduct, returned }),
   });
 }
 
 // The arithmetic half of the all-stores view, split out so it can be checked
-// without a database: every product gets a row (zero-filled if nothing moved),
-// day movements come from the grouped totals, and the consignment balance is
-// summed over each store's carried-forward row.
-function rollUp({ products, date, movements, outstanding, returned }) {
+// without a database: every product gets a row (zero-filled if nothing moved)
+// and day movements come from the grouped totals.
+function rollUp({ products, date, movements, onConsignment, returned }) {
   const totals = new Map(movements.map((m) => [m.productId, m._sum]));
-  const onConsignment = new Map();
-  for (const row of outstanding) {
-    onConsignment.set(row.productId, (onConsignment.get(row.productId) || 0) + row.consignmentQty);
-  }
 
   return products.map((product) => {
     const t = totals.get(product.id) || {};
@@ -258,4 +283,5 @@ router.post('/:storeId/:productId/wastage', async (req, res) => {
 
 module.exports = router;
 module.exports.rollUp = rollUp;
+module.exports.unitsOf = unitsOf;
 module.exports.valueOf = valueOf;
