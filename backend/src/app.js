@@ -6,7 +6,6 @@ require('dotenv').config();
 require('express-async-errors');
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 const authRoutes = require('./routes/auth');
@@ -29,10 +28,12 @@ const app = express();
 // client and lock everyone out together.
 app.set('trust proxy', 1);
 
-// Security headers on API responses. CSP is left to Nginx, which serves the
-// HTML — a policy on a JSON response protects nothing and only confuses the
-// picture when debugging.
-app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+// Security headers are set once, by Nginx, for everything it serves —
+// including proxied API responses (verified against the live host). helmet was
+// added here first and then removed: it duplicated every header and disagreed
+// with one of them, sending both X-Frame-Options SAMEORIGIN and DENY. Node is
+// only reachable through Nginx, so one source is correct and two is a bug
+// waiting to be debugged.
 
 // Login is the one unauthenticated endpoint that guesses a secret, so it is
 // the one worth limiting. Deliberately generous, and counting failures only:
