@@ -63,8 +63,22 @@ function shapeConsignment(c) {
     notes: c.notes,
     totalDeliveredValue: c.items?.reduce((sum, i) => sum + i.totalValue, 0) ?? 0,
     createdAt: c.createdAt,
+    // Who settled it last, and when. Everyone in the business can reach every
+    // one of these records, so a consignment that says SETTLED has to say who
+    // settled it — otherwise the only way to find out is to ask around.
+    // Settlements are ordered newest first everywhere they are included, so
+    // [0] is the most recent pass; a consignment can be settled in several.
+    settledBy: c.settlements?.[0]?.createdBy?.name ?? null,
+    lastSettledAt: c.settlements?.[0]?.settledAt
+      ? c.settlements[0].settledAt.toISOString().slice(0, 10)
+      : null,
     items: c.items?.map(shapeItem),
-    settlements: c.settlements?.map(shapeSettlement),
+    // The list fetches only the newest settlement, and only the two fields the
+    // summary above needs. Mapping that through shapeSettlement would put a
+    // settlement with an undefined id and number into the response, which
+    // reads like a real one. Only the detail include carries whole
+    // settlements, and those have an id.
+    settlements: c.settlements?.[0]?.id ? c.settlements.map(shapeSettlement) : undefined,
   };
 }
 
@@ -325,7 +339,19 @@ router.get('/', async (req, res) => {
   const { where, take } = listQuery(req.user, req.query);
   const consignments = await prisma.consignment.findMany({
     where,
-    include: { store: true, createdBy: true, items: { include: { product: true } } },
+    include: {
+      store: true,
+      createdBy: true,
+      items: { include: { product: true } },
+      // Only the latest settlement, and only the name off it — the list needs
+      // "settled by whom", not the whole settlement tree with its lines on
+      // every row.
+      settlements: {
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { settledAt: true, createdBy: { select: { name: true } } },
+      },
+    },
     orderBy: { deliveredAt: 'desc' },
     take,
   });

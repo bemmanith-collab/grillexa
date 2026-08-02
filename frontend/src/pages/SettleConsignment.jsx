@@ -313,8 +313,10 @@ export default function SettleConsignment() {
               <tr>
                 <th>Consignment #</th>
                 <th>Delivered</th>
+                <th>Delivered By</th>
                 <th>Store</th>
                 <th>Status</th>
+                <th>Settled By</th>
                 <th>Value</th>
                 <th></th>
               </tr>
@@ -324,9 +326,24 @@ export default function SettleConsignment() {
                 <tr key={c.id}>
                   <td className="cell-mono">{c.consignmentNo}</td>
                   <td className="cell-date">{formatDate(c.deliveredAt)}</td>
+                  <td>{c.createdBy || '—'}</td>
                   <td>{c.store}</td>
                   <td>
                     <span className="badge">{c.status.replace('_', ' ')}</span>
+                  </td>
+                  {/* Nothing settled yet is a dash, not a blank cell — on the
+                      phone card layout a blank reads as a missing value. */}
+                  <td>
+                    {c.settledBy ? (
+                      <>
+                        {c.settledBy}
+                        {c.lastSettledAt && (
+                          <span className="cell-muted"> · {formatDate(c.lastSettledAt)}</span>
+                        )}
+                      </>
+                    ) : (
+                      '—'
+                    )}
                   </td>
                   <td>₹{c.totalDeliveredValue.toFixed(2)}</td>
                   <td className="actions-cell">
@@ -345,7 +362,7 @@ export default function SettleConsignment() {
               ))}
               {shown.length === 0 && (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={8}>
                     <EmptyState
                       icon={ReceiptIcon}
                       message={
