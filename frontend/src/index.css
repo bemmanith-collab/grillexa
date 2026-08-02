@@ -1248,6 +1248,15 @@ button:disabled {
   margin: 0;
 }
 
+/* Wraps rather than scrolls: on a phone the second option must stay reachable
+   without a horizontal swipe nobody knows is there. */
+.view-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
 .search-input {
   display: flex;
   align-items: center;

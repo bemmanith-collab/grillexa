@@ -191,6 +191,11 @@ export default function SettleConsignment() {
   const [editingSettlement, setEditingSettlement] = useState(null);
   const [result, setResult] = useState(null);
   const [search, setSearch] = useState('');
+  // 'open' is everything still awaiting settlement, however old — the work
+  // this page exists for. 'all' adds the settled ones so their last settlement
+  // can be corrected, and is the only view that pages by date: history is
+  // endless, outstanding work is not.
+  const [view, setView] = useState('open');
 
   const filteredConsignments = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -207,9 +212,13 @@ export default function SettleConsignment() {
     setLoading(true);
     setError('');
     try {
-      // No status filter: consignments that are fully SETTLED/RETURNED still
-      // need to show up here so their last settlement can be corrected.
-      const res = await client.get('/consignments');
+      // The open list is uncapped server-side, so a consignment nobody has
+      // settled for weeks still appears. Asking for every status instead
+      // returns the most recent 200 only, which across fifty stores is a few
+      // days of history — fine for correcting a recent settlement, useless
+      // for finding an old one that was never settled at all.
+      const params = view === 'open' ? { status: 'DELIVERED,PARTIAL_SETTLED' } : {};
+      const res = await client.get('/consignments', { params });
       setConsignments(res.data.consignments);
     } catch (err) {
       setError('Failed to load consignments.');
@@ -220,7 +229,7 @@ export default function SettleConsignment() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [view]);
 
   function handleSettled(data) {
     setSettling(null);
@@ -247,7 +256,11 @@ export default function SettleConsignment() {
 
   const pager = useDatePages(filteredConsignments, (i) => i.deliveredAt);
   const searching = Boolean(search.trim());
-  const shown = searching ? filteredConsignments : pager.visible;
+  // Outstanding consignments are never paged away: one delivery date at a time
+  // meant a manager watching fifty stores saw the newest day and assumed that
+  // was all there was.
+  const paged = view === 'all' && !searching;
+  const shown = paged ? pager.visible : filteredConsignments;
   return (
     <div className="page">
       <div className="page-header">
@@ -261,6 +274,22 @@ export default function SettleConsignment() {
 
       {!loading && (
         <div className="card form-card">
+          <div className="view-toggle">
+            <button
+              type="button"
+              className={view === 'open' ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+              onClick={() => setView('open')}
+            >
+              Awaiting settlement{view === 'open' ? ` (${consignments.length})` : ''}
+            </button>
+            <button
+              type="button"
+              className={view === 'all' ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+              onClick={() => setView('all')}
+            >
+              All, including settled
+            </button>
+          </div>
           <div className="search-input">
             <Search size={16} />
             <input
@@ -272,7 +301,7 @@ export default function SettleConsignment() {
         </div>
       )}
 
-      {!loading && !searching && <DatePager pager={pager} noun="consignment" />}
+      {!loading && paged && <DatePager pager={pager} noun="consignment" />}
 
       {loading ? (
         <Spinner label="Loading consignments…" />
@@ -319,7 +348,13 @@ export default function SettleConsignment() {
                   <td colSpan={6}>
                     <EmptyState
                       icon={ReceiptIcon}
-                      message={consignments.length === 0 ? 'No consignments yet.' : 'No consignments match your search.'}
+                      message={
+                        consignments.length > 0
+                          ? 'No consignments match your search.'
+                          : view === 'open'
+                          ? 'Nothing is awaiting settlement.'
+                          : 'No consignments yet.'
+                      }
                     />
                   </td>
                 </tr>

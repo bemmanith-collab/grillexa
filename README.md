@@ -12,7 +12,7 @@ Stock and billing for a distributed retail business (sprouts, fruit bowls, banan
 This is the core of the app. Everything else supports it.
 
 1. **Deliver to Store** — goods go to a store on consignment. A Consignment Note is raised with line items and prices. **No revenue is recognised.** The stock is now sitting in the store, still owned by you.
-2. **Settle Consignment** — later, the store reports what sold and what is coming back unsold. Settling generates a **Sale** for the sold portion (this is where revenue and GST are recognised) and a **Return** for the unsold portion. A consignment can be settled in more than one pass; `soldQty + returnedQty` can never exceed `deliveredQty`, and the database enforces that with a CHECK constraint.
+2. **Settle Consignment** — opens on everything still awaiting settlement, however old, across every store the account can see; a second view adds the settled ones so a recent settlement can be corrected. Later, the store reports what sold and what is coming back unsold. Settling generates a **Sale** for the sold portion (this is where revenue and GST are recognised) and a **Return** for the unsold portion. A consignment can be settled in more than one pass; `soldQty + returnedQty` can never exceed `deliveredQty`, and the database enforces that with a CHECK constraint.
 3. **Direct Sale** — a cash bill straight to a walk-in customer. Billed and paid immediately, no consignment behind it. Can include RETURN lines, which credit the customer and subtract from the bill.
 
 `Dispatches` is the pre-consignment HQ→store transfer flow. It is read-only history; new deliveries go through Deliver to Store.
@@ -101,7 +101,7 @@ grillexa/
 │   │   ├── db.js
 │   │   └── index.js
 │   ├── test/            crash-guards.js, stock-cascade.js, stock-rollup.js,
-│   │                    pricing.js   (npm test runs all four)
+│   │                    pricing.js, consignment-list.js   (npm test)
 │   └── .env.example
 ├── frontend/
 │   ├── public/          manifest.json, sw.js, icons (PWA), boot.js and
@@ -226,7 +226,7 @@ Read from the environment or `.env`. One exception worth knowing: the business's
 | GET | `/api/stock/today?storeId=&date=` | Authenticated, store-scoped. `storeId=all` totals every store in scope |
 | GET | `/api/stock/history?storeId=&productId=&from=&to=` | Authenticated, store-scoped |
 | POST | `/api/stock/:storeId/:productId/wastage` | Authenticated, store-scoped |
-| GET | `/api/consignments`, `/api/consignments/:id` | Authenticated, store-scoped |
+| GET | `/api/consignments`, `/api/consignments/:id` | Authenticated, store-scoped. Unfiltered returns the newest 200; `?status=` returns every match |
 | GET | `/api/consignments/latest/:storeId` | Authenticated, store-scoped |
 | POST/PATCH | `/api/consignments`, `/api/consignments/:id` | Admin, Manager, Sales |
 | POST | `/api/consignments/:id/settle` | Admin, Manager, Sales |
@@ -248,12 +248,14 @@ cd frontend && npm test
 
 No framework, no database, no browser — plain Node scripts that print `ok` lines.
 
-Backend, four files:
+Backend, five files:
 
 - `test/crash-guards.js` — malformed request bodies return 400 rather than killing the process (an unhandled rejection in an async handler exits Node on Express 4), `todayStr` is ISO and round-trips, and public signup stays gone.
 - `test/stock-cascade.js` — the ledger cascade against an in-memory Prisma stub: back-dated writes re-chain later days, moving a document between dates leaves nothing behind, and reversing a bill restores stock exactly.
 - `test/stock-rollup.js` — the all-stores sheet's arithmetic: every product gets a row even with no movement, day totals add up across stores, and consignment units come from the open consignments rather than a carried-forward balance — so the units column and the value card can't drift apart.
 - `test/pricing.js` — prices come from the catalogue, a Sales account cannot override one, an edit keeps what the bill already charged, and a product new to the bill prices from the catalogue.
+
+- `test/consignment-list.js` — who sees which consignments, and how many: a manager or admin is never store-scoped (with or without a status filter), a Sales account always is, and the outstanding list is never truncated while the history list still is.
 
 Frontend, one file:
 

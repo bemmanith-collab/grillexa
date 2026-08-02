@@ -283,31 +283,51 @@ async function reverseSettlement(tx, { consignment, settlement }) {
   }
 }
 
+// How much history an unfiltered list hands back. Fine for one store; a
+// manager across fifty stores burns through it in a few days, which is why a
+// status-filtered request is never capped — see below.
+const HISTORY_LIMIT = 200;
+
+// Where "who sees which consignments" is actually decided. Only SALES is
+// store-scoped: ADMIN and MANAGER see every store, with or without a filter.
+// Exported for test/consignment-list.js, since getting this wrong is invisible
+// — the list still renders, it is just missing rows nobody knows to look for.
+function listQuery(user, query) {
+  const requestedStoreId = query.storeId ? Number(query.storeId) : undefined;
+  const where = requestedStoreId
+    ? { storeId: requestedStoreId }
+    : user.role === 'SALES'
+    ? { storeId: { in: user.storeIds } }
+    : {};
+
+  if (query.status) {
+    const statuses = String(query.status).split(',').map((s) => s.trim()).filter(Boolean);
+    if (statuses.length) where.status = statuses.length > 1 ? { in: statuses } : statuses[0];
+  }
+
+  // A status filter is the Settle page asking "what is still outstanding?".
+  // Capping that answer hides the consignment nobody has settled in three
+  // weeks — precisely the one being looked for, and the oldest, so it sorts
+  // last and falls off the end first. Outstanding work is bounded by the
+  // business closing it out; history is not, so history keeps the cap.
+  return { where, take: where.status ? undefined : HISTORY_LIMIT };
+}
+
 router.get('/', async (req, res) => {
-  const requestedStoreId = req.query.storeId ? Number(req.query.storeId) : undefined;
-  if (req.user.role === 'SALES' && requestedStoreId) {
+  if (req.user.role === 'SALES' && req.query.storeId) {
     try {
-      assertStoreAccess(req.user, requestedStoreId);
+      assertStoreAccess(req.user, Number(req.query.storeId));
     } catch (err) {
       return res.status(err.status || 403).json({ error: err.message });
     }
   }
-  const where = requestedStoreId
-    ? { storeId: requestedStoreId }
-    : req.user.role === 'SALES'
-    ? { storeId: { in: req.user.storeIds } }
-    : {};
 
-  if (req.query.status) {
-    const statuses = String(req.query.status).split(',').map((s) => s.trim());
-    where.status = statuses.length > 1 ? { in: statuses } : statuses[0];
-  }
-
+  const { where, take } = listQuery(req.user, req.query);
   const consignments = await prisma.consignment.findMany({
     where,
     include: { store: true, createdBy: true, items: { include: { product: true } } },
     orderBy: { deliveredAt: 'desc' },
-    take: 200,
+    take,
   });
   res.json({ consignments: consignments.map(shapeConsignment) });
 });
@@ -754,3 +774,5 @@ router.patch('/:id/settlements/:settlementId', requireRole('ADMIN', 'MANAGER', '
 });
 
 module.exports = router;
+module.exports.listQuery = listQuery;
+module.exports.HISTORY_LIMIT = HISTORY_LIMIT;
