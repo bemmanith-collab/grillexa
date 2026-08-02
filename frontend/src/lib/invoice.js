@@ -1,6 +1,8 @@
-import { formatCurrency } from './format';
-import { formatDate } from '../utils/date';
-import { BUSINESS_INFO } from './businessInfo';
+// Extensions spelled out: Vite resolves them either way, but test/invoice.js
+// imports this file directly under Node, which does not.
+import { formatCurrency } from './format.js';
+import { formatDate } from '../utils/date.js';
+import { BUSINESS_INFO } from './businessInfo.js';
 
 // Keep the boxed header narrow — WhatsApp's mobile app wraps (or in some
 // clients, horizontally clips) monospace lines that don't fit the message
@@ -96,7 +98,10 @@ function formatCurrencyPdf(amount) {
 // around the item list — rather than the helvetica/table layout a normal
 // PDF invoice would use. jsPDF is loaded on demand so it doesn't add weight
 // to the main bundle for people who never click "Download PDF".
-export async function downloadInvoicePdf(
+// Split from downloadInvoicePdf only so the document can be built without
+// writing a file — test/invoice.js reads the labels back out of the finished
+// PDF. Nothing else should call this.
+export async function buildInvoicePdf(
   title,
   bill,
   hideCreatedBy,
@@ -217,7 +222,14 @@ export async function downloadInvoicePdf(
   doc.setFont('courier', 'italic');
   doc.setFontSize(7);
   doc.setTextColor(140, 140, 140);
-  doc.text('This is a system-generated invoice.', center, y, { align: 'center' });
+  // "document", not "invoice" — this template also prints Consignment Notes,
+  // which are explicitly not a tax invoice. Matches the WhatsApp text.
+  doc.text('This is a system-generated document.', center, y, { align: 'center' });
 
+  return doc;
+}
+
+export async function downloadInvoicePdf(title, bill, hideCreatedBy, documentOptions) {
+  const doc = await buildInvoicePdf(title, bill, hideCreatedBy, documentOptions);
   doc.save(`${bill.number}.pdf`);
 }

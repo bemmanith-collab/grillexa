@@ -19,20 +19,27 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy, d
   const b = BUSINESS_INFO;
   const bandLabel = documentOptions?.bandLabel || 'OFFICIAL INVOICE';
 
+  // Every document helper takes the same four arguments, assembled here and
+  // nowhere else. They used to be spelled out at each call site, and the PDF
+  // button was written without the fourth — so a Consignment Note printed
+  // "OFFICIAL INVOICE" while the same note copied to WhatsApp did not. One
+  // caller cannot fall out of step with the others if there is one caller.
+  const render = (fn) => fn(title, bill, hideCreatedBy, documentOptions);
+
   async function copyInvoice() {
-    await navigator.clipboard.writeText(buildInvoiceShareText(title, bill, hideCreatedBy, documentOptions));
+    await navigator.clipboard.writeText(render(buildInvoiceShareText));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
   function shareWhatsApp() {
-    const text = buildInvoiceShareText(title, bill, hideCreatedBy, documentOptions);
+    const text = render(buildInvoiceShareText);
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   }
 
   async function shareGeneric() {
     try {
-      await navigator.share({ title: `${title} ${bill.number}`, text: buildInvoiceShareText(title, bill, hideCreatedBy, documentOptions) });
+      await navigator.share({ title: `${title} ${bill.number}`, text: render(buildInvoiceShareText) });
     } catch (err) {
       // user dismissed the native share sheet — nothing to do
     }
@@ -123,7 +130,7 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy, d
           <button type="button" className="btn-secondary" onClick={() => window.print()}>
             <Printer size={16} strokeWidth={2} /> Print
           </button>
-          <button type="button" className="btn-secondary" onClick={() => downloadInvoicePdf(title, bill, hideCreatedBy).catch(console.error)}>
+          <button type="button" className="btn-secondary" onClick={() => render(downloadInvoicePdf).catch(console.error)}>
             <FileDown size={16} strokeWidth={2} /> Download PDF
           </button>
           <button type="button" className="btn-secondary" onClick={copyInvoice}>

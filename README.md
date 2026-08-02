@@ -122,6 +122,7 @@ grillexa/
 │   │   └── pages/       Login, Inventory (Today's Stock), DeliverToStore,
 │   │                    SettleConsignment, DirectSale, Sales, Dispatches,
 │   │                    Products, StockHistory, Reports, Stores, Users
+│   ├── test/            invoice.js   (npm test)
 │   └── vite.config.js   dev proxy, build target down to iOS 14
 ├── Dockerfile        production image for Fly (backend + frontend + Nginx)
 ├── entrypoint.sh     runs `prisma migrate deploy`, then Node + Nginx
@@ -242,11 +243,18 @@ Read from the environment or `.env`. One exception worth knowing: the business's
 
 ```bash
 cd backend && npm test
+cd frontend && npm test
 ```
 
-Four files, no framework and no database:
+No framework, no database, no browser — plain Node scripts that print `ok` lines.
+
+Backend, four files:
 
 - `test/crash-guards.js` — malformed request bodies return 400 rather than killing the process (an unhandled rejection in an async handler exits Node on Express 4), `todayStr` is ISO and round-trips, and public signup stays gone.
 - `test/stock-cascade.js` — the ledger cascade against an in-memory Prisma stub: back-dated writes re-chain later days, moving a document between dates leaves nothing behind, and reversing a bill restores stock exactly.
 - `test/stock-rollup.js` — the all-stores sheet's arithmetic: every product gets a row even with no movement, day totals add up across stores, and consignment units come from the open consignments rather than a carried-forward balance — so the units column and the value card can't drift apart.
 - `test/pricing.js` — prices come from the catalogue, a Sales account cannot override one, an edit keeps what the bill already charged, and a product new to the bill prices from the catalogue.
+
+Frontend, one file:
+
+- `test/invoice.js` — a Consignment Note never calls itself an invoice. Both renderers (the WhatsApp text and the PDF) are checked against the same `documentOptions`, the PDF by building it in Node with jsPDF and reading the labels back out of the finished document.
