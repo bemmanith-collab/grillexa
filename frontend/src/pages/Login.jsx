@@ -2,17 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
+import { greetingFor } from '../lib/greeting';
 import logo from '../assets/grillexa-logo.png';
 
 const GREETING_MS = 3000;
-
-// Local clock, not the server's: it's a greeting, so what matters is the time
-// of day where the person reading it is standing.
-function timeOfDay(hour = new Date().getHours()) {
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
-}
 
 export default function Login() {
   const { login } = useAuth();
@@ -25,7 +18,7 @@ export default function Login() {
   const [greeting, setGreeting] = useState('');
 
   // The greeting shows itself out after three seconds and lands them in the
-  // app. Cleared on unmount so a manager who hits Back mid-greeting isn't
+  // app. Cleared on unmount so someone who hits Back mid-greeting isn't
   // yanked forward again by a timer that outlived the page.
   useEffect(() => {
     if (!greeting) return undefined;
@@ -39,12 +32,14 @@ export default function Login() {
     setSubmitting(true);
     try {
       const user = await login(email, password);
-      // Managers get a hello on the way in; everyone else goes straight through.
-      if (user.role === 'MANAGER') {
-        setGreeting(`${timeOfDay()}, ${user.name.split(' ')[0]}`);
-      } else {
-        navigate('/');
-      }
+      // Everyone is greeted by name, not only managers. It was manager-only
+      // first, and the next two people who wanted it were an admin and a
+      // sales account — a role gate here is just that request again the next
+      // time someone is hired. The name is whatever the account says it is,
+      // so changing the greeting means renaming the account, not a deploy.
+      const hello = greetingFor(user.name);
+      if (hello) setGreeting(hello);
+      else navigate('/');
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed.');
     } finally {

@@ -117,12 +117,12 @@ grillexa/
 │   │   │                ProtectedRoute, RouteErrorBoundary, Toast, Spinner,
 │   │   │                EmptyState, icons.jsx
 │   │   ├── lib/         businessInfo.js, invoice.js (jsPDF), format.js,
-│   │   │                reorder.js, returnReasons.js
+│   │   │                greeting.js, reorder.js, returnReasons.js
 │   │   ├── utils/date.js         business-timezone "today"
 │   │   └── pages/       Login, Inventory (Today's Stock), DeliverToStore,
 │   │                    SettleConsignment, DirectSale, Sales, Dispatches,
 │   │                    Products, StockHistory, Reports, Stores, Users
-│   ├── test/            invoice.js   (npm test)
+│   ├── test/            invoice.js, greeting.js   (npm test)
 │   └── vite.config.js   dev proxy, build target down to iOS 14
 ├── Dockerfile        production image for Fly (backend + frontend + Nginx)
 ├── entrypoint.sh     runs `prisma migrate deploy`, then Node + Nginx
@@ -257,6 +257,7 @@ Backend, five files:
 
 - `test/consignment-list.js` — who sees which consignments, and how many: a manager or admin is never store-scoped (with or without a status filter), a Sales account always is, and the outstanding list is never truncated while the history list still is.
 
-Frontend, one file:
+Frontend, two files:
 
+- `test/greeting.js` — the login greeting's name and time-of-day boundaries. Everyone who logs in sees it, and a greeting can't fail, only be wrong.
 - `test/invoice.js` — a Consignment Note never calls itself an invoice. Both renderers (the WhatsApp text and the PDF) are checked against the same `documentOptions`, the PDF by building it in Node with jsPDF and reading the labels back out of the finished document.
