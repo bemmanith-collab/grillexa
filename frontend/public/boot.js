@@ -1,7 +1,6 @@
 /* Loaded from index.html before the app bundle. Kept in its own file so
-   the Content-Security-Policy can forbid inline script outright — the
-   session token lives in localStorage, so script injection is the risk
-   worth closing hardest. */
+   the Content-Security-Policy can forbid inline script outright — see
+   nginx.conf. */
 
 // Chrome fires beforeinstallprompt during page load — before React has
       // mounted and before any component can add a listener. Attaching it in a
