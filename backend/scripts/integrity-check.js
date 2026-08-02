@@ -80,17 +80,39 @@ async function checkMissingStores(from, to) {
 
 // opening/closing are deliberately meaningless in this app — nothing is booked
 // into stock before it is billed, so the running balance drifts negative as a
-// matter of course (see the README). A negative movement, on the other hand,
-// is impossible through any route and means something wrote directly.
+// matter of course (see the README).
+//
+// A negative `received` is NOT automatically wrong either, which this check
+// originally got backwards and reported eleven healthy rows as errors.
+// Settling a consignment books the unsold stock going back to HQ as a negative
+// receipt on the settlement date (see applySettlement in routes/consignments.js
+// and the note on `returned` in routes/stock.js), while the original delivery
+// was a positive receipt on an earlier date. A store that took nothing in that
+// day and sent something back therefore ends the day negative, correctly.
+//
+// What would be wrong is a negative that the day's CONSIGNMENT_UNSOLD returns
+// do not account for: received + returnedToHq < 0 means something reduced
+// receipts that was not stock going back. That is the error worth raising.
 async function checkNegatives(from, to) {
   const [movements, oversettled, negativeClosings] = await Promise.all([
-    prisma.dailyStockEntry.findMany({
-      where: {
-        date: { gte: from, lte: to },
-        OR: [{ received: { lt: 0 } }, { sold: { lt: 0 } }, { wastage: { lt: 0 } }],
-      },
-      include: { store: { select: { name: true } }, product: { select: { name: true } } },
-    }),
+    prisma.$queryRaw`
+      SELECT e.date, s.name AS store, p.name AS product,
+             e.received, e.sold, e.wastage,
+             COALESCE(r.qty, 0)::int AS returned_to_hq
+      FROM "DailyStockEntry" e
+      JOIN "Store" s   ON s.id = e."storeId"
+      JOIN "Product" p ON p.id = e."productId"
+      LEFT JOIN (
+        SELECT "storeId", "productId", date, SUM(quantity) AS qty
+        FROM "Return"
+        WHERE reason = 'CONSIGNMENT_UNSOLD'
+        GROUP BY "storeId", "productId", date
+      ) r ON r."storeId" = e."storeId"
+        AND r."productId" = e."productId"
+        AND r.date = e.date
+      WHERE e.date >= ${from} AND e.date <= ${to}
+        AND (e.received < 0 OR e.sold < 0 OR e.wastage < 0)
+      ORDER BY e.date, s.name, p.name`,
     // deliveredQty - soldQty - returnedQty < 0 needs arithmetic Prisma cannot
     // express in a where. The CHECK constraint should make this impossible;
     // asserting it costs one query and proves the constraint is still there.
@@ -104,9 +126,23 @@ async function checkNegatives(from, to) {
     prisma.dailyStockEntry.count({ where: { date: { gte: from, lte: to }, closing: { lt: 0 } } }),
   ]);
 
-  if (movements.length) {
-    add('ERROR', 'negative-movements', `${movements.length} ledger rows have a negative received/sold/wastage.`,
-      movements.map((r) => `${iso(r.date)}  ${r.store.name}  ${r.product.name}  received=${r.received} sold=${r.sold} wastage=${r.wastage}`));
+  const describe = (r) =>
+    `${iso(r.date)}  ${r.store}  ${r.product}  received=${r.received} sold=${r.sold} wastage=${r.wastage} returnedToHq=${r.returned_to_hq}`;
+
+  // Explained: the day's returns to HQ account for the whole negative, and
+  // nothing else went below zero.
+  const explained = movements.filter(
+    (r) => r.sold >= 0 && r.wastage >= 0 && r.received + r.returned_to_hq >= 0
+  );
+  const unexplained = movements.filter((r) => !explained.includes(r));
+
+  if (unexplained.length) {
+    add('ERROR', 'negative-movements', `${unexplained.length} ledger rows have a negative movement the day's returns do not account for.`,
+      unexplained.map(describe));
+  }
+  if (explained.length) {
+    add('INFO', 'negative-received', `${explained.length} rows have a negative received, fully accounted for by unsold stock going back to HQ that day. This is how a settlement records a return — the gross figure is in the Returned column.`,
+      explained.map(describe));
   }
   if (oversettled.length) {
     add('ERROR', 'oversettled-consignments', `${oversettled.length} consignment items are settled beyond what was delivered — the CHECK constraint should prevent this.`,
@@ -115,8 +151,8 @@ async function checkNegatives(from, to) {
   if (negativeClosings) {
     add('INFO', 'negative-closing', `${negativeClosings} rows have closing < 0. Expected: stock is not booked in before it is billed, so the running balance drifts negative and is not displayed anywhere.`);
   }
-  if (!movements.length && !oversettled.length) {
-    add('INFO', 'negative-movements', 'No negative movements and no over-settled consignment items.');
+  if (!unexplained.length && !oversettled.length) {
+    add('INFO', 'negative-movements', 'No unaccounted-for negative movements and no over-settled consignment items.');
   }
 }
 
