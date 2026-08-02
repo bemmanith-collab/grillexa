@@ -43,6 +43,12 @@ Unit prices are resolved **server-side from the product catalogue** (`backend/sr
 
 **Editing a bill keeps the prices it already charged.** A correction to a phone number must not silently reprice the goods — the bill keeps its number, so a printed copy in someone's hand has to keep matching it. The old prices are read from the saved bill, never from the request, so an edit cannot smuggle a price past the Sales rule; a product added to the bill for the first time prices from the catalogue.
 
+## Product order
+
+Every list of products — the pickers on Deliver to Store and Direct Sale, Today's Stock, the Products page — is ordered by `Product.sortOrder` then by name, from one place (`backend/src/lib/catalogue.js`). Alphabetical order filed "Mixed fruit bowl" between "Green sprouts" and "Mixed sprouts"; nobody loading a van reads the list by spelling.
+
+Numbers run in tens (10, 20, 30 …) so a product can be slotted between two others without renumbering, and `sortOrder` defaults to **100** so a product added without one lands at the end of the list rather than silently at the top. An Admin or Manager sets it in the **Order** column on the Products page.
+
 ## Roles & permissions
 
 | Action | Admin | Manager | Sales |
@@ -106,7 +112,7 @@ grillexa/
 │   │   │                   Consignment(+Item), Settlement(+Line),
 │   │   │                   Sale(+Line), Return,
 │   │   │                   DispatchInvoice(+Line)
-│   │   ├── migrations/     10 migrations
+│   │   ├── migrations/     11 migrations
 │   │   └── seed.js         local only — refuses to run with NODE_ENV=production
 │   ├── scripts/
 │   │   ├── recompute-ledger.js   ledger repair, dry run unless --apply
@@ -114,7 +120,8 @@ grillexa/
 │   │   └── verification-queries.sql  reporting/reconciliation SQL
 │   ├── src/
 │   │   ├── lib/         stock.js (ledger + cascade), pricing.js (catalogue
-│   │   │                prices), scope.js (store access)
+│   │   │                prices), scope.js (store access),
+│   │   │                catalogue.js (one product order for every list)
 │   │   ├── middleware/  auth.js (cookie session), role.js
 │   │   ├── routes/      auth, users, products, stores, stock, consignments,
 │   │   │                sales, returns, dispatches, reports, quotes

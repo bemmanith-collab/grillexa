@@ -12,7 +12,7 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formOpen, setFormOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', sku: '', price: '', costPrice: '' });
+  const [form, setForm] = useState({ name: '', sku: '', price: '', costPrice: '', sortOrder: '' });
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -44,8 +44,11 @@ export default function Products() {
         sku: form.sku,
         price: Number(form.price) || 0,
         costPrice: Number(form.costPrice) || 0,
+        // Left blank means "no opinion" — the server defaults it to the end of
+        // the list rather than to 0, which would put it first.
+        sortOrder: form.sortOrder,
       });
-      setForm({ name: '', sku: '', price: '', costPrice: '' });
+      setForm({ name: '', sku: '', price: '', costPrice: '', sortOrder: '' });
       setFormOpen(false);
       load();
     } catch (err) {
@@ -57,7 +60,7 @@ export default function Products() {
 
   function startEdit(p) {
     setEditingId(p.id);
-    setEditForm({ name: p.name, sku: p.sku, price: p.price, costPrice: p.costPrice });
+    setEditForm({ name: p.name, sku: p.sku, price: p.price, costPrice: p.costPrice, sortOrder: p.sortOrder });
   }
 
   async function handleSaveEdit(id) {
@@ -68,6 +71,7 @@ export default function Products() {
         sku: editForm.sku,
         price: Number(editForm.price) || 0,
         costPrice: Number(editForm.costPrice) || 0,
+        sortOrder: editForm.sortOrder,
       });
       setEditingId(null);
       load();
@@ -132,6 +136,15 @@ export default function Products() {
               value={form.costPrice}
               onChange={(e) => setForm({ ...form, costPrice: e.target.value })}
             />
+            <input
+              placeholder="Order"
+              title="Where it appears in the product lists — lower comes first. Leave blank to add it at the end."
+              type="number"
+              min="0"
+              step="10"
+              value={form.sortOrder}
+              onChange={(e) => setForm({ ...form, sortOrder: e.target.value })}
+            />
             <button type="submit" className="btn-primary" disabled={creating}>
               {creating ? 'Adding…' : 'Add Product'}
             </button>
@@ -147,6 +160,7 @@ export default function Products() {
           <table className="data-table">
             <thead>
               <tr>
+                <th>Order</th>
                 <th>Name</th>
                 <th>SKU</th>
                 <th>Price</th>
@@ -161,6 +175,16 @@ export default function Products() {
                   <tr key={p.id}>
                     {isEditing ? (
                       <>
+                        <td>
+                          <input
+                            className="line-input"
+                            type="number"
+                            min="0"
+                            step="10"
+                            value={editForm.sortOrder}
+                            onChange={(e) => setEditForm({ ...editForm, sortOrder: e.target.value })}
+                          />
+                        </td>
                         <td>
                           <input
                             className="line-input"
@@ -206,6 +230,7 @@ export default function Products() {
                       </>
                     ) : (
                       <>
+                        <td className="cell-mono">{p.sortOrder}</td>
                         <td className="cell-strong">{p.name}</td>
                         <td className="cell-mono">{p.sku}</td>
                         <td>₹{p.price.toFixed(2)}</td>
@@ -227,7 +252,7 @@ export default function Products() {
               })}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={6}>
                     <EmptyState icon={BoxIcon} message="No products yet." />
                   </td>
                 </tr>

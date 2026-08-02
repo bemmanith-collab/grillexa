@@ -3,6 +3,7 @@ const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { normalizeDate, todayStr, getOrCreateDailyEntry, adjustStock } = require('../lib/stock');
 const { assertStoreAccess } = require('../lib/scope');
+const { PRODUCT_ORDER } = require('../lib/catalogue');
 
 const router = express.Router();
 
@@ -130,7 +131,7 @@ router.get('/today', async (req, res) => {
 
   const date = normalizeDate(req.query.date || todayStr());
   const [products, store] = await Promise.all([
-    prisma.product.findMany({ orderBy: { name: 'asc' } }),
+    prisma.product.findMany({ orderBy: PRODUCT_ORDER }),
     prisma.store.findUnique({ where: { id: storeId } }),
   ]);
   if (!store) return res.status(404).json({ error: 'Store not found' });
@@ -179,7 +180,7 @@ async function todayAcrossStores(req, res) {
 
   const [products, entries, storesReporting, returned, { unitsByProduct, ...consignment }, directRevenue] =
     await Promise.all([
-      prisma.product.findMany({ orderBy: { name: 'asc' } }),
+      prisma.product.findMany({ orderBy: PRODUCT_ORDER }),
       // received/sold/wastage are that day's movements, so only today's rows count.
       prisma.dailyStockEntry.groupBy({
         by: ['productId'],

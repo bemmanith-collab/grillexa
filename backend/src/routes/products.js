@@ -2,6 +2,7 @@ const express = require('express');
 const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
+const { PRODUCT_ORDER } = require('../lib/catalogue');
 
 const router = express.Router();
 
@@ -20,6 +21,9 @@ function shapeProduct(product, role) {
     id: product.id,
     name: product.name,
     sku: product.sku,
+    // Not financial and not secret — it is just where the row sits in a list,
+    // and the Products page needs it to show what it is editing.
+    sortOrder: product.sortOrder,
   };
   if (role !== 'SALES') {
     base.price = product.price;
@@ -28,16 +32,28 @@ function shapeProduct(product, role) {
   return base;
 }
 
+// undefined means "not supplied, leave it alone"; an Error means reject.
+// Number('') is 0, which would silently move a product to the top of every
+// list because someone cleared the field.
+function sortOrderOf(value) {
+  if (value === undefined || value === null || value === '') return undefined;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0) return new Error('sortOrder must be a whole number, 0 or more');
+  return n;
+}
+
 router.get('/', async (req, res) => {
-  const products = await prisma.product.findMany({ orderBy: { name: 'asc' } });
+  const products = await prisma.product.findMany({ orderBy: PRODUCT_ORDER });
   res.json({ products: products.map((p) => shapeProduct(p, req.user.role)) });
 });
 
 router.post('/', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
-  const { name, sku, price, costPrice } = req.body;
+  const { name, sku, price, costPrice, sortOrder } = req.body;
   if (!name || !sku) {
     return res.status(400).json({ error: 'name and sku are required' });
   }
+  const order = sortOrderOf(sortOrder);
+  if (order instanceof Error) return res.status(400).json({ error: order.message });
   try {
     const product = await prisma.product.create({
       data: {
@@ -45,6 +61,7 @@ router.post('/', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
         sku,
         price: price != null ? Number(price) : 0,
         costPrice: costPrice != null ? Number(costPrice) : 0,
+        ...(order !== undefined && { sortOrder: order }),
       },
     });
     res.status(201).json({ product: shapeProduct(product, req.user.role) });
@@ -58,7 +75,9 @@ router.post('/', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
 
 router.patch('/:id', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
   const id = Number(req.params.id);
-  const { name, sku, price, costPrice } = req.body;
+  const { name, sku, price, costPrice, sortOrder } = req.body;
+  const order = sortOrderOf(sortOrder);
+  if (order instanceof Error) return res.status(400).json({ error: order.message });
   try {
     const product = await prisma.product.update({
       where: { id },
@@ -67,6 +86,7 @@ router.patch('/:id', requireRole('ADMIN', 'MANAGER'), async (req, res) => {
         ...(sku !== undefined && { sku }),
         ...(price !== undefined && { price: Number(price) }),
         ...(costPrice !== undefined && { costPrice: Number(costPrice) }),
+        ...(order !== undefined && { sortOrder: order }),
       },
     });
     res.json({ product: shapeProduct(product, req.user.role) });

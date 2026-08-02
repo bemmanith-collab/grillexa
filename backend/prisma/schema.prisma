@@ -60,6 +60,14 @@ model Product {
   costPrice Float    @default(0)
   // Company-wide default reorder point; used to flag a store's closing stock as low.
   threshold Int      @default(10)
+  // Where this product sits in every list — the delivery and billing pickers,
+  // Today's Stock, the Products page. Alphabetical order filed "Mixed fruit
+  // bowl" between "Green sprouts" and "Mixed sprouts", which is not how anyone
+  // loading a van reads the list: they read it by family. Lower sorts first,
+  // ties fall back to name. Numbered in tens so a new product can be slotted
+  // between two others without renumbering, and a product added without a
+  // number lands at the end rather than silently at the top.
+  sortOrder Int      @default(100)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
