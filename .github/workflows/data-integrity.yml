@@ -1,0 +1,104 @@
+name: Daily data integrity check
+
+# 00:30 UTC = 06:00 IST. GitHub's scheduler is best effort and routinely runs
+# late at busy times (a top-of-the-hour cron is the worst offender, hence :30);
+# treat the timestamp inside the log as the truth, not the schedule.
+on:
+  schedule:
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+    inputs:
+      from:
+        description: 'Window start (YYYY-MM-DD)'
+        default: '2026-08-01'
+      to:
+        description: 'Window end (YYYY-MM-DD)'
+        default: '2026-08-15'
+
+permissions:
+  contents: write
+
+env:
+  FLY_APP: grillexa
+  WINDOW_FROM: ${{ inputs.from || '2026-08-01' }}
+  WINDOW_TO: ${{ inputs.to || '2026-08-15' }}
+  # Cron has no end date. After this the scheduled run exits immediately —
+  # delete the workflow (or this guard) when the reporting period is over.
+  RUN_UNTIL: '2026-08-15'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stop after the reporting period
+        id: window
+        run: |
+          today=$(date -u -d '+330 minutes' +%F)   # business day, IST
+          if [ "$today" \> "$RUN_UNTIL" ] && [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "past $RUN_UNTIL — nothing to do"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.window.outputs.skip != 'true'
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: steps.window.outputs.skip != 'true'
+
+      # The check runs on the Fly machine because that is what can reach the
+      # database — Managed Postgres is not open to the internet, and putting a
+      # DATABASE_URL in GitHub secrets to change that would be a worse trade
+      # than an SSH hop. It runs whatever version of the script is in the
+      # DEPLOYED image, so deploy before expecting a change here to take.
+      - name: Run the check on the Fly machine
+        if: steps.window.outputs.skip != 'true'
+        id: check
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -o pipefail
+          status=0
+          flyctl ssh console -a "$FLY_APP" \
+            -C "node /app/backend/scripts/integrity-check.js --from=$WINDOW_FROM --to=$WINDOW_TO" \
+            > check-output.txt 2>&1 || status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat check-output.txt
+
+      - name: Append to the log
+        if: steps.window.outputs.skip != 'true'
+        run: |
+          mkdir -p reports
+          log=reports/data-integrity.md
+          [ -f "$log" ] || printf '# Data integrity log\n\nAppended by .github/workflows/data-integrity.yml. Newest entries at the bottom.\n' > "$log"
+          {
+            printf '\n---\n\n## %s (run %s, exit %s)\n\n' \
+              "$(date -u -d '+330 minutes' +%F)" "$GITHUB_RUN_NUMBER" "${{ steps.check.outputs.status }}"
+            printf '```\n'
+            cat check-output.txt
+            printf '```\n'
+          } >> "$log"
+
+      - name: Commit the log
+        if: steps.window.outputs.skip != 'true'
+        run: |
+          git config user.name 'grillexa-bot'
+          git config user.email 'bot@users.noreply.github.com'
+          git add reports/data-integrity.md
+          git diff --staged --quiet && { echo 'nothing to commit'; exit 0; }
+          git commit -m "Data integrity check $(date -u -d '+330 minutes' +%F)"
+          # Someone may have pushed while this ran; rebase rather than fail and
+          # lose the day's entry.
+          for attempt in 1 2 3; do
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && git push && exit 0
+            echo "push attempt $attempt failed, retrying"
+            sleep 5
+          done
+          exit 1
+
+      # The log is committed either way — a failed check must still leave a
+      # record. This step is what turns a red tick on in the Actions tab.
+      - name: Fail if the check found errors
+        if: steps.window.outputs.skip != 'true' && steps.check.outputs.status != '0'
+        run: |
+          echo "integrity-check exited ${{ steps.check.outputs.status }} — see reports/data-integrity.md"
+          exit 1
