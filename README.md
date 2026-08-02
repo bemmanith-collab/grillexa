@@ -86,7 +86,9 @@ Three pieces, in increasing order of how much damage they can do.
 node scripts/integrity-check.js --from=2026-08-01 --to=2026-08-15 --stale-days=7
 ```
 
-Note what it deliberately does *not* flag: `closing < 0` is reported as INFO, not an error. Stock is never booked in before it is billed, so the running balance is expected to drift negative — see the ledger section above.
+Note what it deliberately does *not* flag. `closing < 0` is reported as INFO, not an error: stock is never booked in before it is billed, so the running balance is expected to drift negative — see the ledger section above. Neither is a negative `received`, on its own. **Settling a consignment books the unsold stock going back to HQ as a negative receipt on the settlement date**, while the delivery was a positive receipt on an earlier date, so a store that took nothing in that day and sent something back correctly ends the day negative. The gross figure appears in the Returned column, from the `Return` ledger. What the check raises is a negative that the day's `CONSIGNMENT_UNSOLD` returns do not account for — `received + returnedToHq < 0` — which means something reduced receipts that was not stock going back.
+
+That distinction was learned the hard way: the first version called any negative movement impossible and reported eleven correct rows as errors on its first live run.
 
 **`.github/workflows/data-integrity.yml`** — runs that check at 06:00 IST daily and appends the output to `reports/data-integrity.md`, committed back to the repo. It runs the script over `flyctl ssh console` rather than connecting to Postgres from CI, because Managed Postgres is not open to the internet and putting a `DATABASE_URL` in GitHub secrets to change that is a worse trade than an SSH hop. Two things it needs to work: a `FLY_API_TOKEN` repository secret, and the script to be **deployed** — CI runs whatever is in the running image, not what is on the branch. GitHub's scheduler is best-effort and frequently late, so trust the timestamp inside the log rather than the cron line.
 
