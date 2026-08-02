@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
+import GreetingOverlay from './components/GreetingOverlay';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 import Spinner from './components/Spinner';
@@ -66,6 +67,7 @@ export default function App() {
 
   return (
     <div className={user ? 'app-shell' : ''}>
+      <GreetingOverlay />
       {user && <Sidebar />}
       <main className={user ? 'app-main' : ''}>
         <RouteErrorBoundary>

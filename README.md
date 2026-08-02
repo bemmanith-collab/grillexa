@@ -193,6 +193,8 @@ The app is a PWA. On **Android**, Chrome offers **Install app** — there is als
 
 On **iPhone** there is no install prompt in any browser (they are all WebKit); use **Safari → Share → Add to Home Screen**.
 
+The login greeting is worth knowing about here: the installed app starts at `/` and restores its session from the cookie rather than logging in, so greeting on login alone meant the people who use the app most never saw one. It now also greets on the first open of the day per device (`grillexa_greeted_on` in `localStorage`), and an explicit login always greets.
+
 The service worker caches nothing, deliberately — this app writes bills, and a cached page showing yesterday's consignments as current is worse than a plain connection error.
 
 ## Environment variables (backend)

@@ -1,64 +1,31 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
-import { greetingFor } from '../lib/greeting';
 import logo from '../assets/grillexa-logo.png';
-
-const GREETING_MS = 3000;
 
 export default function Login() {
   const { login } = useAuth();
-  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [greeting, setGreeting] = useState('');
 
-  // The greeting shows itself out after three seconds and lands them in the
-  // app. Cleared on unmount so someone who hits Back mid-greeting isn't
-  // yanked forward again by a timer that outlived the page.
-  useEffect(() => {
-    if (!greeting) return undefined;
-    const timer = setTimeout(() => navigate('/'), GREETING_MS);
-    return () => clearTimeout(timer);
-  }, [greeting, navigate]);
-
+  // No navigate() on success: setting the user in context is what moves them,
+  // since App renders a redirect in place of this route the moment there is
+  // one. The greeting rides along in the context and shows over the app they
+  // land on — see GreetingOverlay.
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
     setSubmitting(true);
     try {
-      const user = await login(email, password);
-      // Everyone is greeted by name, not only managers. It was manager-only
-      // first, and the next two people who wanted it were an admin and a
-      // sales account — a role gate here is just that request again the next
-      // time someone is hired. The name is whatever the account says it is,
-      // so changing the greeting means renaming the account, not a deploy.
-      const hello = greetingFor(user.name);
-      if (hello) setGreeting(hello);
-      else navigate('/');
+      await login(email, password);
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed.');
     } finally {
       setSubmitting(false);
     }
-  }
-
-  if (greeting) {
-    return (
-      <div className="auth-page">
-        <div className="modal-backdrop">
-          <div className="modal greeting-modal" role="status">
-            <img src={logo} alt="" className="greeting-logo" />
-            <h2>{greeting}</h2>
-            <p>Greetings from Grillexa 🥗</p>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   return (
