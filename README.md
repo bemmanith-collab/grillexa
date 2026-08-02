@@ -49,6 +49,8 @@ Every list of products — the pickers on Deliver to Store and Direct Sale, Toda
 
 Numbers run in tens (10, 20, 30 …) so a product can be slotted between two others without renumbering, and `sortOrder` defaults to **100** so a product added without one lands at the end of the list rather than silently at the top. An Admin or Manager sets it in the **Order** column on the Products page.
 
+Seeding it from a migration is worth doing carefully: the first attempt matched `lower(name) = 'mixed sprouts'`, matched no rows on the live catalogue, and left everything at 100 — which looks precisely like the deploy never happened, because alphabetical is the fallback. `backend/scripts/show-catalogue.js` prints the catalogue in the order the app lists it, with names bracketed so stray whitespace shows.
+
 ## Roles & permissions
 
 | Action | Admin | Manager | Sales |
@@ -112,11 +114,12 @@ grillexa/
 │   │   │                   Consignment(+Item), Settlement(+Line),
 │   │   │                   Sale(+Line), Return,
 │   │   │                   DispatchInvoice(+Line)
-│   │   ├── migrations/     11 migrations
+│   │   ├── migrations/     12 migrations
 │   │   └── seed.js         local only — refuses to run with NODE_ENV=production
 │   ├── scripts/
 │   │   ├── recompute-ledger.js   ledger repair, dry run unless --apply
 │   │   ├── integrity-check.js    read-only data checks over a date window
+│   │   ├── show-catalogue.js     product order as the app lists it
 │   │   └── verification-queries.sql  reporting/reconciliation SQL
 │   ├── src/
 │   │   ├── lib/         stock.js (ledger + cascade), pricing.js (catalogue
