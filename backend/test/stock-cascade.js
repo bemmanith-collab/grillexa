@@ -3,72 +3,11 @@
 // stock invented or destroyed, permanently, with no error. adjustStock now
 // re-chains the days after the one it touched; this checks that it does.
 //
-// Run: npm test (from backend/). No database: prisma is faked below, because
-// what's being checked is arithmetic over rows, not SQL.
+// Run: npm test (from backend/). No database: prisma is faked (see
+// fake-tx.js), because what's being checked is arithmetic over rows, not SQL.
 const assert = require('assert');
 const { normalizeDate, rechain, adjustStock } = require('../src/lib/stock');
-
-// Just enough of the Prisma client for lib/stock.js — the four query shapes it
-// actually issues. Dates are compared by time value, as Postgres would.
-function fakeTx(seed = []) {
-  let nextId = 1;
-  const rows = seed.map((r) => ({
-    id: nextId++,
-    received: 0,
-    sold: 0,
-    wastage: 0,
-    consignmentQty: 0,
-    ...r,
-    date: normalizeDate(r.date),
-  }));
-  const match = (row, storeId, productId) => row.storeId === storeId && row.productId === productId;
-
-  return {
-    rows,
-    dailyStockEntry: {
-      async findUnique({ where: { dailyEntryKey: k } }) {
-        return rows.find((r) => match(r, k.storeId, k.productId) && +r.date === +k.date) || null;
-      },
-      async findFirst({ where: { storeId, productId, date } }) {
-        return (
-          rows
-            .filter((r) => match(r, storeId, productId) && +r.date <= +date.lte)
-            .sort((a, b) => b.date - a.date)[0] || null
-        );
-      },
-      async findMany({ where: { storeId, productId, date } }) {
-        return rows
-          .filter((r) => match(r, storeId, productId) && +r.date > +date.gt)
-          .sort((a, b) => a.date - b.date);
-      },
-      async create({ data }) {
-        const row = { id: nextId++, ...data };
-        rows.push(row);
-        return row;
-      },
-      // Understands Prisma's { increment: n } as well as a plain value —
-      // adjustStock writes increments so concurrent movements can't clobber
-      // each other, and a fake that ignored that would test nothing real.
-      async update({ where: { id }, data }) {
-        const row = rows.find((r) => r.id === id);
-        for (const [field, value] of Object.entries(data)) {
-          row[field] =
-            value && typeof value === 'object' && 'increment' in value
-              ? (row[field] || 0) + value.increment
-              : value;
-        }
-        return row;
-      },
-      async upsert({ where: { dailyEntryKey: k }, create }) {
-        const found = rows.find((r) => match(r, k.storeId, k.productId) && +r.date === +k.date);
-        if (found) return found;
-        const row = { id: nextId++, ...create };
-        rows.push(row);
-        return row;
-      },
-    },
-  };
-}
+const { fakeTx } = require('./fake-tx');
 
 const day = (tx, dateStr) => tx.rows.find((r) => +r.date === +normalizeDate(dateStr));
 

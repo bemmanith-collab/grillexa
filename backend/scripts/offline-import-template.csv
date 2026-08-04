@@ -1,0 +1,6 @@
+date,store,product,soldQty,wasteQty,revenue,paymentMethod
+2026-07-01,MG Road Store,Green Sprouts,42,3,1050,CASH
+2026-07-01,MG Road Store,Mixed Sprouts,18,0,540,UPI
+2026-07-01,MG Road Store,Mixed Fruit Bowl,0,4,,
+2026-07-01,Koramangala Store,Green Sprouts,31,2,775,UPI
+2026-07-02,MG Road Store,Green Sprouts,38,1,950,CARD

@@ -94,6 +94,52 @@ That distinction was learned the hard way: the first version called any negative
 
 **`backend/scripts/verification-queries.sql`** — the reporting queries: revenue for a period split by direct versus settlement, top products net of returns, missing store-days, zero-priced lines, and stock delivered inside the window that is still unsettled. Every window is matched on the business date columns, never `createdAt`: `date` is a calendar day at midnight UTC, while `createdAt` is an instant, and anything billed after 18:30 UTC belongs to the next Indian business day.
 
+## Importing offline sales & wastage
+
+For days that were recorded on paper or in a spreadsheet before the app was in use. `POST /api/import/offline`, ADMIN/MANAGER only — it writes bills for any store on any date, which is exactly what a SALES account is scoped away from.
+
+**The CSV.** One row per date × store × product; see `backend/scripts/offline-import-template.csv`.
+
+```csv
+date,store,product,soldQty,wasteQty,revenue,paymentMethod
+2026-07-01,MG Road Store,Green Sprouts,42,3,1050,CASH
+2026-07-01,MG Road Store,Mixed Fruit Bowl,0,4,,
+```
+
+Store and product names must match the catalogue (case-insensitively — check with `node scripts/show-catalogue.js`). `paymentMethod` is one of CASH, UPI, CARD, CREDIT, OTHER, and may be blank. Blank quantities mean zero. **`revenue` is required whenever `soldQty` is above zero and is what the bill is worth** — the sheet's money wins over the catalogue price, which is the entire point of importing it. Revenue with nothing sold is rejected as a contradiction rather than booked.
+
+**Sending it.** The body is the CSV itself, so there is no file upload and no multipart dependency:
+
+```bash
+curl -X POST 'https://grillexa.fly.dev/api/import/offline?dryRun=true' \
+  -H 'Content-Type: text/csv' --data-binary @offline.csv -b cookies.txt
+```
+
+Do the `?dryRun=true` pass first: it validates everything and writes nothing. Nginx's default 1 MB body limit and a 2000-row cap both apply; split larger files.
+
+**Nothing is written unless every row is valid.** A bad row fails the whole file and every problem is reported at once, with line numbers, so the file gets fixed in one pass. A half-imported day of takings is worse than a rejected one: the ledger looks plausible and nothing says which rows are missing. The write itself is one transaction, with a raised timeout — `adjustStock` re-chains every later day for each product it touches, so backfilling old dates does real work per row.
+
+**Re-running it is safe, in two different ways.** Bills are keyed `OFF-20260701-S3-P7`, derived from the row rather than a sequence, and `Sale.number` is unique — so a second import cannot create a second bill. Wastage has no audit row anywhere (`recompute-ledger.js` has to take it as recorded), so `DailyStockEntry.importedWastage` records what the import contributed and a re-run applies the *difference*: the same file twice is a no-op, a corrected file corrects the day, and wastage entered by hand through the app is never swallowed. Note the asymmetry — **a re-import corrects wastage but leaves an existing bill untouched**, reporting it per line as `skipped`. Fix a wrong bill in the app, not by re-importing.
+
+Imported bills are Direct Sales (no consignment behind them), so they appear on the Sales list and in the day's takings exactly like walk-in bills. `paymentMethod` exists only on these — the app's own billing forms do not ask.
+
+**Afterwards, run the ledger repair:**
+
+```bash
+node scripts/recompute-ledger.js            # dry run, prints what differs
+node scripts/recompute-ledger.js --apply    # writes, in one transaction
+```
+
+The import cascades correctly on its own, but a backfill touches many past dates in one go and this is the cheap way to prove the chain: it rebuilds `opening`/`closing` from the movements and reports anything that disagrees. Read *How the ledger works* above before using `--apply` — **it is not safe to run while the app is in use** and it rewrites the whole history rather than the dates you imported. The dry run is safe at any time, so run that first and keep its output.
+
+**Cross-tab sheets** go through `backend/scripts/crosstab-to-csv.js` first, which flattens products-down-the-side, dates-across-the-top into the columns above:
+
+```bash
+node scripts/crosstab-to-csv.js sheet.csv --store "MG Road Store" --payment UPI > offline.csv
+```
+
+It reads a CSV export (not `.xlsx` — no spreadsheet library), recognises `YYYY-MM-DD`, `DD/MM/YYYY` and `DD-MM-YYYY` in column headers along with a metric word (sold/qty/units, waste/wastage/damage, revenue/amount/total), copes with `₹`, thousands separators and `-` for nil, and drops the Total row. The sheet has no store column, so `--store` is required; run it once per store. **If a sheet is shaped differently, only `readCrosstab()` needs changing** — everything downstream works off the flat records it yields.
+
 ## Sessions & browser hardening
 
 The session is a JWT in an **httpOnly cookie** (`grillexa_session`), not a Bearer token in `localStorage` — no script on the page can read it, the app's own or one injected through an XSS. `sameSite: strict` is the CSRF defence; `secure` is set in production only, because local dev has no TLS. `POST /api/auth/logout` clears it server-side: a browser cannot delete a cookie it cannot read, so logout used to be a claim the client made about itself.
@@ -116,26 +162,30 @@ grillexa/
 │   │   │                   Consignment(+Item), Settlement(+Line),
 │   │   │                   Sale(+Line), Return,
 │   │   │                   DispatchInvoice(+Line)
-│   │   ├── migrations/     12 migrations
+│   │   ├── migrations/     13 migrations
 │   │   └── seed.js         local only — refuses to run with NODE_ENV=production
 │   ├── scripts/
 │   │   ├── recompute-ledger.js   ledger repair, dry run unless --apply
 │   │   ├── integrity-check.js    read-only data checks over a date window
 │   │   ├── show-catalogue.js     product order as the app lists it
+│   │   ├── crosstab-to-csv.js    cross-tab sheet → offline import CSV
+│   │   ├── offline-import-template.csv  the import's columns, filled in
 │   │   └── verification-queries.sql  reporting/reconciliation SQL
 │   ├── src/
 │   │   ├── lib/         stock.js (ledger + cascade), pricing.js (catalogue
 │   │   │                prices), scope.js (store access),
-│   │   │                catalogue.js (one product order for every list)
+│   │   │                catalogue.js (one product order for every list),
+│   │   │                offlineImport.js (CSV parse, validate, write)
 │   │   ├── middleware/  auth.js (cookie session), role.js
 │   │   ├── routes/      auth, users, products, stores, stock, consignments,
-│   │   │                sales, returns, dispatches, reports, quotes
+│   │   │                sales, returns, dispatches, reports, quotes, import
 │   │   ├── data/        grillingQuotes.js
 │   │   ├── app.js       CORS, cookie parser, login rate limit, route mounting
 │   │   ├── db.js
 │   │   └── index.js
 │   ├── test/            crash-guards.js, stock-cascade.js, stock-rollup.js,
-│   │                    pricing.js, consignment-list.js   (npm test)
+│   │                    pricing.js, consignment-list.js, offline-import.js,
+│   │                    fake-tx.js (shared in-memory Prisma)   (npm test)
 │   └── .env.example
 ├── frontend/
 │   ├── public/          manifest.json, sw.js, icons (PWA), boot.js and
@@ -269,6 +319,7 @@ Read from the environment or `.env`. One exception worth knowing: the business's
 | PATCH | `/api/consignments/:id/settlements/:settlementId` | Admin, Manager, Sales |
 | GET | `/api/sales`, `/api/sales/:id`, `/api/sales/latest/:storeId` | Authenticated, store-scoped |
 | POST/PATCH | `/api/sales`, `/api/sales/:id` | Admin, Manager, Sales |
+| POST | `/api/import/offline?dryRun=` | Admin, Manager — CSV body, not JSON |
 | GET/POST | `/api/returns` | Authenticated, store-scoped |
 | GET | `/api/dispatches`, `/api/dispatches/:id` | Admin, Manager |
 | POST | `/api/dispatches` | Admin, Manager |
@@ -284,7 +335,7 @@ cd frontend && npm test
 
 No framework, no database, no browser — plain Node scripts that print `ok` lines.
 
-Backend, five files:
+Backend, six files:
 
 - `test/crash-guards.js` — malformed request bodies return 400 rather than killing the process (an unhandled rejection in an async handler exits Node on Express 4), `todayStr` is ISO and round-trips, and public signup stays gone.
 - `test/stock-cascade.js` — the ledger cascade against an in-memory Prisma stub: back-dated writes re-chain later days, moving a document between dates leaves nothing behind, and reversing a bill restores stock exactly.
@@ -292,6 +343,9 @@ Backend, five files:
 - `test/pricing.js` — prices come from the catalogue, a Sales account cannot override one, an edit keeps what the bill already charged, and a product new to the bill prices from the catalogue.
 
 - `test/consignment-list.js` — who sees which consignments, and how many: a manager or admin is never store-scoped (with or without a status filter), a Sales account always is, and the outstanding list is never truncated while the history list still is.
+- `test/offline-import.js` — the offline CSV import end to end without a database: the parser (quotes, CRLF, a UTF-8 BOM), every rule that stops a bad row reaching the ledger, and the write path against the same in-memory Prisma stub — a re-import creates no second bill and adds no second lot of wastage, a corrected file applies the difference, and wastage entered by hand is not swallowed.
+
+`test/fake-tx.js` is not a test: it is the in-memory Prisma stub `stock-cascade.js` and `offline-import.js` share, so there is one fake to keep honest rather than two that drift. It applies the schema's column defaults on insert the way Postgres does — a fake that returned a defaulted column as `undefined` turned the import's wastage delta into `NaN`, which looked exactly like a bug in the code.
 
 Frontend, two files:
 

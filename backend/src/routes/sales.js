@@ -24,6 +24,9 @@ function shapeSale(sale) {
     customerName: sale.customerName,
     customerPhone: sale.customerPhone,
     customerGstin: sale.customerGstin,
+    // Only ever set on bills brought in by the offline CSV import; the app's
+    // own billing forms do not ask for it.
+    paymentMethod: sale.paymentMethod,
     consignmentId: sale.consignmentId,
     createdAt: sale.createdAt,
     lines: sale.lines?.map((l) => ({
