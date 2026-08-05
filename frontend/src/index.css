@@ -733,6 +733,87 @@ select {
   color: var(--text-muted);
 }
 
+/* ---------- Charts & filters ---------- */
+
+/* One row of filters above the charts, wrapping rather than scrolling — on a
+   phone this is three rows of chips and two dropdowns, all thumb-sized. */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filter-chip:hover {
+  border-color: var(--teal);
+}
+
+.filter-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.filter-bar select,
+.filter-bar input[type='date'] {
+  min-height: 38px;
+}
+
+/* Two charts per row on a desktop, one on a phone. minmax(0,…) rather than
+   auto: a canvas has an intrinsic width and will otherwise refuse to shrink,
+   pushing the whole page sideways. */
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.chart-grid > .card {
+  min-width: 0;
+}
+
+.chart-box {
+  position: relative;
+  width: 100%;
+}
+
+.card-title {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.chart-hint {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
 /* ---------- Personal metrics dashboard ---------- */
 
 /* The pull-to-refresh tab. Height is driven from JS by how far the finger has

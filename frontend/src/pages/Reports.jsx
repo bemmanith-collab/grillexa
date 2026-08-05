@@ -1,40 +1,104 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Download, X } from 'lucide-react';
 import client from '../api/client';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { AlertIcon } from '../components/icons';
 import { formatCurrency } from '../lib/format';
+import { formatDate, todayStr, startOfWeekStr, startOfMonthStr } from '../utils/date';
+import Chart, { lineData, barData, doughnutData, TEAL, FLAME, WARN, money } from '../components/Chart';
+
+// The four ranges a manager actually asks for, plus a custom pair. Each one
+// resolves to a from/to here rather than on the server, so every endpoint on
+// the page takes the same two dates and cannot disagree about what "this
+// month" meant.
+const RANGES = {
+  today: { label: 'Today', of: () => [todayStr(), todayStr()] },
+  week: { label: 'This week', of: () => [startOfWeekStr(), todayStr()] },
+  month: { label: 'This month', of: () => [startOfMonthStr(), todayStr()] },
+  custom: { label: 'Custom', of: null },
+};
 
 export default function Reports() {
+  const [range, setRange] = useState('month');
+  const [custom, setCustom] = useState({ from: startOfMonthStr(), to: todayStr() });
+  const [storeId, setStoreId] = useState('');
+  const [productId, setProductId] = useState('');
+
+  const [analytics, setAnalytics] = useState(null);
   const [summary, setSummary] = useState(null);
   const [pnl, setPnl] = useState(null);
   const [productSales, setProductSales] = useState(null);
-  const [days, setDays] = useState(30);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    client
-      .get('/reports/summary')
-      .then((res) => setSummary(res.data))
-      .catch(() => setError('Failed to load summary.'));
-  }, []);
+  const [from, to] = range === 'custom' ? [custom.from, custom.to] : RANGES[range].of();
+
+  // One params object for every request on the page and for the Excel link, so
+  // the workbook covers exactly what is on screen.
+  const params = useMemo(() => {
+    const p = { from, to };
+    if (storeId) p.storeId = storeId;
+    if (productId) p.productId = productId;
+    return p;
+  }, [from, to, storeId, productId]);
 
   useEffect(() => {
-    client
-      .get('/reports/pnl', { params: { days } })
-      .then((res) => setPnl(res.data))
-      .catch(() => setError('Failed to load profit & loss.'));
-  }, [days]);
+    let cancelled = false;
+    setError('');
+    Promise.all([
+      client.get('/reports/analytics', { params }),
+      client.get('/reports/summary'),
+      client.get('/reports/pnl', { params: { from, to, storeId: storeId || undefined } }),
+      client.get('/reports/product-sales', { params }),
+    ])
+      .then(([a, s, p, ps]) => {
+        if (cancelled) return;
+        setAnalytics(a.data);
+        setSummary(s.data);
+        setPnl(p.data);
+        setProductSales(ps.data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.response?.data?.error || 'Failed to load reports.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [params, from, to, storeId]);
 
-  useEffect(() => {
-    client
-      .get('/reports/product-sales', { params: { days } })
-      .then((res) => setProductSales(res.data))
-      .catch(() => setError('Failed to load product sales.'));
-  }, [days]);
+  const excelUrl = `/api/reports/excel?${new URLSearchParams({
+    from,
+    to,
+    ...(storeId ? { storeId } : {}),
+  })}`;
+
+  // Drilling down is just setting the filter the clicked mark stands for —
+  // same state the dropdowns write, so there is one way in and one way out.
+  function drillToStore(index) {
+    const row = analytics?.storePerformance[index];
+    if (row?.id) setStoreId(String(row.id));
+  }
+  function drillToProduct(rows) {
+    return (index) => {
+      const row = rows[index];
+      if (row?.id) setProductId(String(row.id));
+    };
+  }
+  function drillToDay(index) {
+    const day = analytics?.salesTrend[index];
+    if (!day) return;
+    setCustom({ from: day.date, to: day.date });
+    setRange('custom');
+  }
+
+  const storeName = analytics?.filters.stores.find((s) => String(s.id) === storeId)?.name;
+  const productName = analytics?.filters.products.find((p) => String(p.id) === productId)?.name;
 
   if (error) return <div className="page"><div className="form-error">{error}</div></div>;
-  if (!summary || !pnl || !productSales) return <Spinner label="Loading reports…" />;
+  if (!analytics || !summary || !pnl || !productSales) return <Spinner label="Loading reports…" />;
+
+  const trend = analytics.salesTrend;
+  const totalSales = trend.reduce((sum, d) => sum + d.amount, 0);
 
   return (
     <div className="page">
@@ -42,37 +106,196 @@ export default function Reports() {
         <div>
           <h1>Reports</h1>
           <p className="page-subtitle">
-            {pnl.from} – {pnl.to} · {summary.storesReporting} stores reporting
+            {formatDate(from)} – {formatDate(to)} · {summary.storesReporting} stores reporting today
           </p>
         </div>
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
-          <option value={7}>Last 7 days</option>
-          <option value={14}>Last 14 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
-        </select>
+        <div className="page-header-actions">
+          <a className="btn-primary btn-sm" href={excelUrl} download>
+            <Download size={15} /> Download Excel
+          </a>
+        </div>
+      </div>
+
+      <div className="filter-bar">
+        <div className="filter-group" role="group" aria-label="Date range">
+          {Object.entries(RANGES).map(([key, r]) => (
+            <button
+              key={key}
+              type="button"
+              className={`filter-chip${range === key ? ' active' : ''}`}
+              onClick={() => setRange(key)}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+
+        {range === 'custom' && (
+          <div className="filter-group">
+            <input
+              type="date"
+              value={custom.from}
+              max={custom.to}
+              onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))}
+              aria-label="From date"
+            />
+            <input
+              type="date"
+              value={custom.to}
+              min={custom.from}
+              max={todayStr()}
+              onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))}
+              aria-label="To date"
+            />
+          </div>
+        )}
+
+        <div className="filter-group">
+          <select value={storeId} onChange={(e) => setStoreId(e.target.value)} aria-label="Store">
+            <option value="">All stores</option>
+            {analytics.filters.stores.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <select value={productId} onChange={(e) => setProductId(e.target.value)} aria-label="Product">
+            <option value="">All products</option>
+            {analytics.filters.products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {(storeId || productId) && (
+          <div className="filter-group">
+            {storeId && (
+              <button type="button" className="filter-chip active" onClick={() => setStoreId('')}>
+                {storeName || 'Store'} <X size={13} />
+              </button>
+            )}
+            {productId && (
+              <button type="button" className="filter-chip active" onClick={() => setProductId('')}>
+                {productName || 'Product'} <X size={13} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-value">{formatCurrency(pnl.overall.revenue)}</div>
-          <div className="stat-label">Revenue</div>
+          <div>
+            <div className="stat-value">{formatCurrency(totalSales)}</div>
+            <div className="stat-label">Sales in range</div>
+          </div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{formatCurrency(pnl.overall.cogs)}</div>
-          <div className="stat-label">Cost of Goods Sold</div>
-        </div>
-        <div className={`stat-card${pnl.overall.profit < 0 ? ' stat-card-alert' : ''}`}>
-          <div className="stat-value">{formatCurrency(pnl.overall.profit)}</div>
-          <div className="stat-label">Profit</div>
+          <div>
+            <div className="stat-value">{formatCurrency(pnl.overall.profit)}</div>
+            <div className="stat-label">Profit</div>
+          </div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{pnl.overall.revenue !== 0 ? `${pnl.overall.marginPct.toFixed(1)}%` : '—'}</div>
-          <div className="stat-label">Profit Margin</div>
+          <div>
+            <div className="stat-value">
+              {pnl.overall.revenue !== 0 ? `${pnl.overall.marginPct.toFixed(1)}%` : '—'}
+            </div>
+            <div className="stat-label">Margin</div>
+          </div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{summary.totalSoldToday}</div>
-          <div className="stat-label">Units Sold Today</div>
+          <div>
+            <div className="stat-value">
+              {formatCurrency(analytics.wastageByProduct.reduce((s, w) => s + w.value, 0))}
+            </div>
+            <div className="stat-label">Wastage (at cost)</div>
+          </div>
+        </div>
+      </div>
+
+      <h2 className="section-title">Sales trend</h2>
+      <div className="card">
+        <p className="chart-hint">Tap a day to zoom the whole page to it.</p>
+        <Chart
+          type="line"
+          height={240}
+          ariaLabel={`Daily sales from ${from} to ${to}`}
+          data={lineData(trend, { label: 'Sales', color: TEAL })}
+          onSelect={drillToDay}
+        />
+      </div>
+
+      <div className="chart-grid">
+        <div className="card">
+          <h2 className="card-title">Product mix</h2>
+          {analytics.productDistribution.length === 0 ? (
+            <EmptyState icon={AlertIcon} message="No sales in this range." />
+          ) : (
+            <Chart
+              type="doughnut"
+              height={260}
+              ariaLabel="Share of sales by product"
+              data={doughnutData(analytics.productDistribution, { label: 'Sales' })}
+              onSelect={drillToProduct(analytics.productDistribution)}
+              options={{
+                plugins: {
+                  tooltip: {
+                    callbacks: {
+                      label: (ctx) => ` ${ctx.label}: ${money(ctx.parsed)}`,
+                    },
+                  },
+                },
+              }}
+            />
+          )}
+        </div>
+
+        <div className="card">
+          <h2 className="card-title">Store performance</h2>
+          {analytics.storePerformance.length === 0 ? (
+            <EmptyState icon={AlertIcon} message="No sales in this range." />
+          ) : (
+            <Chart
+              type="bar"
+              height={260}
+              ariaLabel="Sales by store"
+              data={barData(analytics.storePerformance, { label: 'Sales', color: FLAME })}
+              onSelect={drillToStore}
+            />
+          )}
+        </div>
+
+        <div className="card">
+          <h2 className="card-title">Wastage by product</h2>
+          {analytics.wastageByProduct.length === 0 ? (
+            <EmptyState icon={AlertIcon} message="No wastage recorded. Good." />
+          ) : (
+            <Chart
+              type="bar"
+              height={260}
+              ariaLabel="Wastage value by product"
+              data={barData(analytics.wastageByProduct, { label: 'Wastage', y: 'value', color: WARN })}
+              onSelect={drillToProduct(analytics.wastageByProduct)}
+            />
+          )}
+        </div>
+
+        <div className="card">
+          <h2 className="card-title">Sales people</h2>
+          {analytics.salespersonPerformance.length === 0 ? (
+            <EmptyState icon={AlertIcon} message="No sales in this range." />
+          ) : (
+            <Chart
+              type="bar"
+              height={260}
+              ariaLabel="Sales by salesperson"
+              data={barData(analytics.salespersonPerformance, { label: 'Sales', color: TEAL })}
+              options={{ horizontal: true, chart: { indexAxis: 'y' } }}
+            />
+          )}
         </div>
       </div>
 

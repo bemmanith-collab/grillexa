@@ -3,6 +3,7 @@ const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { normalizeDate, todayStr } = require('../lib/stock');
 const {
+  SETTLE_GRACE_DAYS,
   visitedStoreIds,
   sumSales,
   changePct,
@@ -11,15 +12,15 @@ const {
   rankIn,
   overdueList,
 } = require('../lib/dashboard');
+const { salesTrend } = require('../lib/analytics');
 
 const router = express.Router();
 
 router.use(authenticate);
 
-// Two full days after delivery, a consignment nobody has settled is money
-// sitting in someone else's shop. Drives both the "pending" count and the
-// alerts list, so they can never disagree.
-const SETTLE_GRACE_DAYS = 2;
+// How much history the dashboard's trend line shows. A month is the shortest
+// window a weekly rhythm is visible in, and it is one more query.
+const TREND_DAYS = 30;
 
 // Everything on this page is one person's day: their bills, their deliveries,
 // their settlements. Scope:
@@ -61,7 +62,10 @@ router.get('/salesperson', async (req, res) => {
   const graceCutoff = new Date(date);
   graceCutoff.setUTCDate(graceCutoff.getUTCDate() - SETTLE_GRACE_DAYS);
 
-  const [sales, lastWeekSales, settlements, delivered, pending, users, dayTotals, storeCount] =
+  const trendFrom = new Date(date);
+  trendFrom.setUTCDate(trendFrom.getUTCDate() - (TREND_DAYS - 1));
+
+  const [sales, lastWeekSales, settlements, delivered, pending, users, dayTotals, storeCount, trendLines] =
     await Promise.all([
       prisma.sale.findMany({
         where: { date, ...mine },
@@ -103,6 +107,13 @@ router.get('/salesperson', async (req, res) => {
       // Ranking is company-wide by definition: it is the comparison.
       prisma.sale.groupBy({ by: ['createdById'], where: { date }, _sum: { totalAmount: true } }),
       companyWide ? prisma.store.count() : Promise.resolve(0),
+      // The trend line under the stat cards. Lines rather than bill totals so
+      // it runs through the same arithmetic as the Reports charts — one
+      // definition of "a day's sales" for the whole app.
+      prisma.saleLine.findMany({
+        where: { sale: { date: { gte: trendFrom, lte: date }, ...mine } },
+        select: { amount: true, quantity: true, type: true, sale: { select: { date: true } } },
+      }),
     ]);
 
   const visited = visitedStoreIds(
@@ -147,6 +158,7 @@ router.get('/salesperson', async (req, res) => {
       overdue: overdue.slice(0, 5),
     },
     topProducts: topProducts(sales),
+    trend: salesTrend(trendLines, trendFrom, date),
     ranking: companyWide
       ? null
       : {

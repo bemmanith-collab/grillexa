@@ -3,7 +3,7 @@
 Stock and billing for a distributed retail business (sprouts, fruit bowls, bananas) supplying 50+ kirana stores. Goods go out to a store **on consignment** — not a sale until the store settles and says what actually sold. Also handles cash sales to walk-in customers, returns, wastage, and a daily per-store ledger.
 
 - **Backend**: Node.js + Express, Prisma ORM, JWT in an httpOnly cookie, bcrypt
-- **Frontend**: React (Vite), installable as an Android app (PWA)
+- **Frontend**: React (Vite), Chart.js, installable as an Android app (PWA)
 - **Database**: PostgreSQL (Neon, Singapore)
 - **Hosted**: Fly.io, region `sin`
 
@@ -111,11 +111,34 @@ The page refreshes every 5 minutes, but only while it is actually on screen — 
 
 No caching layer. It is 8 queries against one day of rows, in parallel; the one thing that actually mattered was an index on `Sale.date`, which every dashboard query needs and none had. Add caching when a measurement says it is slow.
 
+## Charts, and the manager's workbook
+
+Reports carries five charts and one filter bar — date range (Today / This week / This month / Custom), store, product — driving every figure on the page, charts and tables alike. **Tapping a mark drills down** by setting the filter it stands for: a store bar sets the store filter, a product slice or wastage bar sets the product filter, a point on the trend line narrows the whole page to that day. Same state the dropdowns write, so there is one way in and one way back out.
+
+All five series arrive in **one** response (`GET /api/reports/analytics`). Five endpoints would mean five round trips on a phone and five slightly different moments in time on one screen.
+
+**Chart choices that are not taste.** Colour means identity in exactly one chart — the product doughnut — so that is the only one with a categorical palette (fixed order, so a product keeps its colour when a filter removes the one above it) and the only one with a legend; the rest are single-series and named by their heading. The palette is validated for colour-blind separation against the app's white cards rather than eyeballed. Long tails fold into one grey **Other** slice that keeps the money but cannot be drilled into, because it is a remainder, not a thing. A day with no sales is a **zero on the line, not a gap** — a line drawn straight across a dead Sunday reports a quiet week as a steady one.
+
+`GET /api/reports/excel?from=&to=&storeId=` streams a six-sheet workbook: Summary, Store Performance, Product Performance, Salesperson Performance, Consignment Summary, Wastage Breakdown. Headers are bold on petrol with the row frozen and a filter on it, money is `₹#,##0.00`, percentages carry two decimals, dates are **real dates** in `dd/mm/yyyy` (text would not sort or filter by month, which is most of why anyone opens this in Excel), and columns are measured to their content. It runs the same aggregation as the charts (`backend/src/lib/analytics.js`), so the file and the screen cannot disagree.
+
+**exceljs, not SheetJS.** The free build of SheetJS cannot write bold or filled cells — styling is a paid feature there — and bold filled headers on a frozen row are most of what makes six sheets readable. `backend/src/lib/excelReport.js` is the only file that would change to swap back.
+
+Three columns that were asked for are **not** in the workbook, because the data behind them does not exist:
+
+- **Wastage has no reason.** It is a counter on the daily stock ledger (`DailyStockEntry.wastage`), not an event log — there is no per-entry row to hang a reason on. Returns are the ledger that carries reasons. Wastage is valued at **cost**, not at the selling price: it is stock paid for and never sold.
+- **Stores have no city**, only the one composed `address` string (see *Store location*), so the address goes out whole rather than guessed apart.
+- **A consignment has no wastage figure.** Wastage is recorded against a store and a day, never against the consignment the stock arrived on; any per-consignment number would be invented. It is on the Wastage Breakdown sheet at the grain it actually exists at.
+
+**Coverage %** on the salesperson sheet is stores reached ÷ stores assigned over the window, and nothing more blended — a number nobody can recompute in their head is a number nobody trusts when it is used to judge them. It is null, not 0%, for someone with no stores assigned.
+
+Ranges are capped at 366 days: the window drives how many rows every query reads, and "all time" on a phone is a request nobody meant to make.
+
 ## Roles & permissions
 
 | Action | Admin | Manager | Sales |
 |---|:--:|:--:|:--:|
 | My Dashboard (own personal metrics) | ✅ | ✅ | ✅ |
+| Charts on Reports, Download Excel | ✅ | ✅ | ❌ |
 | Dashboard for another person, or company-wide | ✅ | ✅ | ❌ |
 | Today's Stock, Stock History | ✅ any store | ✅ any store | ✅ own stores |
 | Deliver to Store (create / edit consignment) | ✅ any | ✅ any | ✅ own stores |
@@ -224,7 +247,7 @@ grillexa/
 │   │   │                   Consignment(+Item), Settlement(+Line),
 │   │   │                   Sale(+Line), Return,
 │   │   │                   DispatchInvoice(+Line)
-│   │   ├── migrations/     16 migrations
+│   │   ├── migrations/     17 migrations
 │   │   └── seed.js         local only — refuses to run with NODE_ENV=production
 │   ├── scripts/
 │   │   ├── recompute-ledger.js   ledger repair, dry run unless --apply
@@ -237,6 +260,8 @@ grillexa/
 │   │   ├── lib/         stock.js (ledger + cascade), pricing.js (catalogue
 │   │   │                prices), scope.js (store access),
 │   │   │                dashboard.js (personal metrics arithmetic),
+│   │   │                analytics.js (chart + export aggregation),
+│   │   │                excelReport.js (the six-sheet workbook),
 │   │   │                catalogue.js (one product order for every list),
 │   │   │                geocode.js (reverse geocode via Nominatim),
 │   │   │                offlineImport.js (CSV parse, validate, write)
@@ -250,7 +275,7 @@ grillexa/
 │   │   └── index.js
 │   ├── test/            crash-guards.js, stock-cascade.js, stock-rollup.js,
 │   │                    pricing.js, consignment-list.js, offline-import.js,
-│   │                    geocode.js, dashboard.js,
+│   │                    geocode.js, dashboard.js, analytics.js,
 │   │                    fake-tx.js (shared in-memory Prisma)   (npm test)
 │   └── .env.example
 ├── frontend/
@@ -259,7 +284,8 @@ grillexa/
 │   ├── src/
 │   │   ├── api/client.js         axios, withCredentials, 401 → /login
 │   │   ├── context/AuthContext.jsx
-│   │   ├── components/  Sidebar (browser tab gets the website nav, installed
+│   │   ├── components/  Chart (chart.js canvas + dataset builders),
+│   │   │                Sidebar (browser tab gets the website nav, installed
 │   │   │                app gets the tab bar), DatePager, LineItemsForm,
 │   │   │                BillDetailModal, WastageModal, StockDetailModal,
 │   │   │                StoreAssignModal, ChangePasswordModal,
@@ -402,7 +428,9 @@ Read from the environment or `.env`. One exception worth knowing: the business's
 | GET/POST | `/api/returns` | Authenticated, store-scoped |
 | GET | `/api/dispatches`, `/api/dispatches/:id` | Admin, Manager |
 | POST | `/api/dispatches` | Admin, Manager |
-| GET | `/api/reports/summary`, `/pnl?days=`, `/product-sales?days=` | Admin, Manager |
+| GET | `/api/reports/summary`, `/pnl`, `/product-sales` | Admin, Manager — the last two take `?from=&to=&storeId=` (and `?productId=` for product-sales), or the older `?days=` |
+| GET | `/api/reports/analytics?from=&to=&storeId=&productId=` | Admin, Manager — every chart series in one response |
+| GET | `/api/reports/excel?from=&to=&storeId=` | Admin, Manager — six-sheet .xlsx attachment |
 | GET | `/api/dashboard/salesperson?userId=&date=` | Authenticated — Sales always gets its own day, whatever it asks for; `userId=N` or `userId=all` is Admin/Manager only |
 | GET | `/api/quotes/random` | Authenticated |
 
@@ -415,7 +443,7 @@ cd frontend && npm test
 
 No framework, no database, no browser — plain Node scripts that print `ok` lines.
 
-Backend, eight files:
+Backend, nine files:
 
 - `test/crash-guards.js` — malformed request bodies return 400 rather than killing the process (an unhandled rejection in an async handler exits Node on Express 4), `todayStr` is ISO and round-trips, and public signup stays gone.
 - `test/stock-cascade.js` — the ledger cascade against an in-memory Prisma stub: back-dated writes re-chain later days, moving a document between dates leaves nothing behind, and reversing a bill restores stock exactly.
@@ -424,6 +452,7 @@ Backend, eight files:
 
 - `test/consignment-list.js` — who sees which consignments, and how many: a manager or admin is never store-scoped (with or without a status filter), a Sales account always is, and the outstanding list is never truncated while the history list still is.
 - `test/dashboard.js` — the numbers people are ranked on: a return subtracts from its product rather than inflating it, a product only returned today is not a "top seller", a tie shares the higher place, a blank baseline gives no percentage instead of an invented one, and the oldest unsettled consignment is chased first.
+- `test/analytics.js` — the arithmetic behind the charts and the workbook, which are the same arithmetic: a dead day is a zero on the line rather than a gap the chart draws straight through, returns subtract, wastage is valued at cost, a long tail folds into one "Other" that keeps the money, and coverage is null (not 0%) for someone with no stores. The last test writes a real workbook and reads it back — six sheets, bold filled frozen headers, ₹ formats, and dates that arrive as dates rather than as text that cannot be sorted.
 - `test/offline-import.js` — the offline CSV import end to end without a database: the parser (quotes, CRLF, a UTF-8 BOM), every rule that stops a bad row reaching the ledger, and the write path against the same in-memory Prisma stub — a re-import creates no second bill and adds no second lot of wastage, a corrected file applies the difference, and wastage entered by hand is not swallowed.
 
 `test/fake-tx.js` is not a test: it is the in-memory Prisma stub `stock-cascade.js` and `offline-import.js` share, so there is one fake to keep honest rather than two that drift. It applies the schema's column defaults on insert the way Postgres does — a fake that returned a defaulted column as `undefined` turned the import's wastage delta into `NaN`, which looked exactly like a bug in the code.

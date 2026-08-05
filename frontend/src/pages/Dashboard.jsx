@@ -9,11 +9,14 @@ import {
   AlertTriangle,
   MapPinOff,
   RefreshCw,
+  Download,
 } from 'lucide-react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
+import Chart, { lineData, TEAL } from '../components/Chart';
 import { formatCurrency } from '../lib/format';
+import { daysAgoStr, todayStr } from '../utils/date';
 
 // Long enough that the page is never the reason a phone's battery dies between
 // two shops, short enough that the figure you glance at on the way out of one
@@ -157,6 +160,18 @@ export default function Dashboard() {
               <button type="button" className="btn-secondary btn-sm" onClick={load} disabled={refreshing}>
                 <RefreshCw size={15} className={refreshing ? 'icon-spin' : undefined} /> Refresh
               </button>
+              {/* The workbook is company detail, so it follows the same rule
+                  as Reports: staff only. Covers the last 30 days — the window
+                  the trend below is drawn from, so the file matches the page. */}
+              {staff && (
+                <a
+                  className="btn-primary btn-sm"
+                  href={`/api/reports/excel?from=${daysAgoStr(29)}&to=${todayStr()}`}
+                  download
+                >
+                  <Download size={15} /> Excel
+                </a>
+              )}
             </div>
           </div>
 
@@ -228,6 +243,20 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {data.trend?.length > 0 && (
+            <>
+              <h2 className="section-title">Last 30 days</h2>
+              <div className="card">
+                <Chart
+                  type="line"
+                  height={180}
+                  ariaLabel={`Daily sales for the last 30 days${company ? '' : `, ${data.person.name}`}`}
+                  data={lineData(data.trend, { label: 'Sales', color: TEAL })}
+                />
+              </div>
+            </>
+          )}
 
           <h2 className="section-title">Top products today</h2>
           <div className="card">

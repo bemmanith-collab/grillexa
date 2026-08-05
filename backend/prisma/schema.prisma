@@ -204,6 +204,12 @@ model SaleLine {
   amount    Float
   type      String  @default("SALE")
   reason    String?
+
+  // Postgres does not index a foreign key on its own, and every chart and
+  // every sheet of the Excel export reads sale lines through their sale
+  // ("the lines of every bill in this date range"). Without this that is a
+  // scan of every line ever recorded, each time.
+  @@index([saleId])
 }
 
 // reason: "CUSTOMER_RETURN" | "DAMAGED" | "EXCHANGE" | "OTHER" | "CONSIGNMENT_UNSOLD"

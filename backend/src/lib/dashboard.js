@@ -6,6 +6,12 @@
 
 const DAY_MS = 86400000;
 
+// Two full days after delivery, a consignment nobody has settled is money
+// sitting in someone else's shop. Lives here rather than in the dashboard
+// route because the Excel export counts the same thing, and two definitions of
+// "overdue" in one product is a support call waiting to happen.
+const SETTLE_GRACE_DAYS = 2;
+
 // A visit is not a check-in. Nothing in this app records one: the GPS work
 // pinned where stores *are*, it never tracked anyone arriving. What the app
 // does record is work that can only be done standing in the shop — a bill rung
@@ -109,6 +115,7 @@ function overdueList(consignments, date, graceDays) {
 }
 
 module.exports = {
+  SETTLE_GRACE_DAYS,
   visitedStoreIds,
   sumSales,
   changePct,

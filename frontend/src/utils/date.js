@@ -35,3 +35,18 @@ export function todayStr() {
 export function daysAgoStr(n) {
   return businessDayStr(Date.now() - n * 86400000);
 }
+
+// Monday, because that is where the week starts for everyone using this. Both
+// of these work off the business day above, so "this week" means the same
+// thing here as it does to the ledger.
+export function startOfWeekStr() {
+  const today = new Date(`${todayStr()}T00:00:00.000Z`);
+  // getUTCDay: 0 is Sunday, which belongs to the week that has just ended.
+  const backToMonday = (today.getUTCDay() + 6) % 7;
+  today.setUTCDate(today.getUTCDate() - backToMonday);
+  return today.toISOString().slice(0, 10);
+}
+
+export function startOfMonthStr() {
+  return `${todayStr().slice(0, 7)}-01`;
+}
