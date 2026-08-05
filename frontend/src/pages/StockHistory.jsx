@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
-import StorePicker from '../components/StorePicker';
+import SearchSelect, { RECENT_STORES } from '../components/SearchSelect';
 import EmptyState from '../components/EmptyState';
 import { HistoryIcon } from '../components/icons';
 import { formatDate, todayStr, daysAgoStr } from '../utils/date';
@@ -10,6 +10,7 @@ import { formatDate, todayStr, daysAgoStr } from '../utils/date';
 // StockHistory treats "no store" as every store, so this row's id is the
 // empty string the query already uses.
 const ALL_STORES = { id: '', name: 'All stores' };
+const ALL_PRODUCTS = { id: '', name: 'All products' };
 
 export default function StockHistory() {
   const { user } = useAuth();
@@ -67,16 +68,9 @@ export default function StockHistory() {
       <div className="card form-card">
         <div className="inline-form">
           {showStorePicker && (
-            <StorePicker stores={stores} value={storeId} firstOption={ALL_STORES} onChange={setStoreId} />
+            <SearchSelect options={stores} value={storeId} firstOption={ALL_STORES} onChange={setStoreId} recentKey={RECENT_STORES} />
           )}
-          <select value={productId} onChange={(e) => setProductId(e.target.value)}>
-            <option value="">All products</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <SearchSelect options={products} value={productId} firstOption={ALL_PRODUCTS} onChange={setProductId} />
           <label className="inline-date">
             From
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />

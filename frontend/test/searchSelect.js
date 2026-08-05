@@ -1,11 +1,11 @@
-// The store picker's filtering and highlighting. Fifty stores means the wrong
+// The picker's filtering and highlighting. Fifty stores means the wrong
 // store is one mistyped tap away, and a delivery booked against it is a
 // stock movement someone has to unwind by hand.
 //
 // Run: npm test (from frontend/).
 
 import assert from 'node:assert/strict';
-import { matchParts, rankStores } from '../src/lib/storePicker.js';
+import { matchParts, rankOptions, readRecent, pushRecent } from '../src/lib/searchSelect.js';
 
 function check(name, fn) {
   try {
@@ -26,30 +26,30 @@ const stores = [
 const names = (list) => list.map((s) => s.name);
 
 check('an empty query keeps every store, in the order given', () => {
-  assert.deepEqual(names(rankStores(stores, '')), ['Anna Nagar', 'Adyar', 'Nagarjuna Circle', 'T Nagar']);
-  assert.deepEqual(names(rankStores(stores, '   ')), names(stores));
+  assert.deepEqual(names(rankOptions(stores, '')), ['Anna Nagar', 'Adyar', 'Nagarjuna Circle', 'T Nagar']);
+  assert.deepEqual(names(rankOptions(stores, '   ')), names(stores));
 });
 
 check('matches anywhere in the name, ignoring case', () => {
-  assert.deepEqual(names(rankStores(stores, 'nagar')), ['Anna Nagar', 'Nagarjuna Circle', 'T Nagar']);
-  assert.deepEqual(names(rankStores(stores, 'NAGAR')), names(rankStores(stores, 'nagar')));
-  assert.deepEqual(names(rankStores(stores, 'circ')), ['Nagarjuna Circle']);
-  assert.deepEqual(rankStores(stores, 'zzz'), []);
+  assert.deepEqual(names(rankOptions(stores, 'nagar')), ['Anna Nagar', 'Nagarjuna Circle', 'T Nagar']);
+  assert.deepEqual(names(rankOptions(stores, 'NAGAR')), names(rankOptions(stores, 'nagar')));
+  assert.deepEqual(names(rankOptions(stores, 'circ')), ['Nagarjuna Circle']);
+  assert.deepEqual(rankOptions(stores, 'zzz'), []);
 });
 
 check('recent picks come first, and the rest keep their order', () => {
-  assert.deepEqual(names(rankStores(stores, '', [4, 2])), ['T Nagar', 'Adyar', 'Anna Nagar', 'Nagarjuna Circle']);
+  assert.deepEqual(names(rankOptions(stores, '', [4, 2])), ['T Nagar', 'Adyar', 'Anna Nagar', 'Nagarjuna Circle']);
   // Recents that don't match the query stay filtered out.
-  assert.deepEqual(names(rankStores(stores, 'nagar', [2, 4])), ['T Nagar', 'Anna Nagar', 'Nagarjuna Circle']);
+  assert.deepEqual(names(rankOptions(stores, 'nagar', [2, 4])), ['T Nagar', 'Anna Nagar', 'Nagarjuna Circle']);
 });
 
 check('a recent id stored as a string still matches its store', () => {
-  assert.deepEqual(names(rankStores(stores, '', ['4']))[0], 'T Nagar');
+  assert.deepEqual(names(rankOptions(stores, '', ['4']))[0], 'T Nagar');
 });
 
-check('rankStores does not reorder the caller list', () => {
+check('rankOptions does not reorder the caller list', () => {
   const original = [...stores];
-  rankStores(stores, '', [4]);
+  rankOptions(stores, '', [4]);
   assert.deepEqual(stores, original);
 });
 
@@ -69,4 +69,14 @@ check('highlighting covers every occurrence and loses no characters', () => {
 check('an unmatched query leaves the name as one plain run', () => {
   assert.deepEqual(matchParts('Adyar', 'zz'), [{ text: 'Adyar', hit: false }]);
   assert.deepEqual(matchParts('Adyar', ''), [{ text: 'Adyar', hit: false }]);
+});
+
+// The product picker passes no key on purpose, so that the catalogue's
+// deliberate order survives. localStorage doesn't exist here, which is also
+// what the browser looks like in private mode.
+check('no key means no recents, and nothing thrown', () => {
+  assert.deepEqual(readRecent(), []);
+  assert.deepEqual(readRecent(null), []);
+  assert.deepEqual(pushRecent(null, 3), [3]);
+  assert.deepEqual(names(rankOptions(stores, '', readRecent())), names(stores));
 });

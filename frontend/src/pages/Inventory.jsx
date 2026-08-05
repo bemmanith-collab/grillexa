@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import WastageModal from '../components/WastageModal';
 import StockDetailModal from '../components/StockDetailModal';
 import DailyWisdom from '../components/DailyWisdom';
-import StorePicker from '../components/StorePicker';
+import SearchSelect, { RECENT_STORES } from '../components/SearchSelect';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { BoxIcon } from '../components/icons';
@@ -98,7 +98,7 @@ export default function Inventory() {
         </div>
         <div className="page-header-actions">
           {showStorePicker && stores.length > 0 && (
-            <StorePicker stores={stores} value={storeId} firstOption={ALL_STORES} onChange={setStoreId} />
+            <SearchSelect options={stores} value={storeId} firstOption={ALL_STORES} onChange={setStoreId} recentKey={RECENT_STORES} />
           )}
         </div>
       </div>

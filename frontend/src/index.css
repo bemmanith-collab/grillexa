@@ -400,10 +400,6 @@ select {
 .form-card {
   padding: 18px 20px;
   margin-bottom: 20px;
-  /* .card hides overflow to keep tables inside its rounded corners. A form
-     card holds no table, but it does hold the store picker, whose results
-     list hangs below the field — clipped to the card it showed two rows. */
-  overflow: visible;
 }
 
 .data-table {
@@ -2190,10 +2186,11 @@ button:disabled {
   }
 }
 
-/* Searchable store picker. The results list is absolutely positioned so
-   opening it doesn't shove the rest of the form down the page, and every row
-   clears 44px — the smallest thing a thumb can hit reliably. */
-.store-picker {
+/* Searchable picker (stores, products). Every row clears 44px — the smallest
+   thing a thumb can hit reliably. The results list is position: fixed and
+   placed from JS: absolute positioning left it clipped by whichever ancestor
+   scrolls, and one of these lives inside the line-items table's scroller. */
+.search-select {
   position: relative;
   flex: 1;
   min-width: 200px;
@@ -2202,22 +2199,18 @@ button:disabled {
 
 /* The forms style their own inputs (.bill-form-header input, .inline-form
    input), which would paint a second border inside the search box. */
-.store-picker .search-input input {
+.search-select .search-input input {
   border: none;
   padding: 0;
   background: transparent;
   min-width: 0;
 }
 
-.store-picker-results {
-  position: absolute;
-  /* Above the page, below the phone's top bar and tab bar (30–45) — a list
+.search-select-results {
+  position: fixed;
+  /* Above the page, below the phone's top bar and tab bar (30-45) - a list
      scrolled up under the sticky header should pass behind it. */
   z-index: 20;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  max-height: 45vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   margin: 0;
@@ -2229,7 +2222,7 @@ button:disabled {
   box-shadow: var(--shadow);
 }
 
-.store-picker-results li {
+.search-select-results li {
   display: flex;
   align-items: center;
   min-height: 44px;
@@ -2240,11 +2233,11 @@ button:disabled {
   cursor: pointer;
 }
 
-.store-picker-results li[aria-selected='true'] {
+.search-select-results li[aria-selected='true'] {
   background: var(--border-soft);
 }
 
-.store-picker-results mark {
+.search-select-results mark {
   background: var(--primary-soft);
   color: var(--primary);
   font-weight: 600;
@@ -2252,7 +2245,20 @@ button:disabled {
   padding: 0 1px;
 }
 
-.store-picker-empty {
+.search-select-empty {
   color: var(--text-muted);
   cursor: default;
+}
+
+/* In a line-items row the picker is one control among six, so it takes the
+   tighter padding the other cell controls use and drops the 200px floor -
+   .col-product already floors the column at a readable width. */
+.line-items .search-select {
+  min-width: 0;
+}
+
+.line-items .search-select .search-input {
+  padding: 6px 8px;
+  min-width: 0;
+  border-radius: 6px;
 }

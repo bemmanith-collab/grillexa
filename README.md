@@ -51,15 +51,17 @@ Numbers run in tens (10, 20, 30 …) so a product can be slotted between two oth
 
 Seeding it from a migration is worth doing carefully: the first attempt matched `lower(name) = 'mixed sprouts'`, matched no rows on the live catalogue, and left everything at 100 — which looks precisely like the deploy never happened, because alphabetical is the fallback. `backend/scripts/show-catalogue.js` prints the catalogue in the order the app lists it, with names bracketed so stray whitespace shows.
 
-## Picking a store
+## Picking a store or a product
 
-Fifty-odd stores in a `<select>` is a scroll marathon on a phone, so every store dropdown is a **searchable combobox** (`frontend/src/components/StorePicker.jsx`): type any part of a name, matches are filtered case-insensitively and the matching text is highlighted. Arrow keys move, Enter picks, Escape closes; Enter with the list shut still submits the form. Rows are 44px so a thumb hits them, and the input is 16px so iOS doesn't zoom the page on focus.
+Fifty-odd stores in a `<select>` is a scroll marathon on a phone, so every store and product dropdown is a **searchable combobox** (`frontend/src/components/SearchSelect.jsx`): type any part of a name, matches are filtered case-insensitively and the matching text is highlighted. Arrow keys move, Enter picks, Escape closes; Enter with the list shut still submits the form. Rows are 44px so a thumb hits them, and the input is 16px so iOS doesn't zoom the page on focus.
 
-The stores this **device** picked most recently float to the top — recency, not frequency, because the store being delivered to today is nearly always one from this week's route. It lives in `localStorage`, so a phone that only runs one route keeps its own short list, and losing it costs nothing.
+Below six options it renders the plain native `<select>` instead: already touch-friendly, and a search box over four options is a step, not a shortcut. That is what a Sales account with a couple of stores sees, and — until the catalogue grows — what the product pickers show too.
 
-Below six options the component renders the plain native `<select>` instead: already touch-friendly, and a search box over four stores is a step, not a shortcut. That is the case a Sales account with a couple of stores hits.
+**The results list is `position: fixed`, placed from JS.** Absolute positioning is clipped by whichever ancestor scrolls, and one of these pickers lives in a table cell inside `.table-scroll`: the list opened *inside* the horizontal scroller. Fixed escapes every clipping ancestor, at the price of following the field on scroll and resize, and of flipping above the field when there isn't room below — a line near the bottom of the form, or a phone keyboard eating half the screen.
 
-Used on **Deliver to Store**, **Direct Sale**, **Today's Stock** and **Stock History**. The filter pages pass an "All Stores" row and the forms pass "Select a store…" through the same `firstOption` prop — a pinned row that is never counted as a recent pick. Settle Consignment has no store dropdown; it filters its list by a text search that already matches store names. The filtering and highlighting are pure functions in `frontend/src/lib/storePicker.js`, covered by `frontend/test/storePicker.js`.
+**Recents are opt-in, per picker.** The stores this **device** picked most recently float to the top — recency, not frequency, because the store being delivered to today is nearly always one from this week's route. Products deliberately have none: the catalogue has one order for everyone (see Product order above), and a device's habits have no business reshuffling it. The `localStorage` key is the caller's, so no picker can mistake another's ids for its own — store 3 and product 3 are different things.
+
+Stores: **Deliver to Store**, **Direct Sale**, **Today's Stock**, **Stock History**. Products: the **line items editor** (Deliver to Store, Direct Sale, Dispatches) and Stock History's filter. The filter pages pass an "All Stores"/"All products" row and the forms pass "Select a store…" through the same `firstOption` prop — a pinned row that is never counted as a recent pick. Settle Consignment has no store dropdown; it filters its list by a text search that already matches store names. The filtering and highlighting are pure functions in `frontend/src/lib/searchSelect.js`, covered by `frontend/test/searchSelect.js`.
 
 ## Roles & permissions
 
@@ -209,16 +211,17 @@ grillexa/
 │   │   │                StoreAssignModal, ChangePasswordModal,
 │   │   │                ResetPasswordModal, InstallAppButton, DailyWisdom,
 │   │   │                ProtectedRoute, RouteErrorBoundary, Toast, Spinner,
-│   │   │                EmptyState, StorePicker (searchable store combobox),
+│   │   │                EmptyState, SearchSelect (the searchable
+│   │   │                store/product dropdown),
 │   │   │                icons.jsx
 │   │   ├── lib/         businessInfo.js, invoice.js (jsPDF), format.js,
 │   │   │                greeting.js, reorder.js, returnReasons.js,
-│   │   │                storePicker.js (store filter/highlight/recents)
+│   │   │                searchSelect.js (filter/highlight/recents)
 │   │   ├── utils/date.js         business-timezone "today"
 │   │   └── pages/       Login, Inventory (Today's Stock), DeliverToStore,
 │   │                    SettleConsignment, DirectSale, Sales, Dispatches,
 │   │                    Products, StockHistory, Reports, Stores, Users
-│   ├── test/            invoice.js, greeting.js, storePicker.js   (npm test)
+│   ├── test/            invoice.js, greeting.js, searchSelect.js   (npm test)
 │   └── vite.config.js   dev proxy, build target down to iOS 14
 ├── Dockerfile        production image for Fly (backend + frontend + Nginx)
 ├── entrypoint.sh     runs `prisma migrate deploy`, then Node + Nginx

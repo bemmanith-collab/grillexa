@@ -1,4 +1,5 @@
 import React from 'react';
+import SearchSelect from './SearchSelect';
 import { RETURN_REASONS } from '../lib/returnReasons';
 import { formatCurrency } from '../lib/format';
 
@@ -74,13 +75,15 @@ export default function LineItemsForm({ products, lines, setLines, allowReturns 
                   </td>
                 )}
                 <td className="col-product">
-                  <select value={line.productId} onChange={(e) => handleProductChange(i, e.target.value)}>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                  {/* No recentKey: the catalogue order is a deliberate one
+                      (see Product order in the README), and this device's
+                      habits have no business reshuffling it. */}
+                  <SearchSelect
+                    options={products}
+                    value={line.productId}
+                    onChange={(id) => handleProductChange(i, id)}
+                    placeholder="Search products…"
+                  />
                 </td>
                 <td>
                   <input
