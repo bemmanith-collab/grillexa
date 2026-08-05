@@ -17,3 +17,11 @@ Error: no access token available. Please login with 'flyctl auth login'
 ```
 Error: no access token available. Please login with 'flyctl auth login'
 ```
+
+---
+
+## 2026-08-05 (run 3, exit 1)
+
+```
+Error: no access token available. Please login with 'flyctl auth login'
+```
