@@ -5,11 +5,14 @@ import { useAuth } from '../context/AuthContext';
 import WastageModal from '../components/WastageModal';
 import StockDetailModal from '../components/StockDetailModal';
 import DailyWisdom from '../components/DailyWisdom';
+import StorePicker from '../components/StorePicker';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { BoxIcon } from '../components/icons';
 import { formatCurrency } from '../lib/format';
 import { formatDate, todayStr } from '../utils/date';
+
+const ALL_STORES = { id: 'all', name: 'All Stores' };
 
 export default function Inventory() {
   const { user } = useAuth();
@@ -95,17 +98,7 @@ export default function Inventory() {
         </div>
         <div className="page-header-actions">
           {showStorePicker && stores.length > 0 && (
-            <select
-              value={storeId}
-              onChange={(e) => setStoreId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            >
-              <option value="all">All Stores</option>
-              {stores.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <StorePicker stores={stores} value={storeId} firstOption={ALL_STORES} onChange={setStoreId} />
           )}
         </div>
       </div>

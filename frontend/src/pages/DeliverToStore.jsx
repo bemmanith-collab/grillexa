@@ -3,6 +3,7 @@ import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { Search } from 'lucide-react';
 import LineItemsForm, { emptyLine } from '../components/LineItemsForm';
+import StorePicker, { SELECT_A_STORE } from '../components/StorePicker';
 import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
@@ -256,20 +257,15 @@ export default function DeliverToStore() {
               {showStorePicker ? (
                 <label>
                   Store
-                  <select
+                  <StorePicker
+                    stores={stores}
                     value={storeId}
-                    onChange={(e) => {
-                      setStoreId(e.target.value);
+                    firstOption={isScoped ? undefined : SELECT_A_STORE}
+                    onChange={(id) => {
+                      setStoreId(id);
                       setReorderWarning('');
                     }}
-                  >
-                    {!isScoped && <option value="">Select a store…</option>}
-                    {stores.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </label>
               ) : (
                 singleStoreName && (

@@ -51,6 +51,16 @@ Numbers run in tens (10, 20, 30 …) so a product can be slotted between two oth
 
 Seeding it from a migration is worth doing carefully: the first attempt matched `lower(name) = 'mixed sprouts'`, matched no rows on the live catalogue, and left everything at 100 — which looks precisely like the deploy never happened, because alphabetical is the fallback. `backend/scripts/show-catalogue.js` prints the catalogue in the order the app lists it, with names bracketed so stray whitespace shows.
 
+## Picking a store
+
+Fifty-odd stores in a `<select>` is a scroll marathon on a phone, so every store dropdown is a **searchable combobox** (`frontend/src/components/StorePicker.jsx`): type any part of a name, matches are filtered case-insensitively and the matching text is highlighted. Arrow keys move, Enter picks, Escape closes; Enter with the list shut still submits the form. Rows are 44px so a thumb hits them, and the input is 16px so iOS doesn't zoom the page on focus.
+
+The stores this **device** picked most recently float to the top — recency, not frequency, because the store being delivered to today is nearly always one from this week's route. It lives in `localStorage`, so a phone that only runs one route keeps its own short list, and losing it costs nothing.
+
+Below six options the component renders the plain native `<select>` instead: already touch-friendly, and a search box over four stores is a step, not a shortcut. That is the case a Sales account with a couple of stores hits.
+
+Used on **Deliver to Store**, **Direct Sale**, **Today's Stock** and **Stock History**. The filter pages pass an "All Stores" row and the forms pass "Select a store…" through the same `firstOption` prop — a pinned row that is never counted as a recent pick. Settle Consignment has no store dropdown; it filters its list by a text search that already matches store names. The filtering and highlighting are pure functions in `frontend/src/lib/storePicker.js`, covered by `frontend/test/storePicker.js`.
+
 ## Roles & permissions
 
 | Action | Admin | Manager | Sales |
@@ -199,14 +209,16 @@ grillexa/
 │   │   │                StoreAssignModal, ChangePasswordModal,
 │   │   │                ResetPasswordModal, InstallAppButton, DailyWisdom,
 │   │   │                ProtectedRoute, RouteErrorBoundary, Toast, Spinner,
-│   │   │                EmptyState, icons.jsx
+│   │   │                EmptyState, StorePicker (searchable store combobox),
+│   │   │                icons.jsx
 │   │   ├── lib/         businessInfo.js, invoice.js (jsPDF), format.js,
-│   │   │                greeting.js, reorder.js, returnReasons.js
+│   │   │                greeting.js, reorder.js, returnReasons.js,
+│   │   │                storePicker.js (store filter/highlight/recents)
 │   │   ├── utils/date.js         business-timezone "today"
 │   │   └── pages/       Login, Inventory (Today's Stock), DeliverToStore,
 │   │                    SettleConsignment, DirectSale, Sales, Dispatches,
 │   │                    Products, StockHistory, Reports, Stores, Users
-│   ├── test/            invoice.js, greeting.js   (npm test)
+│   ├── test/            invoice.js, greeting.js, storePicker.js   (npm test)
 │   └── vite.config.js   dev proxy, build target down to iOS 14
 ├── Dockerfile        production image for Fly (backend + frontend + Nginx)
 ├── entrypoint.sh     runs `prisma migrate deploy`, then Node + Nginx

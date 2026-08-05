@@ -2,9 +2,14 @@ import React, { useEffect, useState } from 'react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
+import StorePicker from '../components/StorePicker';
 import EmptyState from '../components/EmptyState';
 import { HistoryIcon } from '../components/icons';
 import { formatDate, todayStr, daysAgoStr } from '../utils/date';
+
+// StockHistory treats "no store" as every store, so this row's id is the
+// empty string the query already uses.
+const ALL_STORES = { id: '', name: 'All stores' };
 
 export default function StockHistory() {
   const { user } = useAuth();
@@ -62,14 +67,7 @@ export default function StockHistory() {
       <div className="card form-card">
         <div className="inline-form">
           {showStorePicker && (
-            <select value={storeId} onChange={(e) => setStoreId(e.target.value)}>
-              <option value="">All stores</option>
-              {stores.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <StorePicker stores={stores} value={storeId} firstOption={ALL_STORES} onChange={setStoreId} />
           )}
           <select value={productId} onChange={(e) => setProductId(e.target.value)}>
             <option value="">All products</option>

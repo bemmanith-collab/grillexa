@@ -400,6 +400,10 @@ select {
 .form-card {
   padding: 18px 20px;
   margin-bottom: 20px;
+  /* .card hides overflow to keep tables inside its rounded corners. A form
+     card holds no table, but it does hold the store picker, whose results
+     list hangs below the field — clipped to the card it showed two rows. */
+  overflow: visible;
 }
 
 .data-table {
@@ -2184,4 +2188,71 @@ button:disabled {
   .no-print {
     display: none !important;
   }
+}
+
+/* Searchable store picker. The results list is absolutely positioned so
+   opening it doesn't shove the rest of the form down the page, and every row
+   clears 44px — the smallest thing a thumb can hit reliably. */
+.store-picker {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  max-width: 100%;
+}
+
+/* The forms style their own inputs (.bill-form-header input, .inline-form
+   input), which would paint a second border inside the search box. */
+.store-picker .search-input input {
+  border: none;
+  padding: 0;
+  background: transparent;
+  min-width: 0;
+}
+
+.store-picker-results {
+  position: absolute;
+  /* Above the page, below the phone's top bar and tab bar (30–45) — a list
+     scrolled up under the sticky header should pass behind it. */
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 45vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.store-picker-results li {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.store-picker-results li[aria-selected='true'] {
+  background: var(--border-soft);
+}
+
+.store-picker-results mark {
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.store-picker-empty {
+  color: var(--text-muted);
+  cursor: default;
 }
