@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Search, MapPin, Navigation, Phone } from 'lucide-react';
+import { Search, MapPin, Navigation, Phone, Map } from 'lucide-react';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { StoreIcon } from '../components/icons';
@@ -12,6 +12,9 @@ import {
   formatPin,
   accuracyTier,
   formatAccuracy,
+  accuracyLabel,
+  accuracyBadge,
+  mapsPickUrl,
   parseCoordInput,
   coordError,
   ACCURACY_GOOD_M,
@@ -133,25 +136,25 @@ export default function Stores() {
         setGeo({
           busy: false,
           note: '',
-          error: `Location is only accurate to ${formatAccuracy(accuracy)} — that's a guess from wifi or the network, not GPS. The pin is saved but is probably wrong: step outside and Re-capture, or type the address and coordinates yourself.`,
+          error: `📍 ${accuracyLabel(accuracy)}. Your phone used wifi or the mobile network, not GPS — that happens indoors and between tall buildings. Step outside and try again, or open Google Maps below and paste the exact coordinates.`,
         });
         return;
       }
 
-      setGeo({ busy: true, error: '', note: `Got a fix (${formatAccuracy(accuracy)}) — looking up the address…` });
+      setGeo({ busy: true, error: '', note: `📍 ${accuracyLabel(accuracy)} — looking up the address…` });
       try {
         const res = await client.get('/stores/reverse-geocode', { params: { lat, lng } });
         if (res.data.address) apply({ address: res.data.address });
         const caveat =
-          tier === 'rough'
-            ? ` The fix is only ${formatAccuracy(accuracy)}, so check both before saving.`
+          tier === 'fair'
+            ? ' Step outside and try again if you want a tighter pin.'
             : '';
         setGeo({
           busy: false,
           error: '',
           note: res.data.address
-            ? `Address filled in — correct it if it looks wrong.${caveat}`
-            : `Location saved (${formatAccuracy(accuracy)}). No address found for this point, so type it below.`,
+            ? `📍 ${accuracyLabel(accuracy)}. Address filled in — correct it if it looks wrong.${caveat}`
+            : `📍 ${accuracyLabel(accuracy)}. No address found for this point, so type it below.`,
         });
       } catch (err) {
         setGeo({
@@ -218,6 +221,9 @@ export default function Stores() {
   function coordFields(values, apply) {
     const tier = accuracyTier(values.accuracyM);
     const err = coordError(values.lat, values.lng);
+    // Only when the pin is doubtful or missing — a good fix needs no escape
+    // hatch, and offering one there just invites second-guessing.
+    const mapsPick = tier === 'good' ? '' : mapsPickUrl(values);
     function setPart(part, text) {
       const parsed = parseCoordInput(text);
       if (parsed && parsed.lng !== undefined) return apply({ lat: parsed.lat, lng: parsed.lng, accuracyM: null });
@@ -243,9 +249,8 @@ export default function Stores() {
           onChange={(e) => setPart('lng', e.target.value)}
         />
         {values.accuracyM != null && (
-          <span className={`accuracy-badge accuracy-${tier}`} title="How precise the GPS reading was">
-            {formatAccuracy(values.accuracyM)}
-            {tier === 'poor' ? ' — probably wrong' : tier === 'rough' ? ' — check it' : ''}
+          <span className={`accuracy-badge accuracy-${tier}`} title="How far off this pin could be">
+            {accuracyLabel(values.accuracyM)}
           </span>
         )}
         {hasPin(values) && (
@@ -258,15 +263,39 @@ export default function Stores() {
           </button>
         )}
         {err && <div className="form-warning coord-error">{err}</div>}
-        <span className="form-hint coord-hint">Paste a “lat, lng” pair from Google Maps into either box.</span>
+        {/* The dependable path where GPS isn't: find the shutter by eye on the
+            map, long-press it, and paste the pair back. Offered whenever the
+            fix is worth doubting — or when there is no fix at all. */}
+        {mapsPick && (
+          <a
+            className="btn-secondary btn-sm coord-maps-link"
+            href={mapsPick}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Map size={14} />
+            Find it on Google Maps
+          </a>
+        )}
+        <span className="form-hint coord-hint">
+          {mapsPick
+            ? 'On Google Maps, long-press the shop → copy the coordinates → paste them into the Latitude box.'
+            : 'Paste a “lat, lng” pair from Google Maps into either box.'}
+        </span>
       </div>
     );
   }
 
-  function locateButton(apply, label) {
+  // One button, not two. It always retried — tapping it again is what a retry
+  // is — but after a doubtful fix it has to SAY so, and say what to do
+  // differently, or the reasonable reading is that GPS simply failed.
+  function locateButton(values, apply, label) {
+    const tier = accuracyTier(values.accuracyM);
+    const retryLabel =
+      tier === 'poor' ? '📍 Try again — step outside' : tier === 'fair' ? '📍 Try again' : label;
     return (
       <button type="button" className="btn-secondary btn-locate" onClick={() => locate(apply)} disabled={geo.busy}>
-        {geo.busy ? '⏳ Locating…' : label}
+        {geo.busy ? '⏳ Locating…' : retryLabel}
       </button>
     );
   }
@@ -294,7 +323,7 @@ export default function Stores() {
         <div className="card form-card">
           <form onSubmit={handleCreate}>
             <div className="store-form-locate">
-              {locateButton(applyToForm, '📍 Get Current Location')}
+              {locateButton(form, applyToForm, '📍 Get Current Location')}
               <span className="form-hint">Stand at the store and tap this — it fills the address and saves the exact spot.</span>
             </div>
             {geo.note && <div className="form-success">{geo.note}</div>}
@@ -383,7 +412,7 @@ export default function Stores() {
                           {coordFields(editForm, applyToEdit)}
                         </td>
                         <td className="actions-cell">
-                          {locateButton(applyToEdit, hasPin(editForm) ? '📍 Re-capture' : '📍 Capture GPS')}
+                          {locateButton(editForm, applyToEdit, hasPin(editForm) ? '📍 Re-capture' : '📍 Capture GPS')}
                           <button className="btn-secondary btn-sm" onClick={() => setEditingId(null)}>
                             Cancel
                           </button>
@@ -407,8 +436,11 @@ export default function Stores() {
                               <MapPin size={12} />
                               <span className="cell-mono">{formatPin(s)}</span>
                               {s.accuracyM != null && (
-                                <span className={`accuracy-badge accuracy-${accuracyTier(s.accuracyM)}`}>
-                                  {formatAccuracy(s.accuracyM)}
+                                <span
+                                  className={`accuracy-badge accuracy-${accuracyTier(s.accuracyM)}`}
+                                  title={accuracyLabel(s.accuracyM)}
+                                >
+                                  {accuracyBadge(s.accuracyM)}
                                 </span>
                               )}
                             </div>

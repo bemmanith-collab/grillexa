@@ -14,6 +14,9 @@ import {
   coordError,
   accuracyTier,
   formatAccuracy,
+  accuracyLabel,
+  accuracyBadge,
+  mapsPickUrl,
 } from '../src/lib/storeLinks.js';
 
 function check(name, fn) {
@@ -113,8 +116,8 @@ check('a transposed or out-of-range pair is caught at the keyboard', () => {
 check('accuracy tiers separate a GPS fix from a wifi guess', () => {
   assert.equal(accuracyTier(8), 'good');
   assert.equal(accuracyTier(50), 'good');
-  assert.equal(accuracyTier(51), 'rough');
-  assert.equal(accuracyTier(500), 'rough');
+  assert.equal(accuracyTier(51), 'fair');
+  assert.equal(accuracyTier(500), 'fair');
   assert.equal(accuracyTier(3000), 'poor');
   assert.equal(accuracyTier(null), 'unknown');
   assert.equal(accuracyTier(0), 'unknown');
@@ -125,4 +128,26 @@ check('accuracy reads in the unit a person would say it in', () => {
   assert.equal(formatAccuracy(950), '±950m');
   assert.equal(formatAccuracy(3200), '±3.2km');
   assert.equal(formatAccuracy(null), '');
+});
+
+check('the accuracy label names the tier and says what to do about it', () => {
+  assert.equal(accuracyLabel(9), 'GPS accuracy: ±9m (good)');
+  assert.equal(accuracyLabel(240), 'GPS accuracy: ±240m (fair — check the address)');
+  assert.equal(accuracyLabel(2000), 'GPS accuracy: ±2.0km (poor — step outside)');
+  assert.equal(accuracyLabel(null), '');
+});
+
+check('the row badge is the short form of the same thing', () => {
+  assert.equal(accuracyBadge(9), '±9m good');
+  assert.equal(accuracyBadge(2000), '±2.0km poor');
+  assert.equal(accuracyBadge(null), '');
+});
+
+check('the Maps escape hatch centres on a rough pin, or searches the address', () => {
+  assert.equal(mapsPickUrl({ lat: 13.05, lng: 80.19 }), 'https://www.google.com/maps/@13.05,80.19,19z');
+  assert.equal(
+    mapsPickUrl({ name: 'Adyar', address: 'LB Road, Chennai' }),
+    'https://www.google.com/maps/search/?api=1&query=Adyar%20LB%20Road%2C%20Chennai'
+  );
+  assert.equal(mapsPickUrl({}), '');
 });

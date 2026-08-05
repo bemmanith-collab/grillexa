@@ -17,6 +17,19 @@ export function hasPin(store) {
   return Number.isFinite(store?.lat) && Number.isFinite(store?.lng);
 }
 
+// Opens Google Maps so the exact spot can be found by eye and its coordinates
+// copied back. This is the reliable path where GPS isn't: long-press the shop
+// on the map, copy the pair, paste it into the latitude box.
+//
+// Centred on the rough pin when there is one — that's the neighbourhood to
+// look around in — and otherwise searching whatever address was typed. Zoom 19
+// is close enough to tell one shutter from the next.
+export function mapsPickUrl(store) {
+  if (hasPin(store)) return `https://www.google.com/maps/@${store.lat},${store.lng},19z`;
+  const query = [store?.name, store?.address].filter(Boolean).join(' ');
+  return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : '';
+}
+
 // Dialers ignore spaces and brackets but choke on letters, and a leading + has
 // to survive — it's what makes a number dialable from outside the country.
 export function telHref(phone) {
@@ -44,8 +57,26 @@ export const ACCURACY_POOR_M = 500;
 export function accuracyTier(metres) {
   if (!Number.isFinite(metres) || metres <= 0) return 'unknown';
   if (metres <= ACCURACY_GOOD_M) return 'good';
-  if (metres <= ACCURACY_POOR_M) return 'rough';
+  if (metres <= ACCURACY_POOR_M) return 'fair';
   return 'poor';
+}
+
+// The badge people actually read. A bare "±2.0km" means nothing to someone who
+// has never thought about GPS accuracy — the word is what carries it, and on
+// the two bad tiers it also says what to do about it.
+export function accuracyLabel(metres) {
+  const tier = accuracyTier(metres);
+  if (tier === 'unknown') return '';
+  const size = formatAccuracy(metres);
+  if (tier === 'good') return `GPS accuracy: ${size} (good)`;
+  if (tier === 'fair') return `GPS accuracy: ${size} (fair — check the address)`;
+  return `GPS accuracy: ${size} (poor — step outside)`;
+}
+
+// Short form for a table row, where the sentence doesn't fit.
+export function accuracyBadge(metres) {
+  const tier = accuracyTier(metres);
+  return tier === 'unknown' ? '' : `${formatAccuracy(metres)} ${tier}`;
 }
 
 export function formatAccuracy(metres) {

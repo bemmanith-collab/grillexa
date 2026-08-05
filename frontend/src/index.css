@@ -2360,7 +2360,7 @@ a.btn-danger {
   color: var(--success);
 }
 
-.accuracy-rough {
+.accuracy-fair {
   background: var(--warn-soft);
   color: var(--warn);
 }
