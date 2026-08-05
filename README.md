@@ -252,6 +252,8 @@ grillexa/
 │   ├── scripts/
 │   │   ├── recompute-ledger.js   ledger repair, dry run unless --apply
 │   │   ├── integrity-check.js    read-only data checks over a date window
+│   │   ├── smoke-analytics.js    post-deploy check of the charts + Excel
+│   │   │                         endpoints, run inside the machine
 │   │   ├── show-catalogue.js     product order as the app lists it
 │   │   ├── crosstab-to-csv.js    cross-tab sheet → offline import CSV
 │   │   ├── offline-import-template.csv  the import's columns, filled in
