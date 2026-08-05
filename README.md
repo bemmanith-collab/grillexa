@@ -4,7 +4,7 @@ Stock and billing for a distributed retail business (sprouts, fruit bowls, banan
 
 - **Backend**: Node.js + Express, Prisma ORM, JWT in an httpOnly cookie, bcrypt
 - **Frontend**: React (Vite), installable as an Android app (PWA)
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL (Neon, Singapore)
 - **Hosted**: Fly.io, region `sin`
 
 ## The consignment model
@@ -309,12 +309,19 @@ flyctl deploy -a grillexa      # from the repo root — fly.toml points at ./Doc
 `entrypoint.sh` runs `prisma migrate deploy` on every container start, before Nginx binds. A migration that fails therefore stops the app from starting: it will not roll back on its own, and needs `flyctl ssh console` and `npx prisma migrate resolve`. Before deploying anything with a migration, know your restore path:
 
 ```bash
-flyctl mpg list --org personal                 # cluster id
-flyctl mpg backup list <cluster-id>            # continuous automated backups
-flyctl mpg restore --help
+npx neonctl@latest branches list            # branches, one per restore point
+# or restore from the last pg_dump — see below
 ```
 
-Database is Fly Managed Postgres (`grillexa-db`, region `sin`, Basic plan), with continuous automated backups. The app image is stateless and holds no volume, so replacing the machine cannot lose data.
+Database is **Neon** (free tier, `ap-southeast-1` Singapore), reached over the public internet from Fly `sin`. Measured from the app machine: **3ms warm, 432ms on the first query after idle** — Neon suspends the compute after ~5 minutes of no queries, so the first action of the morning pays that wake-up once. The `/health` endpoint deliberately does **not** touch the database; if it did, the health check every 15s would keep the compute awake permanently and burn the free tier's 191.9 monthly compute-hours in about eight days.
+
+`DATABASE_URL` uses Neon's **direct** endpoint, not the `-pooler` one. `entrypoint.sh` runs `prisma migrate deploy` on every boot and Prisma migrations are not reliable through PgBouncer. If connection counts ever outgrow the direct endpoint, the fix is a `directUrl` in `schema.prisma` — not simply swapping in the pooled string.
+
+Moved off Fly Managed Postgres on 2026-08-05: a Basic cluster provisioned 10GB to hold **9.6MB** of data, at ~$38/month against ~$0. Migration was `pg_dump --schema=public --no-owner --no-acl` → `psql`, verified by comparing exact row counts, all 13 sequence `last_value`s, constraint/index counts and `_prisma_migrations` on both sides, then running `integrity-check.js` against the new database before cutting over.
+
+Two things that bite on this restore path, both already handled in the dump command above: extensions (`pg_stat_monitor`, `pgaudit` are Percona/Fly-specific and do not exist on Neon — scoping the dump to `--schema=public` leaves them out), and `CREATE SCHEMA public` colliding with the one Neon creates for a new database.
+
+The app image is stateless and holds no volume, so replacing a machine cannot lose data.
 
 `min_machines_running = 1` is deliberate: a cold boot is ~26 seconds because `prisma migrate deploy` runs before Nginx binds, and once the app is installed to a phone home screen that delay is a blank splash screen.
 
@@ -332,7 +339,7 @@ The service worker caches nothing, deliberately — this app writes bills, and a
 
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | Postgres connection string. A Fly secret in production, never committed |
+| `DATABASE_URL` | Postgres connection string — Neon's **direct** endpoint in production, never the pooled one. A Fly secret, never committed |
 | `JWT_SECRET` | Signing secret. The app refuses to start without it |
 | `JWT_EXPIRES_IN` | Token lifetime, default `8h` |
 | `PORT` | Node's port — `4000` locally, `4001` inside the Fly image where Nginx owns `4000` |
