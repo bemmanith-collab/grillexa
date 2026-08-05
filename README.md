@@ -91,10 +91,32 @@ The same button sits in the row editor as **📍 Re-capture**, because fifty sto
 
 The address is stored as the single `Store.address` string the table already had, composed from the geocoded parts. The coordinates and the address text are **independent fields** — editing one never touches the other, and Directions always prefers the coordinates. Schema additions: `lat`, `lng`, `accuracyM`, and `phone` (`phone` because a Call button needs a number and there was nowhere to keep one).
 
+## Personal metrics (the landing page)
+
+Signing in lands on **My Dashboard** (`/`) — one salesperson's day, not the company's. Today's Stock moved to `/stock` and kept its place in the nav.
+
+It shows: how many of your stores you got to, what you took, how that compares with the same weekday last week, consignments you settled, your top three products, where you rank against everyone else selling today, and what needs chasing.
+
+**What a visit means here.** Nothing in this app records a check-in. The GPS work pinned where stores *are*; it never tracked anyone arriving, and there is no `StoreVisit` table. So a visit is inferred from work that can only be done standing in the shop — a bill rung up, stock delivered, or a consignment settled at that store today. This is evidence, not attendance: **someone who walks into a shop and sells nothing counts as missed.** It is honest about what the data can support, and it works from the first day rather than waiting for everyone to start tapping a check-in button. Real check-ins (a `StoreVisit` row written from the phone's GPS on arrival, geofenced against `Store.lat/lng`) would replace `visitedStoreIds()` in `backend/src/lib/dashboard.js` and nothing else.
+
+**Whose number is it.** Personal figures follow **who did the work** (`createdById`), not which store it happened at. Stores are shared between salespeople — crediting by store would pay two people for the same rupees and make the ranking meaningless. Settlement pressure is the one exception: an unsettled consignment is chased by whoever covers that shop, so pending/overdue alerts are scoped to your stores *or* your own deliveries.
+
+**Ranking** is today's takings, highest first, over everyone who sold. Ties share the higher place, so two people level on ₹4,200 are both #2. A Sales account only ever learns its own rank and who is top — per-person amounts are company data and go to Admin/Manager only.
+
+**Overdue** means two full days after delivery with the consignment still `DELIVERED` or `PARTIAL_SETTLED`. Same constant drives the pending count and the alert list, so they cannot disagree.
+
+Admin and Manager land on **their own** metrics (they sell too) and switch with the picker: any individual, or *Everyone* for the company view. Company-wide **reporting** is unchanged and still lives in Reports.
+
+The page refreshes every 5 minutes, but only while it is actually on screen — the app sits open in a pocket all day, and waking it to refetch a screen nobody is reading costs battery and data. Returning to the foreground refreshes immediately. Pull-to-refresh is implemented in the page: installed as an app there is no browser chrome to pull against, and that is the gesture everyone tries first.
+
+No caching layer. It is 8 queries against one day of rows, in parallel; the one thing that actually mattered was an index on `Sale.date`, which every dashboard query needs and none had. Add caching when a measurement says it is slow.
+
 ## Roles & permissions
 
 | Action | Admin | Manager | Sales |
 |---|:--:|:--:|:--:|
+| My Dashboard (own personal metrics) | ✅ | ✅ | ✅ |
+| Dashboard for another person, or company-wide | ✅ | ✅ | ❌ |
 | Today's Stock, Stock History | ✅ any store | ✅ any store | ✅ own stores |
 | Deliver to Store (create / edit consignment) | ✅ any | ✅ any | ✅ own stores |
 | Settle Consignment (incl. edit last settlement) | ✅ any | ✅ any | ✅ own stores |
@@ -202,7 +224,7 @@ grillexa/
 │   │   │                   Consignment(+Item), Settlement(+Line),
 │   │   │                   Sale(+Line), Return,
 │   │   │                   DispatchInvoice(+Line)
-│   │   ├── migrations/     15 migrations
+│   │   ├── migrations/     16 migrations
 │   │   └── seed.js         local only — refuses to run with NODE_ENV=production
 │   ├── scripts/
 │   │   ├── recompute-ledger.js   ledger repair, dry run unless --apply
@@ -214,19 +236,21 @@ grillexa/
 │   ├── src/
 │   │   ├── lib/         stock.js (ledger + cascade), pricing.js (catalogue
 │   │   │                prices), scope.js (store access),
+│   │   │                dashboard.js (personal metrics arithmetic),
 │   │   │                catalogue.js (one product order for every list),
 │   │   │                geocode.js (reverse geocode via Nominatim),
 │   │   │                offlineImport.js (CSV parse, validate, write)
 │   │   ├── middleware/  auth.js (cookie session), role.js
 │   │   ├── routes/      auth, users, products, stores, stock, consignments,
-│   │   │                sales, returns, dispatches, reports, quotes, import
+│   │   │                sales, returns, dispatches, reports, quotes, import,
+│   │   │                dashboard
 │   │   ├── data/        grillingQuotes.js
 │   │   ├── app.js       CORS, cookie parser, login rate limit, route mounting
 │   │   ├── db.js
 │   │   └── index.js
 │   ├── test/            crash-guards.js, stock-cascade.js, stock-rollup.js,
 │   │                    pricing.js, consignment-list.js, offline-import.js,
-│   │                    geocode.js,
+│   │                    geocode.js, dashboard.js,
 │   │                    fake-tx.js (shared in-memory Prisma)   (npm test)
 │   └── .env.example
 ├── frontend/
@@ -249,7 +273,8 @@ grillexa/
 │   │   │                searchSelect.js (filter/highlight/recents),
 │   │   │                storeLinks.js (maps and tel: links)
 │   │   ├── utils/date.js         business-timezone "today"
-│   │   └── pages/       Login, Inventory (Today's Stock), DeliverToStore,
+│   │   └── pages/       Login, Dashboard (personal metrics, the landing
+│   │                    page), Inventory (Today's Stock), DeliverToStore,
 │   │                    SettleConsignment, DirectSale, Sales, Dispatches,
 │   │                    Products, StockHistory, Reports, Stores, Users
 │   ├── test/            invoice.js, greeting.js, searchSelect.js,
@@ -378,6 +403,7 @@ Read from the environment or `.env`. One exception worth knowing: the business's
 | GET | `/api/dispatches`, `/api/dispatches/:id` | Admin, Manager |
 | POST | `/api/dispatches` | Admin, Manager |
 | GET | `/api/reports/summary`, `/pnl?days=`, `/product-sales?days=` | Admin, Manager |
+| GET | `/api/dashboard/salesperson?userId=&date=` | Authenticated — Sales always gets its own day, whatever it asks for; `userId=N` or `userId=all` is Admin/Manager only |
 | GET | `/api/quotes/random` | Authenticated |
 
 ## Tests
@@ -389,7 +415,7 @@ cd frontend && npm test
 
 No framework, no database, no browser — plain Node scripts that print `ok` lines.
 
-Backend, six files:
+Backend, eight files:
 
 - `test/crash-guards.js` — malformed request bodies return 400 rather than killing the process (an unhandled rejection in an async handler exits Node on Express 4), `todayStr` is ISO and round-trips, and public signup stays gone.
 - `test/stock-cascade.js` — the ledger cascade against an in-memory Prisma stub: back-dated writes re-chain later days, moving a document between dates leaves nothing behind, and reversing a bill restores stock exactly.
@@ -397,6 +423,7 @@ Backend, six files:
 - `test/pricing.js` — prices come from the catalogue, a Sales account cannot override one, an edit keeps what the bill already charged, and a product new to the bill prices from the catalogue.
 
 - `test/consignment-list.js` — who sees which consignments, and how many: a manager or admin is never store-scoped (with or without a status filter), a Sales account always is, and the outstanding list is never truncated while the history list still is.
+- `test/dashboard.js` — the numbers people are ranked on: a return subtracts from its product rather than inflating it, a product only returned today is not a "top seller", a tie shares the higher place, a blank baseline gives no percentage instead of an invented one, and the oldest unsettled consignment is chased first.
 - `test/offline-import.js` — the offline CSV import end to end without a database: the parser (quotes, CRLF, a UTF-8 BOM), every rule that stops a bad row reaching the ledger, and the write path against the same in-memory Prisma stub — a re-import creates no second bill and adds no second lot of wastage, a corrected file applies the difference, and wastage entered by hand is not swallowed.
 
 `test/fake-tx.js` is not a test: it is the in-memory Prisma stub `stock-cascade.js` and `offline-import.js` share, so there is one fake to keep honest rather than two that drift. It applies the schema's column defaults on insert the way Postgres does — a fake that returned a defaulted column as `undefined` turned the import's wastage delta into `NaN`, which looked exactly like a bug in the code.

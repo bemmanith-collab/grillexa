@@ -733,6 +733,147 @@ select {
   color: var(--text-muted);
 }
 
+/* ---------- Personal metrics dashboard ---------- */
+
+/* The pull-to-refresh tab. Height is driven from JS by how far the finger has
+   travelled, so it grows out of the top of the page under the thumb. */
+.pull-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: hidden;
+  color: #a9cdd4;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.rank-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--teal);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.rank-banner svg {
+  color: var(--teal);
+  flex-shrink: 0;
+}
+
+/* Top of the board gets the flame, which is the app's "this is the good one"
+   colour everywhere else. */
+.rank-banner-top {
+  border-left-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.rank-banner-top svg {
+  color: var(--primary);
+}
+
+.rank-leader,
+.rank-of {
+  color: var(--text-muted);
+}
+
+/* "6/8" — the target is context, not the figure, so it stays quieter than the
+   count it hangs off. */
+.stat-of {
+  color: var(--text-muted);
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
+.top-products {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.top-product-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 0.92rem;
+}
+
+.top-product-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.top-product-amount {
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.top-product-bar {
+  display: block;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--border-soft);
+  overflow: hidden;
+}
+
+.top-product-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary-grad);
+}
+
+.top-product-qty {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.alerts {
+  display: grid;
+  gap: 10px;
+}
+
+.alert-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.alert-row svg {
+  flex-shrink: 0;
+}
+
+.alert-warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.alert-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.alert-row strong {
+  color: inherit;
+}
+
 /* ---------- Daily Grilling Wisdom ---------- */
 
 .wisdom-card {
@@ -1665,7 +1806,9 @@ button:disabled {
 
   .tabbar {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    /* Five sections plus More. One-word labels (the `short` in Sidebar's NAV)
+       are what keeps six columns legible on a 360px phone. */
+    grid-template-columns: repeat(6, 1fr);
     position: fixed;
     bottom: 0;
     left: 0;
@@ -1693,6 +1836,16 @@ button:disabled {
     color: var(--text-muted);
     text-decoration: none;
     cursor: pointer;
+  }
+
+  /* Six columns on the narrowest phones still in use leaves ~52px each; the
+     label has to give a little rather than wrap under its icon. */
+  @media (max-width: 370px) {
+    .tabbar-item {
+      font-size: 0.62rem;
+      padding-left: 0;
+      padding-right: 0;
+    }
   }
 
   .tabbar-item.active {

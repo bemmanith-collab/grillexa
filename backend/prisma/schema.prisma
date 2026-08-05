@@ -181,6 +181,11 @@ model Sale {
 
   lines      SaleLine[]
   settlement Settlement?
+
+  // Every dashboard load asks four questions about one day's sales, for every
+  // sales person, every five minutes. Without this each one reads the whole
+  // sales history to find them.
+  @@index([date])
 }
 
 // type: "SALE" | "RETURN". A RETURN line credits its quantity back to stock

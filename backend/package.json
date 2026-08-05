@@ -9,7 +9,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "seed": "node prisma/seed.js",
-    "test": "node test/crash-guards.js && node test/stock-cascade.js && node test/stock-rollup.js && node test/pricing.js && node test/consignment-list.js && node test/offline-import.js && node test/geocode.js"
+    "test": "node test/crash-guards.js && node test/stock-cascade.js && node test/stock-rollup.js && node test/pricing.js && node test/consignment-list.js && node test/offline-import.js && node test/geocode.js && node test/dashboard.js"
   },
   "dependencies": {
     "@prisma/client": "^5.19.1",

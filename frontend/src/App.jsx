@@ -8,6 +8,7 @@ import Spinner from './components/Spinner';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 
 const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Dispatches = lazy(() => import('./pages/Dispatches'));
 const DeliverToStore = lazy(() => import('./pages/DeliverToStore'));
@@ -76,6 +77,17 @@ export default function App() {
             <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
             <Route
               path="/"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            {/* Today's Stock used to be the landing page and is still what
+                half the muscle memory in the shop reaches for, so /stock is a
+                real route rather than a redirect. */}
+            <Route
+              path="/stock"
               element={
                 <ProtectedRoute>
                   <Inventory />

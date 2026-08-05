@@ -21,6 +21,7 @@ const returnRoutes = require('./routes/returns');
 const quoteRoutes = require('./routes/quotes');
 const consignmentRoutes = require('./routes/consignments');
 const importRoutes = require('./routes/import');
+const dashboardRoutes = require('./routes/dashboard');
 
 const app = express();
 
@@ -98,6 +99,7 @@ app.use('/api/returns', returnRoutes);
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/consignments', consignmentRoutes);
 app.use('/api/import', importRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

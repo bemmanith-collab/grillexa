@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
+  LayoutDashboard,
   BarChart3,
   Banknote,
   Wallet,
@@ -36,7 +37,8 @@ const STAFF = 'ADMIN MANAGER';
 // the phone tab bar shows the first four and files the rest under More.
 // `short` is the tab-bar label, where there's room for one word.
 const NAV = [
-  { to: '/', end: true, icon: BarChart3, label: "Today's Stock", short: 'Stock', roles: ALL },
+  { to: '/', end: true, icon: LayoutDashboard, label: 'My Dashboard', short: 'Home', roles: ALL },
+  { to: '/stock', icon: BarChart3, label: "Today's Stock", short: 'Stock', roles: ALL },
   { to: '/deliver-to-store', icon: PackageCheck, label: 'Deliver to Store', short: 'Deliver', roles: ALL },
   { to: '/settle-consignment', icon: Handshake, label: 'Settle Consignment', short: 'Settle', roles: ALL },
   { to: '/direct-sale', icon: Wallet, label: 'Direct Sale', short: 'Sale', roles: ALL },
@@ -49,7 +51,10 @@ const NAV = [
   { to: '/users', icon: Users, label: 'Users', roles: 'ADMIN' },
 ];
 
-const PRIMARY_COUNT = 4;
+// Five, not four: the dashboard took a tab and pushing Direct Sale into the
+// More sheet would put a till behind two taps. The bar is sized for six
+// columns (five plus More) in index.css.
+const PRIMARY_COUNT = 5;
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
@@ -151,8 +156,8 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      {/* Phone only. Four sections a shift actually uses, plus More for the
-          rest — which is also what stops an admin's eleven links overflowing
+      {/* Phone only. The sections a shift actually uses, plus More for the
+          rest — which is also what stops an admin's twelve links overflowing
           a screen the way the old drawer did. */}
       <nav className="tabbar" aria-label="Sections">
         {primary.map(({ to, end, icon: Icon, label, short }) => (
