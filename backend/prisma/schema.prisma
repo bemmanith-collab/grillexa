@@ -40,6 +40,13 @@ model Store {
   id        Int      @id @default(autoincrement())
   name      String   @unique
   address   String?
+  phone     String?
+  // Where the store actually is, captured on the phone standing outside it.
+  // The address is a label for humans; these are what a map needs. Nullable
+  // because every store already in the table was added without them, and a
+  // store nobody has walked to yet has no pin.
+  lat       Float?
+  lng       Float?
   createdAt DateTime @default(now())
 
   salesUsers        User[]

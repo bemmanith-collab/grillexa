@@ -2262,3 +2262,56 @@ button:disabled {
   min-width: 0;
   border-radius: 6px;
 }
+
+/* Counterpart to .form-warning for the good news — the GPS fix landed and the
+   address came back filled in. */
+.form-success {
+  background: var(--success-soft);
+  color: var(--success);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  margin-bottom: 14px;
+}
+
+/* Anchors carrying a button class: Directions and Call are links, because a
+   maps URL and a tel: URL are what the phone's own apps hand off from. */
+a.btn-primary,
+a.btn-secondary,
+a.btn-danger {
+  text-decoration: none;
+}
+
+/* ---------- Store location ---------- */
+
+.store-form-locate {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.store-form-locate .form-hint {
+  margin: 0;
+  flex: 1;
+  min-width: 220px;
+}
+
+/* This one is pressed standing outside a shop, one-handed, probably in the
+   sun. 44px is the floor for that; the rest of the form can stay compact. */
+.btn-locate {
+  min-height: 44px;
+  padding: 10px 18px;
+  font-size: 0.9rem;
+}
+
+.store-pin {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}

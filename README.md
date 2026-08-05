@@ -63,6 +63,24 @@ Below six options it renders the plain native `<select>` instead: already touch-
 
 Stores: **Deliver to Store**, **Direct Sale**, **Today's Stock**, **Stock History**. Products: the **line items editor** (Deliver to Store, Direct Sale, Dispatches) and Stock History's filter. The filter pages pass an "All Stores"/"All products" row and the forms pass "Select a store…" through the same `firstOption` prop — a pinned row that is never counted as a recent pick. Settle Consignment has no store dropdown; it filters its list by a text search that already matches store names. The filtering and highlighting are pure functions in `frontend/src/lib/searchSelect.js`, covered by `frontend/test/searchSelect.js`.
 
+## Store location
+
+A store is a shutter on a street, and "Anna Nagar" typed into Maps lands a driver in the middle of a neighbourhood. So a store carries a **GPS pin** — `lat`/`lng`, captured on the phone while standing outside it.
+
+**Adding one.** The 📍 Get Current Location button on the Stores page asks the browser for a fix, saves the coordinates, then reverse geocodes them to fill the address field. The address stays editable: the pin is where someone stood, the text is a label for humans, and the label is the part that is often wrong. A pin can be removed if it was taken in the wrong car park — a bad pin is worse than none, because Directions trusts it over the address.
+
+**The pin is applied before the address lookup is attempted**, not after. The lookup can be slow, rate-limited or down; the fix cannot be typed back in later, so it must never depend on the lookup succeeding. Every failure path — permission denied, no fix, timeout, lookup down — says what to do next and leaves the form usable.
+
+The same button sits in the row editor, because fifty stores were added before pins existed and that is the only way to give them one.
+
+**Directions and Call are for every role**, not just an Admin: the people who drive to these shops are the ones who can't edit them. Directions opens `maps/dir/?api=1&destination=LAT,LNG` when there's a pin, and falls back to a name-and-address search when there isn't — labelled *(approx.)*, so the difference is visible before the drive rather than after. Call is a `tel:` link, shown only when the store has a number. Both are in `frontend/src/lib/storeLinks.js`, covered by `frontend/test/storeLinks.js`.
+
+**Reverse geocoding goes through the API, not the page** (`GET /api/stores/reverse-geocode`, Admin only). Nominatim is free and asks in return for a User-Agent identifying the application — which a browser will not let script set — so the page cannot make this call politely. Routing it through the server also keeps `connect-src 'self'` intact, and gives somewhere to put a rate limit: the whole app shares one outbound IP, and a stuck retry loop would get that IP blocked for everyone. `backend/src/lib/geocode.js` composes the address; Nominatim files the same field under different keys depending on how an area was mapped, so a Chennai suburb arrives as `suburb`, `neighbourhood` or `city_district` and a city as `city`, `town`, `village` or `state_district`.
+
+**Two headers had to change** (`nginx.conf`). `Permissions-Policy` denied geolocation to the whole app, so the button would have failed before the browser ever asked the user — it is now `geolocation=(self)`, still denied to any embedded frame. The CSP is unchanged: the geocode proxy is what makes that possible.
+
+The address is stored as the single `Store.address` string the table already had, composed from the geocoded parts — the schema change here is only `lat`, `lng` and `phone` (`phone` because a Call button needs a number and there was nowhere to keep one).
+
 ## Roles & permissions
 
 | Action | Admin | Manager | Sales |
@@ -174,7 +192,7 @@ grillexa/
 │   │   │                   Consignment(+Item), Settlement(+Line),
 │   │   │                   Sale(+Line), Return,
 │   │   │                   DispatchInvoice(+Line)
-│   │   ├── migrations/     13 migrations
+│   │   ├── migrations/     14 migrations
 │   │   └── seed.js         local only — refuses to run with NODE_ENV=production
 │   ├── scripts/
 │   │   ├── recompute-ledger.js   ledger repair, dry run unless --apply
@@ -187,6 +205,7 @@ grillexa/
 │   │   ├── lib/         stock.js (ledger + cascade), pricing.js (catalogue
 │   │   │                prices), scope.js (store access),
 │   │   │                catalogue.js (one product order for every list),
+│   │   │                geocode.js (reverse geocode via Nominatim),
 │   │   │                offlineImport.js (CSV parse, validate, write)
 │   │   ├── middleware/  auth.js (cookie session), role.js
 │   │   ├── routes/      auth, users, products, stores, stock, consignments,
@@ -197,6 +216,7 @@ grillexa/
 │   │   └── index.js
 │   ├── test/            crash-guards.js, stock-cascade.js, stock-rollup.js,
 │   │                    pricing.js, consignment-list.js, offline-import.js,
+│   │                    geocode.js,
 │   │                    fake-tx.js (shared in-memory Prisma)   (npm test)
 │   └── .env.example
 ├── frontend/
@@ -216,12 +236,14 @@ grillexa/
 │   │   │                icons.jsx
 │   │   ├── lib/         businessInfo.js, invoice.js (jsPDF), format.js,
 │   │   │                greeting.js, reorder.js, returnReasons.js,
-│   │   │                searchSelect.js (filter/highlight/recents)
+│   │   │                searchSelect.js (filter/highlight/recents),
+│   │   │                storeLinks.js (maps and tel: links)
 │   │   ├── utils/date.js         business-timezone "today"
 │   │   └── pages/       Login, Inventory (Today's Stock), DeliverToStore,
 │   │                    SettleConsignment, DirectSale, Sales, Dispatches,
 │   │                    Products, StockHistory, Reports, Stores, Users
-│   ├── test/            invoice.js, greeting.js, searchSelect.js   (npm test)
+│   ├── test/            invoice.js, greeting.js, searchSelect.js,
+│                         storeLinks.js   (npm test)
 │   └── vite.config.js   dev proxy, build target down to iOS 14
 ├── Dockerfile        production image for Fly (backend + frontend + Nginx)
 ├── entrypoint.sh     runs `prisma migrate deploy`, then Node + Nginx
