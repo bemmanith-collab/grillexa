@@ -7,7 +7,7 @@
 // pure, and reverseGeocode() is handed a fake fetch.
 const assert = require('assert');
 
-const { isLatLng, describe: describeFix, reverseGeocode } = require('../src/lib/geocode');
+const { isLatLng, describe: describeFix, reverseGeocode, readCoords } = require('../src/lib/geocode');
 
 // A real Nominatim reply, trimmed to the fields used.
 const chennai = {
@@ -82,6 +82,38 @@ const tests = {
     assert.ok(/grillexa/.test(seen.opts.headers['User-Agent']), 'User-Agent must name the app');
   },
 
+
+  'a valid pin is taken with its accuracy': () => {
+    const r = readCoords({ lat: 13.0878, lng: 80.2103, accuracyM: 12.4 });
+    assert.deepStrictEqual(r, { ok: true, data: { lat: 13.0878, lng: 80.2103, accuracyM: 12.4 } });
+  },
+
+  'a hand-typed pin has no accuracy, and that is a real value': () => {
+    assert.deepStrictEqual(readCoords({ lat: 13, lng: 80 }).data, { lat: 13, lng: 80, accuracyM: null });
+    assert.deepStrictEqual(readCoords({ lat: 13, lng: 80, accuracyM: null }).data.accuracyM, null);
+    assert.deepStrictEqual(readCoords({ lat: 13, lng: 80, accuracyM: -5 }).data.accuracyM, null);
+    assert.deepStrictEqual(readCoords({ lat: 13, lng: 80, accuracyM: 'x' }).data.accuracyM, null);
+  },
+
+  'half a pin is rejected rather than half-saved': () => {
+    for (const body of [{ lat: 13 }, { lng: 80 }, { lat: 13, lng: 'x' }, { lat: 91, lng: 80 }, { lat: 13, lng: 181 }]) {
+      assert.strictEqual(readCoords(body).ok, false, JSON.stringify(body));
+    }
+  },
+
+  'clearing the pin clears its accuracy too': () => {
+    assert.deepStrictEqual(readCoords({ lat: null, lng: null }).data, { lat: null, lng: null, accuracyM: null });
+    assert.deepStrictEqual(readCoords({ lat: '', lng: '' }).data, { lat: null, lng: null, accuracyM: null });
+  },
+
+  'a body that never mentions coordinates leaves the saved pin alone': () => {
+    assert.deepStrictEqual(readCoords({ name: 'Adyar' }).data, {});
+    assert.deepStrictEqual(readCoords({}).data, {});
+  },
+
+  'zero is a real coordinate here too': () => {
+    assert.deepStrictEqual(readCoords({ lat: 0, lng: 0 }).data, { lat: 0, lng: 0, accuracyM: null });
+  },
   'an error from Nominatim is thrown, never returned as an address': async () => {
     await assert.rejects(
       () => reverseGeocode(13, 80, async () => ({ ok: false, status: 429 })),

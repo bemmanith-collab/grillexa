@@ -67,11 +67,17 @@ Stores: **Deliver to Store**, **Direct Sale**, **Today's Stock**, **Stock Histor
 
 A store is a shutter on a street, and "Anna Nagar" typed into Maps lands a driver in the middle of a neighbourhood. So a store carries a **GPS pin** — `lat`/`lng`, captured on the phone while standing outside it.
 
-**Adding one.** The 📍 Get Current Location button on the Stores page asks the browser for a fix, saves the coordinates, then reverse geocodes them to fill the address field. The address stays editable: the pin is where someone stood, the text is a label for humans, and the label is the part that is often wrong. A pin can be removed if it was taken in the wrong car park — a bad pin is worse than none, because Directions trusts it over the address.
+**Adding one.** The 📍 Get Current Location button on the Stores page asks the browser for a fix, saves the coordinates, then reverse geocodes them to fill the address field. Everything it produces is a suggestion: the address is an ordinary editable field, and so are the coordinates — both can be typed over, and the latitude box accepts a whole `lat, lng` pair pasted straight out of Google Maps, which is how anyone fixing a wrong pin actually has the number to hand. A pin can be cleared outright; a bad pin is worse than none, because Directions trusts it over the address.
+
+**It watches for a better fix instead of taking the first one.** The first reading a phone returns is usually the cheap one — wifi or cell tower, hundreds of metres out, sometimes kilometres — and the real GNSS fix arrives seconds later. `getCurrentPosition` hands back that first guess, which is what puts a store on the wrong road. So capture uses `watchPosition`, keeps the most accurate reading seen, stops early once it is within 50m, and settles for the best it managed after 12 seconds.
+
+**Accuracy is recorded and shown, because a bad pin is otherwise invisible.** The browser reports the fix as a radius in metres, and that number is the only thing separating an 8m GNSS fix from a 5km guess — once saved they look identical, and the sole symptom is a driver arriving at the wrong shop. It is stored (`Store.accuracyM`) and shown as a coloured badge on every row: green under 50m, amber to 500m, red beyond. Anything over 500m also **skips the address lookup entirely** — reverse geocoding a point that far out returns a confidently wrong street, and a wrong address that looks authoritative is worse than an empty box. The pin is still saved, with a warning saying to step outside and re-capture or type it in.
+
+Null accuracy means no sensor estimate: a pin typed by hand, or one saved before this was recorded.
 
 **The pin is applied before the address lookup is attempted**, not after. The lookup can be slow, rate-limited or down; the fix cannot be typed back in later, so it must never depend on the lookup succeeding. Every failure path — permission denied, no fix, timeout, lookup down — says what to do next and leaves the form usable.
 
-The same button sits in the row editor, because fifty stores were added before pins existed and that is the only way to give them one.
+The same button sits in the row editor as **📍 Re-capture**, because fifty stores were added before pins existed, and because a fix taken on a bad day needs replacing.
 
 **Directions and Call are for every role**, not just an Admin: the people who drive to these shops are the ones who can't edit them. Directions opens `maps/dir/?api=1&destination=LAT,LNG` when there's a pin, and falls back to a name-and-address search when there isn't — labelled *(approx.)*, so the difference is visible before the drive rather than after. Call is a `tel:` link, shown only when the store has a number. Both are in `frontend/src/lib/storeLinks.js`, covered by `frontend/test/storeLinks.js`.
 
@@ -79,7 +85,7 @@ The same button sits in the row editor, because fifty stores were added before p
 
 **Two headers had to change** (`nginx.conf`). `Permissions-Policy` denied geolocation to the whole app, so the button would have failed before the browser ever asked the user — it is now `geolocation=(self)`, still denied to any embedded frame. The CSP is unchanged: the geocode proxy is what makes that possible.
 
-The address is stored as the single `Store.address` string the table already had, composed from the geocoded parts — the schema change here is only `lat`, `lng` and `phone` (`phone` because a Call button needs a number and there was nowhere to keep one).
+The address is stored as the single `Store.address` string the table already had, composed from the geocoded parts. The coordinates and the address text are **independent fields** — editing one never touches the other, and Directions always prefers the coordinates. Schema additions: `lat`, `lng`, `accuracyM`, and `phone` (`phone` because a Call button needs a number and there was nowhere to keep one).
 
 ## Roles & permissions
 
@@ -192,7 +198,7 @@ grillexa/
 │   │   │                   Consignment(+Item), Settlement(+Line),
 │   │   │                   Sale(+Line), Return,
 │   │   │                   DispatchInvoice(+Line)
-│   │   ├── migrations/     14 migrations
+│   │   ├── migrations/     15 migrations
 │   │   └── seed.js         local only — refuses to run with NODE_ENV=production
 │   ├── scripts/
 │   │   ├── recompute-ledger.js   ledger repair, dry run unless --apply

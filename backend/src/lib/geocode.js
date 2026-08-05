@@ -65,4 +65,23 @@ async function reverseGeocode(lat, lng, fetchImpl = fetch) {
   return describe(await res.json());
 }
 
-module.exports = { isLatLng, describe, reverseGeocode, toParts, toAddressLine };
+// What a store's pin should become, given a request body. A pin without its
+// pair is meaningless and a number out of range is a bug upstream, not a
+// location — either both arrive valid or the store has no pin, never half of
+// one. Returns {} for "the caller didn't mention coordinates", which must
+// leave an existing pin alone on a PATCH.
+function readCoords(body) {
+  const { lat, lng, accuracyM } = body || {};
+  const cleared = lat === null || lng === null || lat === '' || lng === '';
+  if (cleared) return { ok: true, data: { lat: null, lng: null, accuracyM: null } };
+  if (lat === undefined && lng === undefined) return { ok: true, data: {} };
+  const [latNum, lngNum] = [Number(lat), Number(lng)];
+  if (!isLatLng(latNum, lngNum)) return { ok: false, error: 'lat and lng must be a valid coordinate pair' };
+  // A hand-typed pin has no sensor estimate, so absent is a real value here,
+  // not an omission. A nonsense radius is dropped rather than failing the save
+  // — the coordinates are the part worth keeping.
+  const acc = Number(accuracyM);
+  return { ok: true, data: { lat: latNum, lng: lngNum, accuracyM: Number.isFinite(acc) && acc > 0 ? acc : null } };
+}
+
+module.exports = { isLatLng, describe, reverseGeocode, toParts, toAddressLine, readCoords };

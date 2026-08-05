@@ -47,6 +47,11 @@ model Store {
   // store nobody has walked to yet has no pin.
   lat       Float?
   lng       Float?
+  // Radius in metres the browser reported for the fix. Kept because it is the
+  // only thing that tells a 8m GNSS pin from a 5km guess off wifi — they look
+  // identical once saved, and the second one silently sends drivers to the
+  // wrong road. Null for a pin typed in by hand, which has no sensor estimate.
+  accuracyM Float?
   createdAt DateTime @default(now())
 
   salesUsers        User[]

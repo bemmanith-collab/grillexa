@@ -2315,3 +2315,65 @@ a.btn-danger {
   font-size: 0.82rem;
   color: var(--text-muted);
 }
+
+/* Coordinates as editable fields, not a readout: a GPS fix in a dense street
+   is a suggestion, and the fastest repair is pasting the right pair in. */
+.store-coords {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.store-coords-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.store-coords .coord-input {
+  width: 9rem;
+  min-width: 7rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+.store-coords .coord-hint,
+.store-coords .coord-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+/* How far the fix could be off. Colour-coded because the number alone means
+   nothing to someone who has never thought about GPS accuracy. */
+.accuracy-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.accuracy-good {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.accuracy-rough {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.accuracy-poor {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.store-pin-readout {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 0.78rem;
+}

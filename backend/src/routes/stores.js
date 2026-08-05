@@ -3,24 +3,12 @@ const rateLimit = require('express-rate-limit');
 const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
-const { isLatLng, reverseGeocode } = require('../lib/geocode');
+const { isLatLng, reverseGeocode, readCoords } = require('../lib/geocode');
 
 const router = express.Router();
 
 router.use(authenticate);
 
-// A pin without its pair is meaningless, and a number out of range is a bug
-// somewhere upstream, not a location. Either both arrive valid, or the store
-// has no pin — never half of one.
-function readCoords(body) {
-  const { lat, lng } = body;
-  const cleared = lat === null || lng === null || lat === '' || lng === '';
-  if (cleared) return { ok: true, data: { lat: null, lng: null } };
-  if (lat === undefined && lng === undefined) return { ok: true, data: {} };
-  const [latNum, lngNum] = [Number(lat), Number(lng)];
-  if (!isLatLng(latNum, lngNum)) return { ok: false, error: 'lat and lng must be a valid coordinate pair' };
-  return { ok: true, data: { lat: latNum, lng: lngNum } };
-}
 
 // A SALES account sees only its own stores, and never who else is assigned to
 // them. This used to return every store's name and address plus the names of

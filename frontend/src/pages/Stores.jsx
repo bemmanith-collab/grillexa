@@ -5,9 +5,24 @@ import { Search, MapPin, Navigation, Phone } from 'lucide-react';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import { StoreIcon } from '../components/icons';
-import { directionsUrl, telHref, hasPin, formatPin } from '../lib/storeLinks';
+import {
+  directionsUrl,
+  telHref,
+  hasPin,
+  formatPin,
+  accuracyTier,
+  formatAccuracy,
+  parseCoordInput,
+  coordError,
+  ACCURACY_GOOD_M,
+} from '../lib/storeLinks';
 
-const EMPTY_FORM = { name: '', address: '', phone: '', lat: null, lng: null };
+const EMPTY_FORM = { name: '', address: '', phone: '', lat: null, lng: null, accuracyM: null };
+
+// How long to keep watching for a better fix before settling for the best one
+// seen. Long enough for a cold GNSS start, short enough that nobody standing
+// on a footpath gives up on it.
+const WATCH_MS = 12000;
 
 // getCurrentPosition's error codes, in the words of someone holding the phone.
 // A denial is the common one and is not a failure — the address can always be
@@ -64,36 +79,88 @@ export default function Stores() {
   // is the part that can't be typed back in later.
   function locate(apply) {
     if (!navigator.geolocation) {
-      setGeo({ busy: false, error: 'This browser cannot report a location. Type the address below.', note: '' });
+      setGeo({ busy: false, error: 'This browser cannot report a location. Type the address or coordinates below.', note: '' });
       return;
     }
-    setGeo({ busy: true, error: '', note: '' });
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude: lat, longitude: lng } = pos.coords;
-        apply({ lat, lng });
-        setGeo({ busy: true, error: '', note: 'Got the location — looking up the address…' });
-        try {
-          const res = await client.get('/stores/reverse-geocode', { params: { lat, lng } });
-          if (res.data.address) apply({ address: res.data.address });
-          setGeo({
-            busy: false,
-            error: '',
-            note: res.data.address ? 'Address filled in — correct it if it looks wrong.' : 'Location saved. No address found for this point, so type it below.',
-          });
-        } catch (err) {
-          setGeo({
-            busy: false,
-            error: err.response?.data?.error || 'Address lookup failed — the location is saved, type the address below.',
-            note: '',
-          });
-        }
+    setGeo({ busy: true, error: '', note: 'Locating… hold still for a few seconds.' });
+
+    // watchPosition, not getCurrentPosition. The FIRST fix a phone returns is
+    // usually the cheap one — wifi or cell, hundreds of metres out, sometimes
+    // kilometres — and the true GNSS fix arrives seconds later. Taking the
+    // first reading is what puts a store on the wrong road. So: watch, keep
+    // the most accurate reading seen, and stop early once it is good enough.
+    let best = null;
+    let done = false;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
+        setGeo({ busy: true, error: '', note: `Locating… best so far ${formatAccuracy(best.coords.accuracy)}` });
+        if (best.coords.accuracy <= ACCURACY_GOOD_M) finish();
       },
-      (err) => setGeo({ busy: false, error: geoMessage(err), note: '' }),
-      // High accuracy is the point of standing outside the shop. 15s is long
-      // enough for a cold GPS start on a phone that just came out of a pocket.
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      (err) => {
+        if (done) return;
+        // A later error after a good reading isn't a failure — keep what we have.
+        if (best) return finish();
+        done = true;
+        navigator.geolocation.clearWatch(watchId);
+        setGeo({ busy: false, error: geoMessage(err), note: '' });
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
+    // Don't watch forever: a phone that never gets a clean fix must still hand
+    // back the best it managed rather than spinning.
+    const timer = setTimeout(() => finish(), WATCH_MS);
+
+    async function finish() {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      navigator.geolocation.clearWatch(watchId);
+      if (!best) {
+        setGeo({ busy: false, error: "Couldn't get a fix — type the address or coordinates below.", note: '' });
+        return;
+      }
+      const { latitude: lat, longitude: lng, accuracy } = best.coords;
+      const tier = accuracyTier(accuracy);
+      // The pin lands first, always — it is the part that cannot be typed back
+      // in later, and the address lookup may fail or be slow.
+      apply({ lat, lng, accuracyM: Math.round(accuracy) });
+
+      // A fix this coarse would reverse-geocode to a confidently wrong street.
+      // Filling that in is worse than leaving it blank: it looks authoritative
+      // and someone has to notice it is wrong. Keep the pin, skip the address.
+      if (tier === 'poor') {
+        setGeo({
+          busy: false,
+          note: '',
+          error: `Location is only accurate to ${formatAccuracy(accuracy)} — that's a guess from wifi or the network, not GPS. The pin is saved but is probably wrong: step outside and Re-capture, or type the address and coordinates yourself.`,
+        });
+        return;
+      }
+
+      setGeo({ busy: true, error: '', note: `Got a fix (${formatAccuracy(accuracy)}) — looking up the address…` });
+      try {
+        const res = await client.get('/stores/reverse-geocode', { params: { lat, lng } });
+        if (res.data.address) apply({ address: res.data.address });
+        const caveat =
+          tier === 'rough'
+            ? ` The fix is only ${formatAccuracy(accuracy)}, so check both before saving.`
+            : '';
+        setGeo({
+          busy: false,
+          error: '',
+          note: res.data.address
+            ? `Address filled in — correct it if it looks wrong.${caveat}`
+            : `Location saved (${formatAccuracy(accuracy)}). No address found for this point, so type it below.`,
+        });
+      } catch (err) {
+        setGeo({
+          busy: false,
+          error: err.response?.data?.error || 'Address lookup failed — the location is saved, type the address below.',
+          note: '',
+        });
+      }
+    }
   }
 
   async function handleCreate(e) {
@@ -116,7 +183,7 @@ export default function Stores() {
   function startEdit(s) {
     setGeo({ busy: false, error: '', note: '' });
     setEditingId(s.id);
-    setEditForm({ name: s.name, address: s.address || '', phone: s.phone || '', lat: s.lat, lng: s.lng });
+    setEditForm({ name: s.name, address: s.address || '', phone: s.phone || '', lat: s.lat, lng: s.lng, accuracyM: s.accuracyM });
   }
 
   async function handleSaveEdit(id) {
@@ -142,17 +209,56 @@ export default function Stores() {
     }
   }
 
-  // The captured pin, with a way to drop it — a fix taken in the wrong car
-  // park is worse than none, because Directions trusts it over the address.
-  function pinRow(values, apply) {
-    if (!hasPin(values)) return null;
+  // The coordinates, always editable and always visible. GPS is a suggestion
+  // like the address is: where the fix is wrong — and in a dense Indian
+  // street it often is — the fastest repair is pasting the pair straight out
+  // of Google Maps, so the lat box takes "13.0878, 80.2103" as one paste and
+  // splits it. Typing here clears the accuracy reading: it described the
+  // sensor's guess, not this hand-entered pin.
+  function coordFields(values, apply) {
+    const tier = accuracyTier(values.accuracyM);
+    const err = coordError(values.lat, values.lng);
+    function setPart(part, text) {
+      const parsed = parseCoordInput(text);
+      if (parsed && parsed.lng !== undefined) return apply({ lat: parsed.lat, lng: parsed.lng, accuracyM: null });
+      apply({ [part]: parsed ? parsed.lat : null, accuracyM: null });
+    }
     return (
-      <div className="store-pin">
-        <MapPin size={14} />
-        <span className="cell-mono">{formatPin(values)}</span>
-        <button type="button" className="btn-secondary btn-sm" onClick={() => apply({ lat: null, lng: null })}>
-          Remove pin
-        </button>
+      <div className="store-coords">
+        <MapPin size={14} className="store-coords-icon" />
+        <input
+          className="line-input coord-input"
+          inputMode="decimal"
+          placeholder="Latitude"
+          aria-label="Latitude"
+          value={values.lat ?? ''}
+          onChange={(e) => setPart('lat', e.target.value)}
+        />
+        <input
+          className="line-input coord-input"
+          inputMode="decimal"
+          placeholder="Longitude"
+          aria-label="Longitude"
+          value={values.lng ?? ''}
+          onChange={(e) => setPart('lng', e.target.value)}
+        />
+        {values.accuracyM != null && (
+          <span className={`accuracy-badge accuracy-${tier}`} title="How precise the GPS reading was">
+            {formatAccuracy(values.accuracyM)}
+            {tier === 'poor' ? ' — probably wrong' : tier === 'rough' ? ' — check it' : ''}
+          </span>
+        )}
+        {hasPin(values) && (
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={() => apply({ lat: null, lng: null, accuracyM: null })}
+          >
+            Clear
+          </button>
+        )}
+        {err && <div className="form-warning coord-error">{err}</div>}
+        <span className="form-hint coord-hint">Paste a “lat, lng” pair from Google Maps into either box.</span>
       </div>
     );
   }
@@ -193,7 +299,7 @@ export default function Stores() {
             </div>
             {geo.note && <div className="form-success">{geo.note}</div>}
             {geo.error && <div className="form-warning">{geo.error}</div>}
-            {pinRow(form, applyToForm)}
+            {coordFields(form, applyToForm)}
             <div className="inline-form">
               <input
                 placeholder="Store name"
@@ -274,10 +380,10 @@ export default function Stores() {
                             onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                           />
                           {geo.error && <div className="form-warning">{geo.error}</div>}
-                          {pinRow(editForm, applyToEdit)}
+                          {coordFields(editForm, applyToEdit)}
                         </td>
                         <td className="actions-cell">
-                          {locateButton(applyToEdit, hasPin(editForm) ? '📍 Re-locate' : '📍 Locate')}
+                          {locateButton(applyToEdit, hasPin(editForm) ? '📍 Re-capture' : '📍 Capture GPS')}
                           <button className="btn-secondary btn-sm" onClick={() => setEditingId(null)}>
                             Cancel
                           </button>
@@ -292,6 +398,23 @@ export default function Stores() {
                         <td>
                           {s.address || '—'}
                           {s.phone && <div className="cell-muted">{s.phone}</div>}
+                          {/* The pin, in the open. A store whose fix was taken
+                              indoors can be kilometres out, and until it is
+                              shown here the only symptom is a driver ending up
+                              on the wrong road. */}
+                          {hasPin(s) ? (
+                            <div className="cell-muted store-pin-readout">
+                              <MapPin size={12} />
+                              <span className="cell-mono">{formatPin(s)}</span>
+                              {s.accuracyM != null && (
+                                <span className={`accuracy-badge accuracy-${accuracyTier(s.accuracyM)}`}>
+                                  {formatAccuracy(s.accuracyM)}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="cell-muted store-pin-readout">No GPS pin — directions are approximate</div>
+                          )}
                         </td>
                         {/* Directions and Call are for everyone, not just an
                             admin: the people who drive to these shops are the

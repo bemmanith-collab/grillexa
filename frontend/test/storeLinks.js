@@ -5,7 +5,16 @@
 // Run: npm test (from frontend/).
 
 import assert from 'node:assert/strict';
-import { directionsUrl, telHref, hasPin, formatPin } from '../src/lib/storeLinks.js';
+import {
+  directionsUrl,
+  telHref,
+  hasPin,
+  formatPin,
+  parseCoordInput,
+  coordError,
+  accuracyTier,
+  formatAccuracy,
+} from '../src/lib/storeLinks.js';
 
 function check(name, fn) {
   try {
@@ -68,4 +77,52 @@ check('nothing dialable means no Call button', () => {
   assert.equal(telHref(null), '');
   assert.equal(telHref('n/a'), '');
   assert.equal(telHref('12345'), '');
+});
+
+// --- Coordinates typed or pasted by hand, and how much to trust a fix ---
+
+check('a pair pasted from Google Maps lands in both fields', () => {
+  assert.deepEqual(parseCoordInput('13.0878, 80.2103'), { lat: 13.0878, lng: 80.2103 });
+  assert.deepEqual(parseCoordInput('13.0878,80.2103'), { lat: 13.0878, lng: 80.2103 });
+  assert.deepEqual(parseCoordInput('  13.0878 , 80.2103  '), { lat: 13.0878, lng: 80.2103 });
+  assert.deepEqual(parseCoordInput('(13.0878, 80.2103)'), { lat: 13.0878, lng: 80.2103 });
+});
+
+check('southern and western hemispheres survive the paste', () => {
+  assert.deepEqual(parseCoordInput('-33.8688, 151.2093'), { lat: -33.8688, lng: 151.2093 });
+  assert.deepEqual(parseCoordInput('40.7128, -74.0060'), { lat: 40.7128, lng: -74.006 });
+});
+
+check('a lone number is just that field', () => {
+  assert.deepEqual(parseCoordInput('13.0878'), { lat: 13.0878 });
+  assert.deepEqual(parseCoordInput('-13'), { lat: -13 });
+});
+
+check('nothing usable parses to nothing', () => {
+  for (const junk of ['', '   ', 'abc', null, undefined]) assert.equal(parseCoordInput(junk), null);
+});
+
+check('a transposed or out-of-range pair is caught at the keyboard', () => {
+  assert.equal(coordError(13.0878, 80.2103), '');
+  assert.equal(coordError(null, null), '');
+  assert.match(coordError(80.2103, 200), /Longitude/);
+  assert.match(coordError(91, 80), /Latitude/);
+  assert.match(coordError(13.0878, null), /both/);
+});
+
+check('accuracy tiers separate a GPS fix from a wifi guess', () => {
+  assert.equal(accuracyTier(8), 'good');
+  assert.equal(accuracyTier(50), 'good');
+  assert.equal(accuracyTier(51), 'rough');
+  assert.equal(accuracyTier(500), 'rough');
+  assert.equal(accuracyTier(3000), 'poor');
+  assert.equal(accuracyTier(null), 'unknown');
+  assert.equal(accuracyTier(0), 'unknown');
+});
+
+check('accuracy reads in the unit a person would say it in', () => {
+  assert.equal(formatAccuracy(8.4), '±8m');
+  assert.equal(formatAccuracy(950), '±950m');
+  assert.equal(formatAccuracy(3200), '±3.2km');
+  assert.equal(formatAccuracy(null), '');
 });
