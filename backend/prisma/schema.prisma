@@ -36,6 +36,32 @@ model User {
   settlements      Settlement[]
 }
 
+// The Grilling Wisdom Planner: what the business wants said today, and to
+// whom. Two audiences, because they are read in different places and by
+// different people — STAFF lines appear on the dashboard when a salesperson
+// opens the app, CUSTOMER lines print on the footer of their bill.
+//
+// audience: "STAFF" | "CUSTOMER"
+// source:   "CURATED" (written or approved here) | "WEB" (pulled from a quote
+//           API and approved by an admin — nothing reaches a customer's bill
+//           without a person having said yes to it)
+model WisdomMessage {
+  id        Int       @id @default(autoincrement())
+  text      String
+  author    String    @default("The Grillexa Team")
+  audience  String    @default("STAFF")
+  // Pinned to one day. Null means the message is part of the rotating pool,
+  // which is what most of them are — a pinned line is for the day you want to
+  // say something specific.
+  showOn    DateTime?
+  active    Boolean   @default(true)
+  source    String    @default("CURATED")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([audience, active])
+}
+
 model Store {
   id        Int      @id @default(autoincrement())
   name      String   @unique

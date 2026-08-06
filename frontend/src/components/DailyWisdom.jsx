@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Flame, RefreshCw } from 'lucide-react';
+import { Flame } from 'lucide-react';
 import client from '../api/client';
 import { todayStr } from '../utils/date';
 
@@ -8,19 +8,21 @@ const STORAGE_KEY = 'grillexa_daily_quote';
 // variant: 'prominent' (Sales — they need the motivation) or 'subtle' (Admin/Manager).
 export default function DailyWisdom({ variant = 'subtle' }) {
   const [quote, setQuote] = useState(null);
-  const [loading, setLoading] = useState(false);
 
+  // The line comes from the Wisdom Planner and is the same for everyone all
+  // day. There is no shuffle button any more: it used to ask for a *random*
+  // quote, which changed on every page load — and this card now sits on a
+  // dashboard that refreshes itself every five minutes, so the quote would
+  // have moved under the reader several times an hour.
   const fetchQuote = useCallback(async () => {
-    setLoading(true);
     try {
-      const res = await client.get('/quotes/random');
-      const entry = { quote: res.data.quote, author: res.data.author, date: todayStr() };
+      const res = await client.get('/quotes/today', { params: { audience: 'STAFF' } });
+      if (!res.data.message) return;
+      const entry = { quote: res.data.message.text, author: res.data.message.author, date: todayStr() };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(entry));
       setQuote(entry);
     } catch (err) {
       // Purely decorative widget — a failed fetch just means no quote today.
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -54,16 +56,6 @@ export default function DailyWisdom({ variant = 'subtle' }) {
       <div className="wisdom-body">
         <div className="wisdom-header">
           <span className="wisdom-title">Daily Grilling Wisdom</span>
-          <button
-            type="button"
-            className="wisdom-refresh"
-            onClick={fetchQuote}
-            disabled={loading}
-            aria-label="Get a new quote"
-            title="Get a new quote"
-          >
-            <RefreshCw size={14} className={loading ? 'wisdom-spin' : ''} />
-          </button>
         </div>
         <p className="wisdom-quote">&ldquo;{quote.quote}&rdquo;</p>
         <p className="wisdom-author">— {quote.author}</p>

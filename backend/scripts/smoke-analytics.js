@@ -93,6 +93,27 @@ function check(label, ok, detail) {
   // An .xlsx is a zip; "PK" is the first thing in one. A JSON error page is not.
   check('the body is a real workbook', excel.body.slice(0, 2).toString() === 'PK', `${excel.body.length} bytes`);
 
+  // The planner feeds two live surfaces, so both are checked: the card a
+  // salesperson opens the app to, and the footer of a customer's bill.
+  const staffLine = await get('/api/quotes/today?audience=STAFF', cookie);
+  const customerLine = await get('/api/quotes/today?audience=CUSTOMER', cookie);
+  check('GET /quotes/today (staff)', staffLine.status === 200, `status ${staffLine.status}`);
+  check('GET /quotes/today (customer)', customerLine.status === 200, `status ${customerLine.status}`);
+  if (staffLine.status === 200 && customerLine.status === 200) {
+    const staff = JSON.parse(staffLine.body).message;
+    const customer = JSON.parse(customerLine.body).message;
+    check('both audiences have something to say today', Boolean(staff && customer));
+    if (staff) console.log(`        staff:    "${staff.text}"`);
+    if (customer) console.log(`        customer: "${customer.text}"`);
+    // Asked twice, the same answer: the widget refreshes every five minutes
+    // and a quote that changes under the reader is not a daily quote.
+    const again = await get('/api/quotes/today?audience=STAFF', cookie);
+    check(
+      'the day\'s line is stable across requests',
+      JSON.parse(again.body).message?.text === staff?.text
+    );
+  }
+
   const dashboard = await get('/api/dashboard/salesperson', cookie);
   check('GET /dashboard/salesperson', dashboard.status === 200, `status ${dashboard.status}`);
   if (dashboard.status === 200) {

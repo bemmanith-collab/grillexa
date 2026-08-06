@@ -733,6 +733,51 @@ select {
   color: var(--text-muted);
 }
 
+/* ---------- Wisdom Planner ---------- */
+
+.wisdom-today-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.wisdom-today-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+}
+
+.suggestion-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.suggestion-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.suggestion-list .wisdom-quote,
+.suggestion-list .wisdom-author {
+  margin: 0;
+}
+
 /* ---------- Charts & filters ---------- */
 
 /* One row of filters above the charts, wrapping rather than scrolling — on a
