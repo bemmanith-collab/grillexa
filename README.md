@@ -113,7 +113,9 @@ No caching layer. It is 8 queries against one day of rows, in parallel; the one 
 
 ## Charts, and the manager's workbook
 
-Reports carries five charts and one filter bar — date range (Today / This week / This month / Custom), store, product — driving every figure on the page, charts and tables alike. **Tapping a mark drills down** by setting the filter it stands for: a store bar sets the store filter, a product slice or wastage bar sets the product filter, a point on the trend line narrows the whole page to that day. Same state the dropdowns write, so there is one way in and one way back out.
+Reports carries five charts and one filter bar — date range (Today / This week / This month / Custom), store, product, sales person — driving every figure on the page, charts and tables alike. **Tapping a mark drills down** by setting the filter it stands for: a store bar sets the store filter, a product slice or wastage bar sets the product filter, a bar on the sales-people chart sets the person filter, and a point on the trend line narrows the whole page to that day. Same state the dropdowns write, so there is one way in and one way back out.
+
+**The person filter reaches what the data attributes, and says so where it does not.** Sales are credited by who rang the bill up (`createdById`) — the same rule the personal dashboard uses — so the trend, the product mix, the store bars and the P&L table all narrow to one person. Wastage and Units Moved cannot: a stock ledger row records a store and a day and nobody's name, so those two keep showing everything in range, with a line above each saying why rather than leaving someone to notice a chart that did not move. The Excel export is store-and-range wide for the same reason; its Salesperson Performance sheet is where per-person figures live.
 
 All five series arrive in **one** response (`GET /api/reports/analytics`). Five endpoints would mean five round trips on a phone and five slightly different moments in time on one screen.
 
@@ -430,8 +432,8 @@ Read from the environment or `.env`. One exception worth knowing: the business's
 | GET/POST | `/api/returns` | Authenticated, store-scoped |
 | GET | `/api/dispatches`, `/api/dispatches/:id` | Admin, Manager |
 | POST | `/api/dispatches` | Admin, Manager |
-| GET | `/api/reports/summary`, `/pnl`, `/product-sales` | Admin, Manager — the last two take `?from=&to=&storeId=` (and `?productId=` for product-sales), or the older `?days=` |
-| GET | `/api/reports/analytics?from=&to=&storeId=&productId=` | Admin, Manager — every chart series in one response |
+| GET | `/api/reports/summary`, `/pnl`, `/product-sales` | Admin, Manager — the last two take `?from=&to=&storeId=` (plus `?userId=` on pnl, `?productId=` on product-sales), or the older `?days=` |
+| GET | `/api/reports/analytics?from=&to=&storeId=&productId=&userId=` | Admin, Manager — every chart series in one response |
 | GET | `/api/reports/excel?from=&to=&storeId=` | Admin, Manager — six-sheet .xlsx attachment |
 | GET | `/api/dashboard/salesperson?userId=&date=` | Authenticated — Sales always gets its own day, whatever it asks for; `userId=N` or `userId=all` is Admin/Manager only |
 | GET | `/api/quotes/random` | Authenticated |

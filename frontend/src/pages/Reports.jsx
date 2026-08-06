@@ -24,6 +24,7 @@ export default function Reports() {
   const [custom, setCustom] = useState({ from: startOfMonthStr(), to: todayStr() });
   const [storeId, setStoreId] = useState('');
   const [productId, setProductId] = useState('');
+  const [userId, setUserId] = useState('');
 
   const [analytics, setAnalytics] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -39,8 +40,9 @@ export default function Reports() {
     const p = { from, to };
     if (storeId) p.storeId = storeId;
     if (productId) p.productId = productId;
+    if (userId) p.userId = userId;
     return p;
-  }, [from, to, storeId, productId]);
+  }, [from, to, storeId, productId, userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,8 +50,14 @@ export default function Reports() {
     Promise.all([
       client.get('/reports/analytics', { params }),
       client.get('/reports/summary'),
-      client.get('/reports/pnl', { params: { from, to, storeId: storeId || undefined } }),
-      client.get('/reports/product-sales', { params }),
+      client.get('/reports/pnl', {
+        params: { from, to, storeId: storeId || undefined, userId: userId || undefined },
+      }),
+      // No userId: Units Moved comes from the stock ledger, which records a
+      // store and a day and nobody's name — see the note above the table.
+      client.get('/reports/product-sales', {
+        params: { from, to, storeId: storeId || undefined, productId: productId || undefined },
+      }),
     ])
       .then(([a, s, p, ps]) => {
         if (cancelled) return;
@@ -64,7 +72,7 @@ export default function Reports() {
     return () => {
       cancelled = true;
     };
-  }, [params, from, to, storeId]);
+  }, [params, from, to, storeId, productId, userId]);
 
   const excelUrl = `/api/reports/excel?${new URLSearchParams({
     from,
@@ -84,6 +92,10 @@ export default function Reports() {
       if (row?.id) setProductId(String(row.id));
     };
   }
+  function drillToPerson(index) {
+    const row = analytics?.salespersonPerformance[index];
+    if (row?.id) setUserId(String(row.id));
+  }
   function drillToDay(index) {
     const day = analytics?.salesTrend[index];
     if (!day) return;
@@ -93,6 +105,7 @@ export default function Reports() {
 
   const storeName = analytics?.filters.stores.find((s) => String(s.id) === storeId)?.name;
   const productName = analytics?.filters.products.find((p) => String(p.id) === productId)?.name;
+  const personName = analytics?.filters.people.find((p) => String(p.id) === userId)?.name;
 
   if (error) return <div className="page"><div className="form-error">{error}</div></div>;
   if (!analytics || !summary || !pnl || !productSales) return <Spinner label="Loading reports…" />;
@@ -167,9 +180,17 @@ export default function Reports() {
               </option>
             ))}
           </select>
+          <select value={userId} onChange={(e) => setUserId(e.target.value)} aria-label="Sales person">
+            <option value="">All sales people</option>
+            {analytics.filters.people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {(storeId || productId) && (
+        {(storeId || productId || userId) && (
           <div className="filter-group">
             {storeId && (
               <button type="button" className="filter-chip active" onClick={() => setStoreId('')}>
@@ -181,9 +202,21 @@ export default function Reports() {
                 {productName || 'Product'} <X size={13} />
               </button>
             )}
+            {userId && (
+              <button type="button" className="filter-chip active" onClick={() => setUserId('')}>
+                {personName || 'Sales person'} <X size={13} />
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {userId && (
+        <p className="chart-hint">
+          The Excel export covers the store and date range, not the sales person — every person's
+          figures are on its Salesperson Performance sheet.
+        </p>
+      )}
 
       <div className="stat-grid">
         <div className="stat-card">
@@ -270,6 +303,14 @@ export default function Reports() {
 
         <div className="card">
           <h2 className="card-title">Wastage by product</h2>
+          {/* Said out loud rather than left to be inferred from a chart that
+              did not move when the person filter was set. */}
+          {userId && (
+            <p className="chart-hint">
+              Wastage is recorded against a store and a day, never a person — this is all wastage
+              in the range.
+            </p>
+          )}
           {analytics.wastageByProduct.length === 0 ? (
             <EmptyState icon={AlertIcon} message="No wastage recorded. Good." />
           ) : (
@@ -293,6 +334,7 @@ export default function Reports() {
               height={260}
               ariaLabel="Sales by salesperson"
               data={barData(analytics.salespersonPerformance, { label: 'Sales', color: TEAL })}
+              onSelect={drillToPerson}
               options={{ horizontal: true, chart: { indexAxis: 'y' } }}
             />
           )}
@@ -335,6 +377,12 @@ export default function Reports() {
       </div>
 
       <h2 className="section-title" style={{ marginTop: 28 }}>Units Moved by Store</h2>
+      {userId && (
+        <p className="chart-hint">
+          Not filtered by sales person: these come from the stock ledger, which records a store and
+          a day, not who moved the goods.
+        </p>
+      )}
 
       <div className="store-report-grid">
         {productSales.stores.map((store) => (

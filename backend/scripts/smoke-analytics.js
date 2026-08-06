@@ -61,6 +61,27 @@ function check(label, ok, detail) {
     console.log(`        ${analytics.body.toString().slice(0, 300)}`);
   }
 
+  // The person filter, against someone who actually sold: the figures must
+  // come back smaller than the unfiltered ones, not equal to them (a filter
+  // that silently does nothing looks exactly like a quiet salesperson).
+  if (analytics.status === 200) {
+    const all = JSON.parse(analytics.body);
+    const top = all.salespersonPerformance[0];
+    if (top) {
+      const one = await get(`/api/reports/analytics?${range}&userId=${top.id}`, cookie);
+      check('GET /reports/analytics?userId', one.status === 200, `status ${one.status}`);
+      if (one.status === 200) {
+        const data = JSON.parse(one.body);
+        const total = data.salesTrend.reduce((s, d) => s + d.amount, 0);
+        check(
+          `the person filter narrows to ${top.label}`,
+          Math.abs(total - top.amount) < 0.01 && data.salespersonPerformance.length === 1,
+          `₹${total.toFixed(2)} of ₹${all.salesTrend.reduce((s, d) => s + d.amount, 0).toFixed(2)}`
+        );
+      }
+    }
+  }
+
   const excel = await get(`/api/reports/excel?${range}`, cookie);
   check('GET /reports/excel', excel.status === 200, `status ${excel.status}`);
   check(

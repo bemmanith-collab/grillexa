@@ -60,8 +60,16 @@ function optionalId(value) {
 // small reference tables. Lines rather than bills because a line carries its
 // product, which is what makes a product filter — and the product charts —
 // possible at all; summed over a bill they come to the same total.
-async function loadCore({ from, to, storeId, productId }) {
-  const saleWhere = { date: { gte: from, lte: to }, ...(storeId ? { storeId } : {}) };
+// `userId` credits by who rang the bill up (createdById) — the same rule the
+// personal dashboard uses, and the only attribution the data supports. It
+// reaches sale lines and nothing else: a stock ledger row belongs to a store
+// and a day, so wastage cannot be filtered by person, only by store.
+async function loadCore({ from, to, storeId, productId, userId }) {
+  const saleWhere = {
+    date: { gte: from, lte: to },
+    ...(storeId ? { storeId } : {}),
+    ...(userId ? { createdById: userId } : {}),
+  };
   const [lines, wastageEntries, stores, users] = await Promise.all([
     prisma.saleLine.findMany({
       where: { sale: saleWhere, ...(productId ? { productId } : {}) },
@@ -110,8 +118,15 @@ router.get('/analytics', async (req, res) => {
   const { from, to } = parseRange(req.query);
   const storeId = optionalId(req.query.storeId);
   const productId = optionalId(req.query.productId);
+  const userId = optionalId(req.query.userId);
 
-  const { lines, wastageEntries, stores, users } = await loadCore({ from, to, storeId, productId });
+  const { lines, wastageEntries, stores, users } = await loadCore({
+    from,
+    to,
+    storeId,
+    productId,
+    userId,
+  });
   const names = new Map(users.map((u) => [u.id, u.name]));
 
   const storeNames = new Map(stores.map((s) => [s.id, s.name]));
@@ -132,11 +147,19 @@ router.get('/analytics', async (req, res) => {
     storePerformance: withOther(byStore, 10),
     wastageByProduct: withOther(wastageByProduct(wastageEntries), 10, (r) => r.value),
     salespersonPerformance: byPerson,
+    // Wastage is recorded against a store and a day, never against a person,
+    // so a person filter cannot reach it. Said here rather than left for
+    // someone to infer from a chart that did not change when they filtered.
+    wastageIsPersonScoped: false,
     // The filter dropdowns come back with the data — two fewer round trips on
     // a phone, and they can never list a store the figures exclude.
     filters: {
       stores: stores.map((s) => ({ id: s.id, name: s.name })),
       products: byProduct.filter((p) => p.id).map((p) => ({ id: p.id, name: p.label })),
+      // Everyone, not only those who sold in this window: picking a person who
+      // turns out to have sold nothing is a legitimate question, and the empty
+      // chart is the answer to it.
+      people: users.map((u) => ({ id: u.id, name: u.name, role: u.role })),
     },
   });
 });
@@ -348,10 +371,17 @@ router.get('/pnl', async (req, res) => {
   const { from, to } = parseRange(req.query);
   const days = Math.round((to - from) / 86400000) + 1;
   const storeId = optionalId(req.query.storeId);
+  const userId = optionalId(req.query.userId);
 
   const [saleLines, stores] = await Promise.all([
     prisma.saleLine.findMany({
-      where: { sale: { date: { gte: from, lte: to }, ...(storeId ? { storeId } : {}) } },
+      where: {
+        sale: {
+          date: { gte: from, lte: to },
+          ...(storeId ? { storeId } : {}),
+          ...(userId ? { createdById: userId } : {}),
+        },
+      },
       include: { sale: true, product: true },
     }),
     prisma.store.findMany({ where: storeId ? { id: storeId } : {}, orderBy: { name: 'asc' } }),
