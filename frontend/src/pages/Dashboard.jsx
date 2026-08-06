@@ -15,6 +15,7 @@ import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
 import Chart, { lineData, TEAL } from '../components/Chart';
+import DailyWisdom from '../components/DailyWisdom';
 import { formatCurrency } from '../lib/format';
 import { daysAgoStr, todayStr } from '../utils/date';
 
@@ -193,6 +194,12 @@ export default function Dashboard() {
               </span>
             </div>
           )}
+
+          {/* Under the name and the ranking, above the numbers: this is the
+              first page of the day now, which is the whole point of a daily
+              quote. Sales accounts get the prominent card, as they did on
+              Today's Stock. */}
+          <DailyWisdom variant={user.role === 'SALES' ? 'prominent' : 'subtle'} />
 
           <div className="stat-grid">
             <div className={`stat-card${data.visits.missed.length ? ' stat-card-alert' : ''}`}>

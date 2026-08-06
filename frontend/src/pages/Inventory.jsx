@@ -4,7 +4,6 @@ import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import WastageModal from '../components/WastageModal';
 import StockDetailModal from '../components/StockDetailModal';
-import DailyWisdom from '../components/DailyWisdom';
 import SearchSelect, { RECENT_STORES } from '../components/SearchSelect';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
@@ -102,8 +101,6 @@ export default function Inventory() {
           )}
         </div>
       </div>
-
-      <DailyWisdom variant={user.role === 'SALES' ? 'prominent' : 'subtle'} />
 
       {error && <div className="form-error">{error}</div>}
       {isScoped && myStores.length === 0 && (

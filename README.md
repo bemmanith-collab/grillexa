@@ -95,7 +95,9 @@ The address is stored as the single `Store.address` string the table already had
 
 Signing in lands on **My Dashboard** (`/`) — one salesperson's day, not the company's. Today's Stock moved to `/stock` and kept its place in the nav.
 
-It shows: how many of your stores you got to, what you took, how that compares with the same weekday last week, consignments you settled, your top three products, where you rank against everyone else selling today, and what needs chasing.
+It shows: how many of your stores you got to, what you took, how that compares with the same weekday last week, consignments you settled, your top three products, where you rank against everyone else selling today, what needs chasing, and a 30-day trend line.
+
+The **daily grilling quote** moved here from Today's Stock along with the landing page — a quote for the day belongs on the page you land on, and it sits under the ranking so the numbers still come first. Sales accounts get the prominent card, Admin and Manager the subtle one, exactly as before.
 
 **What a visit means here.** Nothing in this app records a check-in. The GPS work pinned where stores *are*; it never tracked anyone arriving, and there is no `StoreVisit` table. So a visit is inferred from work that can only be done standing in the shop — a bill rung up, stock delivered, or a consignment settled at that store today. This is evidence, not attendance: **someone who walks into a shop and sells nothing counts as missed.** It is honest about what the data can support, and it works from the first day rather than waiting for everyone to start tapping a check-in button. Real check-ins (a `StoreVisit` row written from the phone's GPS on arrival, geofenced against `Store.lat/lng`) would replace `visitedStoreIds()` in `backend/src/lib/dashboard.js` and nothing else.
 
