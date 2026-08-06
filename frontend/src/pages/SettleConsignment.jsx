@@ -68,6 +68,23 @@ function SettleForm({ consignment, existingSettlement, onClose, onSettled }) {
     setRows((prev) => prev.map((r) => (r.consignmentItemId === id ? { ...r, ...patch } : r)));
   }
 
+  // Each input caps at remainingQty on its own, but sold and returned are
+  // spent from the same pile: 5 sold + 5 returned against 5 remaining passed
+  // the inputs and was rejected by the server. Flagged per row rather than in
+  // the banner at the top — on a phone the banner is off-screen above a long
+  // list, so the one place the message is certain to be seen is next to the
+  // fields that caused it. itemId -> units over.
+  const overCommitted = useMemo(() => {
+    const over = new Map();
+    for (const r of rows) {
+      const item = effectiveItems.find((i) => i.id === r.consignmentItemId);
+      if (!item) continue;
+      const excess = (Number(r.soldQty) || 0) + (Number(r.returnedQty) || 0) - item.remainingQty;
+      if (excess > 0) over.set(item.id, excess);
+    }
+    return over;
+  }, [rows, effectiveItems]);
+
   const paymentDue = useMemo(() => {
     return rows.reduce((sum, r) => {
       const item = effectiveItems.find((i) => i.id === r.consignmentItemId);
@@ -87,6 +104,10 @@ function SettleForm({ consignment, existingSettlement, onClose, onSettled }) {
       .filter((l) => l.soldQty > 0 || l.returnedQty > 0);
     if (lines.length === 0) {
       setError('Enter a sold or returned quantity for at least one product.');
+      return;
+    }
+    if (overCommitted.size > 0) {
+      setError('Some rows claim more than is still remaining — see the Remaining column.');
       return;
     }
     setSubmitting(true);
@@ -135,7 +156,10 @@ function SettleForm({ consignment, existingSettlement, onClose, onSettled }) {
                   return (
                     <tr key={item.id}>
                       <td className="cell-strong">{item.product}</td>
-                      <td>{item.remainingQty}</td>
+                      <td className={overCommitted.has(item.id) ? 'text-danger' : undefined}>
+                        {item.remainingQty}
+                        {overCommitted.has(item.id) && ` · over by ${overCommitted.get(item.id)}`}
+                      </td>
                       <td>
                         <input
                           type="number"
@@ -173,7 +197,7 @@ function SettleForm({ consignment, existingSettlement, onClose, onSettled }) {
             <button type="button" className="btn-secondary" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn-primary" disabled={submitting}>
+            <button type="submit" className="btn-primary" disabled={submitting || overCommitted.size > 0}>
               {submitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Settle Consignment'}
             </button>
           </div>

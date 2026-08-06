@@ -15,6 +15,8 @@ This is the core of the app. Everything else supports it.
 2. **Settle Consignment** — opens on everything still awaiting settlement, however old, across every store the account can see; a second view adds the settled ones so a recent settlement can be corrected. Each row names who delivered it and who settled it last, to every role: everyone in the business can reach every one of these records, so a consignment that says SETTLED has to say who settled it. Later, the store reports what sold and what is coming back unsold. Settling generates a **Sale** for the sold portion (this is where revenue and GST are recognised) and a **Return** for the unsold portion. A consignment can be settled in more than one pass; `soldQty + returnedQty` can never exceed `deliveredQty`, and the database enforces that with a CHECK constraint.
 3. **Direct Sale** — a cash bill straight to a walk-in customer. Billed and paid immediately, no consignment behind it. Can include RETURN lines, which credit the customer and subtract from the bill.
 
+**Sold and returned come out of the same pile, and the settle form says so per row.** Each input caps at that item's remaining quantity on its own, which let 5 sold + 5 returned through against 5 remaining — the server rejected it, correctly, but only after a round trip. The form now flags the offending row in the **Remaining** column ("5 · over by 5") and disables the submit button. Per row rather than in the error banner at the top: on a phone the banner sits off-screen above a long list of products, so the only place the message is certain to be read is next to the fields that caused it. The server check stays where it was — it is the one that matters, and the client cannot be trusted to have run.
+
 `Dispatches` is the pre-consignment HQ→store transfer flow. It is read-only history; new deliveries go through Deliver to Store.
 
 ## How the ledger works, and what it is not
@@ -42,6 +44,8 @@ The per-day movements (`received`, `sold`, `wastage`) *are* real: each one is a 
 Unit prices are resolved **server-side from the product catalogue** (`backend/src/lib/pricing.js`), never trusted from the request. `GET /api/products` hides `price` from Sales accounts, so a Sales user's form has nothing to send back — trusting the client meant bills saved at ₹0.00 with stock correctly deducted and no error. Admin and Manager may override a price for a negotiated rate; a Sales account gets the catalogue price. Negative prices and fractional quantities are rejected.
 
 **Editing a bill keeps the prices it already charged.** A correction to a phone number must not silently reprice the goods — the bill keeps its number, so a printed copy in someone's hand has to keep matching it. The old prices are read from the saved bill, never from the request, so an edit cannot smuggle a price past the Sales rule; a product added to the bill for the first time prices from the catalogue.
+
+**"Reorder from Last …" is the opposite case, and repeats the order but not the price.** The shortcut on Deliver to Store and Direct Sale copies the previous document's products and quantities, then prices them from *today's* catalogue (`frontend/src/lib/reorder.js`). Carrying the old `pricePerUnit` across re-billed a repeat order at last month's price, and silently — the field looked filled in, so nobody checked it. A product with no catalogue price comes across blank, which the server reads as "use the catalogue price"; it is never sent as an explicit `0`, which the server takes as a deliberate override and would save the bill at zero. A product that has left the catalogue since is dropped and named in a warning rather than silently shrinking the order.
 
 ## Product order
 
@@ -144,6 +148,8 @@ All five series arrive in **one** response (`GET /api/reports/analytics`). Five 
 Three columns that were asked for are **not** in the workbook, because the data behind them does not exist:
 
 - **Wastage has no reason.** It is a counter on the daily stock ledger (`DailyStockEntry.wastage`), not an event log — there is no per-entry row to hang a reason on. Returns are the ledger that carries reasons. Wastage is valued at **cost**, not at the selling price: it is stock paid for and never sold.
+
+- **Wastage is whole units, and has no upper bound.** `DailyStockEntry.wastage` is an `Int`, so a fractional quantity used to clear the route's `Number.isFinite` guard and fail inside the transaction instead, surfacing as a bare 500. Both the form and `POST /api/stock/:storeId/:productId/wastage` now require a positive integer. There is deliberately **no maximum**: the ledger's running balance is meaningless by design (see above), so there is no honest "units on hand" to cap against, and an invented cap would block a real entry.
 - **Stores have no city**, only the one composed `address` string (see *Store location*), so the address goes out whole rather than guessed apart.
 - **A consignment has no wastage figure.** Wastage is recorded against a store and a day, never against the consignment the stock arrived on; any per-consignment number would be invented. It is on the Wastage Breakdown sheet at the grain it actually exists at.
 
@@ -484,7 +490,10 @@ Backend, ten files:
 
 `test/fake-tx.js` is not a test: it is the in-memory Prisma stub `stock-cascade.js` and `offline-import.js` share, so there is one fake to keep honest rather than two that drift. It applies the schema's column defaults on insert the way Postgres does — a fake that returned a defaulted column as `undefined` turned the import's wastage delta into `NaN`, which looked exactly like a bug in the code.
 
-Frontend, two files:
+Frontend, five files:
 
 - `test/greeting.js` — the login greeting's name and time-of-day boundaries. Everyone who logs in sees it, and a greeting can't fail, only be wrong.
 - `test/invoice.js` — a Consignment Note never calls itself an invoice. Both renderers (the WhatsApp text and the PDF) are checked against the same `documentOptions`, the PDF by building it in Node with jsPDF and reading the labels back out of the finished document.
+- `test/searchSelect.js` — the combobox every store and product picker is built on: matching anywhere in the name and case-insensitively, recent picks first without reordering the caller's list, and highlighting that covers every occurrence without losing characters.
+- `test/storeLinks.js` — the Directions and Call links. A wrong maps URL sends a delivery to the wrong end of the city and never looks like an error, so half a pin is never sent as a coordinate, zero is treated as a real coordinate rather than a missing one, and a pair pasted from Google Maps lands in both fields.
+- `test/reorder.js` — "Reorder from Last …" repeats the order, not last month's prices: lines are re-priced from the current catalogue, a product with no price comes back blank rather than as an explicit `0`, and a discontinued product is dropped and named rather than silently removed.

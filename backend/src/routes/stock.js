@@ -274,8 +274,11 @@ router.post('/:storeId/:productId/wastage', async (req, res) => {
   const quantity = Number(req.body.quantity);
   const date = req.body.date ? normalizeDate(req.body.date) : normalizeDate(todayStr());
 
-  if (!Number.isFinite(quantity) || quantity <= 0) {
-    return res.status(400).json({ error: 'quantity must be a positive number' });
+  // Integer, not merely finite: wastage is an Int column, so a fractional
+  // quantity got past this guard and failed inside the transaction instead,
+  // surfacing as a bare 500 that told the user nothing.
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    return res.status(400).json({ error: 'quantity must be a positive whole number of units' });
   }
 
   try {

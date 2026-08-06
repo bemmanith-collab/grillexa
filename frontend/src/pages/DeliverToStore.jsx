@@ -166,7 +166,6 @@ export default function DeliverToStore() {
           productId: i.productId,
           product: i.product,
           quantity: i.deliveredQty,
-          unitPrice: i.pricePerUnit,
         })),
         products
       );
