@@ -41,3 +41,11 @@ Error: no access token available. Please login with 'flyctl auth login'
 ```
 Error: get app: failed to run query ($appName: String!) { appcompact:app(name: $appName) { id internalNumericId name hostname cnameTarget deployed network status appUrl platformVersion organization { id internalNumericId slug paidPlan } postgresAppRole: role { name } } }: Post "https://api.fly.io/graphql": net/http: invalid header field value for "Authorization"
 ```
+
+---
+
+## 2026-08-06 (run 6, exit 1)
+
+```
+Error: get app: failed to run query ($appName: String!) { appcompact:app(name: $appName) { id internalNumericId name hostname cnameTarget deployed network status appUrl platformVersion organization { id internalNumericId slug paidPlan } postgresAppRole: role { name } } }: Post "https://api.fly.io/graphql": net/http: invalid header field value for "Authorization"
+```
