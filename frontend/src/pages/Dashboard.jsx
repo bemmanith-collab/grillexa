@@ -10,12 +10,15 @@ import {
   MapPinOff,
   RefreshCw,
   Download,
+  Trash2,
 } from 'lucide-react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
 import Chart, { lineData, TEAL } from '../components/Chart';
 import DailyWisdom from '../components/DailyWisdom';
+import ShiftWastageModal from '../components/ShiftWastageModal';
+import Toast from '../components/Toast';
 import { formatCurrency } from '../lib/format';
 import { daysAgoStr, todayStr } from '../utils/date';
 
@@ -41,6 +44,8 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [pull, setPull] = useState(0);
+  const [wastageOpen, setWastageOpen] = useState(false);
+  const [toast, setToast] = useState('');
 
   const load = useCallback(async () => {
     setRefreshing(true);
@@ -160,6 +165,12 @@ export default function Dashboard() {
               )}
               <button type="button" className="btn-secondary btn-sm" onClick={load} disabled={refreshing}>
                 <RefreshCw size={15} className={refreshing ? 'icon-spin' : undefined} /> Refresh
+              </button>
+              {/* Everyone, including Sales — they are the ones counting at the
+                  end of their own run. The count has no store on it, so
+                  unlike Today's Stock there is nothing to scope it to. */}
+              <button type="button" className="btn-secondary btn-sm" onClick={() => setWastageOpen(true)}>
+                <Trash2 size={15} /> Record Wastage
               </button>
               {/* The workbook is company detail, so it follows the same rule
                   as Reports: staff only. Covers the last 30 days — the window
@@ -345,6 +356,11 @@ export default function Dashboard() {
 
         </>
       )}
+
+      {wastageOpen && (
+        <ShiftWastageModal onClose={() => setWastageOpen(false)} onSaved={setToast} />
+      )}
+      <Toast message={toast} onDone={() => setToast('')} />
     </div>
   );
 }

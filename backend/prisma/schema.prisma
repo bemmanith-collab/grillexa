@@ -34,6 +34,7 @@ model User {
   returns          Return[]
   consignments     Consignment[]
   settlements      Settlement[]
+  wastages         Wastage[]
 }
 
 // The Grilling Wisdom Planner: what the business wants said today, and to
@@ -114,6 +115,7 @@ model Product {
   saleLines            SaleLine[]
   returns              Return[]
   consignmentItems     ConsignmentItem[]
+  wastages             Wastage[]
 }
 
 // One row per (date, store, product) — the daily stock ledger.
@@ -264,6 +266,50 @@ model Return {
   // enough — the same consignment can be settled in more than one pass).
   settlementId Int?
   settlement   Settlement? @relation(fields: [settlementId], references: [id])
+}
+
+// End-of-shift wastage: what a salesperson counts as spoiled at the end of
+// their run, one row per product they counted.
+//
+// THIS IS NOT DailyStockEntry.wastage, AND THE TWO MUST NEVER BE ADDED
+// TOGETHER. They measure different stock at different points in its life:
+//
+//   DailyStockEntry.wastage  stock that spoiled while sitting in a STORE.
+//                            Per (date, store, product), decrements that
+//                            store's ledger, and is what the Reports wastage
+//                            chart, the Excel Wastage Breakdown sheet and the
+//                            P&L cost line are built from (lib/analytics.js).
+//
+//   Wastage (this table)     stock that spoiled back at HQ, counted at the end
+//                            of a shift. It has no storeId because it has no
+//                            store: unsold consignment stock has already come
+//                            back to HQ as a CONSIGNMENT_UNSOLD Return by the
+//                            time anyone counts it, so there is no store
+//                            ledger left to decrement and no store to blame.
+//
+// Deliberately storeless, and deliberately outside the stock ledger: the app
+// tracks stock in stores, not stock at HQ, so there is nothing here to
+// decrement. That also means there is no "available quantity" to validate a
+// count against — see the route, which caps nothing on purpose.
+//
+// reason: "SPOILED" | "DAMAGED" | "EXPIRED" | "OTHER" — unlike the ledger
+// counter, a per-entry row CAN carry a reason, which is most of why this
+// table earns its place.
+model Wastage {
+  id          Int      @id @default(autoincrement())
+  date        DateTime
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Int
+  reason      String
+  // Who counted it. An end-of-shift count belongs to a person — two people
+  // counting on the same day would otherwise merge into one figure with no
+  // way to tell whose it was. Same rule as every other record here.
+  createdById Int
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([date])
 }
 
 // The sale-or-return model this business runs on: HQ delivers stock to a

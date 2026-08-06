@@ -2241,6 +2241,15 @@ button:disabled {
     padding: 10px 12px;
   }
 
+  /* End-of-shift wastage is one row per product for the whole catalogue,
+     thumbed in at the back of a van at the end of a run. Every row is a
+     control, so every row gets the full target rather than the default
+     input padding. */
+  .shift-wastage .line-input,
+  .shift-wastage select {
+    min-height: 44px;
+  }
+
   .stat-grid {
     grid-template-columns: 1fr;
   }

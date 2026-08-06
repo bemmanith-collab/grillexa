@@ -149,6 +149,8 @@ Three columns that were asked for are **not** in the workbook, because the data 
 
 - **Wastage has no reason.** It is a counter on the daily stock ledger (`DailyStockEntry.wastage`), not an event log — there is no per-entry row to hang a reason on. Returns are the ledger that carries reasons. Wastage is valued at **cost**, not at the selling price: it is stock paid for and never sold.
 
+- **There are two wastage figures, and they are never added together.** `DailyStockEntry.wastage` is stock that spoiled *inside a store*: per (date, store, product), it decrements that store's ledger, and it is what the Reports wastage chart, the Excel Wastage Breakdown sheet and the P&L cost line are built from. The `Wastage` table is **end-of-shift wastage** — what a salesperson counts as spoiled at the end of their run, with no `storeId` because there is no store to attach it to. See below.
+
 - **Wastage is whole units, and has no upper bound.** `DailyStockEntry.wastage` is an `Int`, so a fractional quantity used to clear the route's `Number.isFinite` guard and fail inside the transaction instead, surfacing as a bare 500. Both the form and `POST /api/stock/:storeId/:productId/wastage` now require a positive integer. There is deliberately **no maximum**: the ledger's running balance is meaningless by design (see above), so there is no honest "units on hand" to cap against, and an invented cap would block a real entry.
 - **Stores have no city**, only the one composed `address` string (see *Store location*), so the address goes out whole rather than guessed apart.
 - **A consignment has no wastage figure.** Wastage is recorded against a store and a day, never against the consignment the stock arrived on; any per-consignment number would be invented. It is on the Wastage Breakdown sheet at the grain it actually exists at.
@@ -156,6 +158,24 @@ Three columns that were asked for are **not** in the workbook, because the data 
 **Coverage %** on the salesperson sheet is stores reached ÷ stores assigned over the window, and nothing more blended — a number nobody can recompute in their head is a number nobody trusts when it is used to judge them. It is null, not 0%, for someone with no stores assigned.
 
 Ranges are capped at 366 days: the window drives how many rows every query reads, and "all time" on a phone is a request nobody meant to make.
+
+## End-of-shift wastage
+
+**Unsold is not wasted.** Stock a store did not sell comes back to HQ when the consignment is settled — a `Return` with reason `CONSIGNMENT_UNSOLD`, booked as a negative receipt against that store. It is still good stock and it goes out again to another store tomorrow. Nothing about a return says anything was lost.
+
+The only point at which the business actually knows what was lost is **the end of a shift**, when the salesperson counts what came back spoiled across their whole run. That is what the `Wastage` table records, from the **Record Wastage** button on the dashboard: a date, and one row per product with a quantity and a reason.
+
+**It has no `storeId`, deliberately.** By the time anyone counts, the goods are back at HQ — the store ledger has already been squared by the settlement, and no single store can be blamed for a tray that spoiled in a van carrying stock from eleven of them. A storeless row is the honest shape.
+
+Three consequences worth knowing:
+
+- **It does not touch the stock ledger.** `adjustStock` needs `(storeId, productId, date)`, and this has no store. The app tracks stock *in stores*, never stock at HQ, so there is nothing here to decrement.
+- **There is no quantity cap.** Nothing to validate against — no HQ stock figure exists, and the per-store running balance is meaningless by design. The rule is a positive whole number and nothing more; a cap would refuse a true count, which is worse than accepting a surprising one. A `CHECK (quantity > 0)` enforces the floor in the database.
+- **It carries a reason, where the ledger counter could not.** Spoiled, Damaged, Expired, Other. A per-entry row has somewhere to hang a reason; a counter on a ledger row does not, which is why store wastage still has none. This is most of why the table earns its place.
+
+Every row records **who counted it** (`createdById`). An end-of-shift count belongs to a person — two people counting the same day would otherwise merge into one figure with nobody's name on it, and this is the one number in the app with no store to trace it back through.
+
+`POST /api/wastage` is open to any signed-in account including Sales, because they are the ones doing the counting. It is the only write in the app with no `assertStoreAccess` behind it — there is no store to scope to — which is exactly why authorship is recorded. `GET /api/wastage/summary` is staff-only, following Reports: your own count is yours, but what everyone together threw away is a manager's number. It totals by product, valued **at cost**, and keeps the reason split rather than flattening it: "40 units wasted" and "40 wasted, 38 of them expired" are different problems.
 
 ## Roles & permissions
 
@@ -168,7 +188,9 @@ Ranges are capped at 366 days: the window drives how many rows every query reads
 | Deliver to Store (create / edit consignment) | ✅ any | ✅ any | ✅ own stores |
 | Settle Consignment (incl. edit last settlement) | ✅ any | ✅ any | ✅ own stores |
 | Direct Sale (create / **edit** a bill) | ✅ any | ✅ any | ✅ own stores |
-| Record wastage, record returns | ✅ any | ✅ any | ✅ own stores |
+| Record wastage (per store), record returns | ✅ any | ✅ any | ✅ own stores |
+| Record end-of-shift wastage | ✅ | ✅ | ✅ — it is their shift, and the count has no store to scope |
+| View the end-of-shift wastage summary | ✅ | ✅ | ❌ |
 | See product prices | ✅ | ✅ | ❌ |
 | Reports (P&L, product sales) | ✅ | ✅ | ❌ |
 | Dispatches (historical) | ✅ | ✅ | ❌ |
@@ -270,9 +292,9 @@ grillexa/
 │   ├── prisma/
 │   │   ├── schema.prisma   User, Store, Product, DailyStockEntry,
 │   │   │                   Consignment(+Item), Settlement(+Line),
-│   │   │                   Sale(+Line), Return,
+│   │   │                   Sale(+Line), Return, Wastage (end-of-shift),
 │   │   │                   DispatchInvoice(+Line)
-│   │   ├── migrations/     18 migrations
+│   │   ├── migrations/     19 migrations
 │   │   └── seed.js         local only — refuses to run with NODE_ENV=production
 │   ├── scripts/
 │   │   ├── recompute-ledger.js   ledger repair, dry run unless --apply
@@ -297,13 +319,14 @@ grillexa/
 │   │   ├── middleware/  auth.js (cookie session), role.js
 │   │   ├── routes/      auth, users, products, stores, stock, consignments,
 │   │   │                sales, returns, dispatches, reports, quotes, import,
-│   │   │                dashboard
+│   │   │                dashboard, wastage (end-of-shift, storeless)
 │   │   ├── app.js       CORS, cookie parser, login rate limit, route mounting
 │   │   ├── db.js
 │   │   └── index.js
 │   ├── test/            crash-guards.js, stock-cascade.js, stock-rollup.js,
 │   │                    pricing.js, consignment-list.js, offline-import.js,
 │   │                    geocode.js, dashboard.js, analytics.js, wisdom.js,
+│   │                    wastage.js,
 │   │                    fake-tx.js (shared in-memory Prisma)   (npm test)
 │   └── .env.example
 ├── frontend/
@@ -315,7 +338,9 @@ grillexa/
 │   │   ├── components/  Chart (chart.js canvas + dataset builders),
 │   │   │                Sidebar (browser tab gets the website nav, installed
 │   │   │                app gets the tab bar), DatePager, LineItemsForm,
-│   │   │                BillDetailModal, WastageModal, StockDetailModal,
+│   │   │                BillDetailModal, WastageModal (per store),
+│   │   │                ShiftWastageModal (end-of-shift, no store),
+│   │   │                StockDetailModal,
 │   │   │                StoreAssignModal, ChangePasswordModal,
 │   │   │                ResetPasswordModal, InstallAppButton, DailyWisdom,
 │   │   │                ProtectedRoute, RouteErrorBoundary, Toast, Spinner,
@@ -462,6 +487,9 @@ Read from the environment or `.env`. One exception worth knowing: the business's
 | GET | `/api/reports/analytics?from=&to=&storeId=&productId=&userId=` | Admin, Manager — every chart series in one response |
 | GET | `/api/reports/excel?from=&to=&storeId=` | Admin, Manager — six-sheet .xlsx attachment |
 | GET | `/api/dashboard/salesperson?userId=&date=` | Authenticated — Sales always gets its own day, whatever it asks for; `userId=N` or `userId=all` is Admin/Manager only |
+| POST | `/api/wastage` | Authenticated, any role — end-of-shift count, `{ date, lines: [{ productId, quantity, reason }] }`. No store, no cap, blanks skipped |
+| GET | `/api/wastage/summary?from=&to=` | Admin, Manager — totals by product at cost, with the reason split and who counted each row |
+| GET | `/api/wastage/products` | Authenticated — the catalogue and the reason list the modal is built from |
 | GET | `/api/quotes/today?audience=STAFF\|CUSTOMER` | Authenticated — the day's line for the dashboard card or the bill footer |
 | GET/POST/PATCH/DELETE | `/api/quotes`, `/api/quotes/:id` | Admin — the plan itself |
 | GET | `/api/quotes/suggestions` | Admin — candidate lines pulled from ZenQuotes and filtered to food/health |
@@ -475,7 +503,7 @@ cd frontend && npm test
 
 No framework, no database, no browser — plain Node scripts that print `ok` lines.
 
-Backend, ten files:
+Backend, eleven files:
 
 - `test/crash-guards.js` — malformed request bodies return 400 rather than killing the process (an unhandled rejection in an async handler exits Node on Express 4), `todayStr` is ISO and round-trips, and public signup stays gone.
 - `test/stock-cascade.js` — the ledger cascade against an in-memory Prisma stub: back-dated writes re-chain later days, moving a document between dates leaves nothing behind, and reversing a bill restores stock exactly.
@@ -487,6 +515,8 @@ Backend, ten files:
 - `test/analytics.js` — the arithmetic behind the charts and the workbook, which are the same arithmetic: a dead day is a zero on the line rather than a gap the chart draws straight through, returns subtract, wastage is valued at cost, a long tail folds into one "Other" that keeps the money, and coverage is null (not 0%) for someone with no stores. The last test writes a real workbook and reads it back — six sheets, bold filled frozen headers, ₹ formats, and dates that arrive as dates rather than as text that cannot be sorted.
 - `test/wisdom.js` — the planner: a day's message is the same every time it is asked and does not depend on the order the database returned rows in, a message pinned to a date beats the rotation, a switched-off line is never shown, an empty planner is null rather than a crash, and the relevance filter keeps "Let food be thy medicine" while rejecting "Be the change you wish to see" — and is not fooled by "create" containing "ate" or "wealthy" containing "health".
 - `test/offline-import.js` — the offline CSV import end to end without a database: the parser (quotes, CRLF, a UTF-8 BOM), every rule that stops a bad row reaching the ledger, and the write path against the same in-memory Prisma stub — a re-import creates no second bill and adds no second lot of wastage, a corrected file applies the difference, and wastage entered by hand is not swallowed.
+
+- `test/wastage.js` — the end-of-shift count's rules, which are mostly about what is *not* an error: the modal posts every product in the catalogue and most of them are blank, so a blank is skipped rather than written as a zero or rejected, an empty submission is caught as "nothing counted", a fractional count is refused before it can hit an Int column, the same product twice is refused rather than double-counted, and there is no upper bound because there is nothing to bound it against. The summary values at cost and keeps the reason split.
 
 `test/fake-tx.js` is not a test: it is the in-memory Prisma stub `stock-cascade.js` and `offline-import.js` share, so there is one fake to keep honest rather than two that drift. It applies the schema's column defaults on insert the way Postgres does — a fake that returned a defaulted column as `undefined` turned the import's wastage delta into `NaN`, which looked exactly like a bug in the code.
 
