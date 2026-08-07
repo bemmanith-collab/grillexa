@@ -2099,6 +2099,21 @@ button:disabled {
     min-width: 0;
   }
 
+  /* A control in a card cell must fit the cell. The card is a two-column grid
+     and each column is 1fr, but an <input type="number"> and a <select> both
+     size to their own content and ignore the column — so the Quantity box
+     overflowed column 1 and the Reason dropdown was painted on top of it.
+     The equivalent rule already existed for the line-item editors, scoped to
+     .line-items; every other table that puts a control in a cell (this modal,
+     Settle Consignment's sold/returned, the Order column on Products) never
+     got it. Scoped to the card layout because a desktop table cell sizes to
+     its content and has no columns to overflow. */
+  .data-table tbody td input,
+  .data-table tbody td select {
+    width: 100%;
+    max-width: 100%;
+  }
+
   .data-table tbody td::before {
     content: attr(data-label);
     display: block;
