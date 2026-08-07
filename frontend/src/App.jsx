@@ -20,7 +20,6 @@ const StockHistory = lazy(() => import('./pages/StockHistory'));
 const Users = lazy(() => import('./pages/Users'));
 const Stores = lazy(() => import('./pages/Stores'));
 const Reports = lazy(() => import('./pages/Reports'));
-const WisdomPlanner = lazy(() => import('./pages/WisdomPlanner'));
 
 // Copies each column heading onto its cells as data-label, which the phone
 // card layout prints beside the value (see .data-table in index.css). Done in
@@ -164,14 +163,6 @@ export default function App() {
               element={
                 <ProtectedRoute roles={['ADMIN']}>
                   <Stores />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/wisdom"
-              element={
-                <ProtectedRoute roles={['ADMIN']}>
-                  <WisdomPlanner />
                 </ProtectedRoute>
               }
             />

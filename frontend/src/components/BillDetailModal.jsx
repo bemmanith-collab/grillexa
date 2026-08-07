@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Printer, Share2, MessageCircle, Check, Copy, FileDown } from 'lucide-react';
-import client from '../api/client';
 import { formatCurrency } from '../lib/format';
 import { formatDate } from '../utils/date';
 import { ALL_RETURN_REASON_LABELS } from '../lib/returnReasons';
@@ -20,34 +19,12 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy, d
   const b = BUSINESS_INFO;
   const bandLabel = documentOptions?.bandLabel || 'OFFICIAL INVOICE';
 
-  // The day's customer line from the Wisdom Planner, printed where the fixed
-  // "Thank you for shopping with us" used to be — the one thing on this
-  // screen a customer actually takes away with them.
-  //
-  // Fetched here rather than passed in by each page: the bill is the only
-  // place it belongs, and one component asking for it means no caller can
-  // forget to. A document that brings its own footer (a Consignment Note says
-  // no payment is due yet) keeps it — that goes to a shopkeeper, not a
-  // customer, and is not the place for a word about breakfast.
-  const [wisdom, setWisdom] = useState('');
-  useEffect(() => {
-    if (documentOptions?.footerMessage) return undefined;
-    let cancelled = false;
-    client
-      .get('/quotes/today', { params: { audience: 'CUSTOMER' } })
-      .then((res) => {
-        if (!cancelled && res.data.message) setWisdom(res.data.message.text);
-      })
-      .catch(() => {
-        /* the bill prints with its usual thank-you */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [documentOptions?.footerMessage]);
-
-  const footerMessage =
-    documentOptions?.footerMessage || wisdom || '🙏 Thank you for shopping with us!';
+  // A document that brings its own footer (a Consignment Note says no payment
+  // is due yet) keeps it; everything that is actually a bill gets the standard
+  // thank-you. This used to print the day's customer line from the Wisdom
+  // Planner — that page is gone, so the line a customer takes away is fixed
+  // again rather than rotating from a table nobody can edit.
+  const footerMessage = documentOptions?.footerMessage || '🙏 Thank you for shopping with us!';
 
   // Every document helper takes the same four arguments, assembled here and
   // nowhere else. They used to be spelled out at each call site, and the PDF

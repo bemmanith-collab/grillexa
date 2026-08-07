@@ -95,19 +95,19 @@ The same button sits in the row editor as **📍 Re-capture**, because fifty sto
 
 The address is stored as the single `Store.address` string the table already had, composed from the geocoded parts. The coordinates and the address text are **independent fields** — editing one never touches the other, and Directions always prefers the coordinates. Schema additions: `lat`, `lng`, `accuracyM`, and `phone` (`phone` because a Call button needs a number and there was nowhere to keep one).
 
-## The Grilling Wisdom Planner
+## The daily grilling line (staff dashboard only)
 
-One line a day, to two audiences. **Sales people** get it on the dashboard card when they open the app; **customers** get it printed where the fixed "Thank you for shopping with us" used to sit on the footer of their bill — on screen, in the PDF, and in the WhatsApp text, which are now guaranteed to agree because the footer is resolved once in `BillDetailModal` and handed to all three. A Consignment Note keeps its own footer: that goes to a shopkeeper, not a customer, and is not the place for a word about breakfast.
+Sales people get one line a day on the dashboard card when they open the app. It comes from the `WisdomMessage` table via `GET /api/quotes/today?audience=STAFF`, cached per device for the day.
 
-Admin plans it at **/wisdom**: write a line, pick its audience, and either leave it in the daily rotation or pin it to a date. The page shows what both audiences are being told *today*, because the point of a planner is seeing what is actually live rather than what you hoped was.
+**The pick is deterministic, and that is a fix, not a detail.** The old widget asked for a *random* quote on every request, so it changed on every page load — and the dashboard refreshes itself every five minutes, which would have moved the quote under the reader several times an hour. One line per day, the same for everyone, so two people comparing notes are looking at the same thing. A message pinned to a date beats the rotation.
 
-**The pick is deterministic, and that is a fix, not a detail.** The old widget asked for a *random* quote on every request, so it changed on every page load — and the dashboard now refreshes itself every five minutes, which would have moved the quote under the reader several times an hour. One line per day, the same for everyone, so two people comparing notes are looking at the same thing. A message pinned to a date beats the rotation.
+**The planner page that managed these is gone** (removed 2026-08-07), and so is the customer line on bills — a bill footer is back to the fixed "🙏 Thank you for shopping with us!". What remains is read-only in practice:
 
-**No quote API serves this topic.** Checked before building on one: [API Ninjas](https://api-ninjas.com/api/quotes) offers twenty categories (wisdom, life, success, leadership…) and none for health, food, fitness or nutrition; the "nutrition APIs" that fill search results are food *databases*, not quotes. [ZenQuotes](https://docs.zenquotes.io/keyword-support-added-to-api-calls/) is the closest thing — it supports `keyword=`, which needs a registered key.
+- The `WisdomMessage` table and its rows are untouched, so the staff card keeps rotating through whatever was in it the day the page was removed.
+- **Nothing in the UI can add, edit, pin or switch off a line any more.** Changing what the card says now means a SQL statement against the table, or restoring the page from git (`git show e3708a2 -- frontend/src/pages/WisdomPlanner.jsx`).
+- The `/api/quotes` CRUD routes and `GET /api/quotes/suggestions` still exist and still work; nothing calls them. `ZENQUOTES_KEY` now configures a suggestion endpoint with no UI in front of it.
 
-So the planner uses one **server-side**, day-cached (`connect-src` is `'self'`, same reason the geocoder is proxied — see *Store location*), and treats what comes back as *suggestions only*: `backend/src/lib/wisdom.js` filters for words about food and the body, drops anything over 160 characters (a bill footer is one line) and anything already in the plan, and an Admin approves each survivor into the form before it goes anywhere. **Nothing from a third party reaches a customer's bill unread by a person** — which matters when the text prints under your GSTIN. With `ZENQUOTES_KEY` set it queries `health`, `food` and `nutrition` directly; without one it filters a free unkeyed batch, so the feature works with no configuration, just less well. If the service is down the planner is unaffected — suggestions are a convenience, and the button says so.
-
-The messages live in the `WisdomMessage` table rather than a source file, so the business edits its own words without a deploy. The fifteen original grilling lines were migrated in, plus staff lines about what is actually on the van ("Lead with the sprouts — a cup has more protein than an egg") and customer lines that thank before they suggest: a bill that lectures its reader is a bill that loses a customer.
+If the card outlives its welcome too, deleting `DailyWisdom` from `Dashboard.jsx` retires the whole feature; the table can then be dropped in its own migration.
 
 ## Personal metrics (the landing page)
 
@@ -198,7 +198,6 @@ Every row records **who counted it** (`createdById`). An end-of-shift count belo
 | Delete products | ✅ | ❌ | ❌ |
 | Manage stores | ✅ | ❌ | ❌ |
 | Manage users, reset passwords | ✅ | ❌ | ❌ |
-| Grilling Wisdom Planner (plan what is said, to staff and customers) | ✅ | ❌ | ❌ |
 | Change own password | ✅ | ✅ | ✅ |
 | Store list | ✅ all, with staff | ✅ all, with staff | own stores, no staff names |
 
@@ -353,12 +352,11 @@ grillexa/
 │   │   │                storeLinks.js (maps and tel: links)
 │   │   ├── utils/date.js         business-timezone "today"
 │   │   └── pages/       Login, Dashboard (personal metrics, the landing
-│   │                    page), WisdomPlanner,
 │   │                    page), Inventory (Today's Stock), DeliverToStore,
 │   │                    SettleConsignment, DirectSale, Sales, Dispatches,
 │   │                    Products, StockHistory, Reports, Stores, Users
 │   ├── test/            invoice.js, greeting.js, searchSelect.js,
-│                         storeLinks.js   (npm test)
+│   │                    storeLinks.js, reorder.js   (npm test)
 │   └── vite.config.js   dev proxy, build target down to iOS 14
 ├── Dockerfile        production image for Fly (backend + frontend + Nginx)
 ├── entrypoint.sh     runs `prisma migrate deploy`, then Node + Nginx
@@ -451,7 +449,7 @@ The service worker caches nothing, deliberately — this app writes bills, and a
 | `CORS_ORIGIN` | Comma-separated allowed origins. Unset means "reflect the caller's origin" — a literal `*` is illegal alongside the credentialed cookie, so the config sends back the caller instead. Not needed on Fly, where Nginx serves the app and API from one origin |
 | `NODE_ENV` | `production` in the Fly image. Sets `secure` on the session cookie, and makes `npm run seed` refuse to run |
 | `BUSINESS_UTC_OFFSET_MINUTES` | Business day offset, default `330` (IST). Both the server and the browser resolve "today" with this, so a device in another timezone can't disagree with the ledger |
-| `ZENQUOTES_KEY` | **Optional.** Lets the Wisdom Planner's suggestion button query ZenQuotes by keyword (`health`, `food`, `nutrition`) instead of filtering a free unkeyed batch. Everything else about the planner works without it |
+| `ZENQUOTES_KEY` | **Optional, and currently pointless.** It configured the Wisdom Planner's suggestion button, and that page has been removed — `GET /api/quotes/suggestions` still honours the key but nothing calls it. Safe to leave unset |
 
 Read from the environment or `.env`. One exception worth knowing: the business's own name, address and FSSAI licence number are hardcoded in `frontend/src/lib/businessInfo.js` because they are printed on every invoice. Not secret, but they are per-business and would need changing for anyone else.
 
@@ -490,9 +488,9 @@ Read from the environment or `.env`. One exception worth knowing: the business's
 | POST | `/api/wastage` | Authenticated, any role — end-of-shift count, `{ date, lines: [{ productId, quantity, reason }] }`. No store, no cap, blanks skipped |
 | GET | `/api/wastage/summary?from=&to=` | Admin, Manager — totals by product at cost, with the reason split and who counted each row |
 | GET | `/api/wastage/products` | Authenticated — the catalogue and the reason list the modal is built from |
-| GET | `/api/quotes/today?audience=STAFF\|CUSTOMER` | Authenticated — the day's line for the dashboard card or the bill footer |
-| GET/POST/PATCH/DELETE | `/api/quotes`, `/api/quotes/:id` | Admin — the plan itself |
-| GET | `/api/quotes/suggestions` | Admin — candidate lines pulled from ZenQuotes and filtered to food/health |
+| GET | `/api/quotes/today?audience=STAFF\|CUSTOMER` | Authenticated — the day's line. Only `STAFF` is still called, by the dashboard card; bills no longer ask for `CUSTOMER` |
+| GET/POST/PATCH/DELETE | `/api/quotes`, `/api/quotes/:id` | Admin — **orphaned.** The planner page that used these was removed; they work, nothing calls them |
+| GET | `/api/quotes/suggestions` | Admin — **orphaned**, same reason |
 
 ## Tests
 
@@ -513,7 +511,7 @@ Backend, eleven files:
 - `test/consignment-list.js` — who sees which consignments, and how many: a manager or admin is never store-scoped (with or without a status filter), a Sales account always is, and the outstanding list is never truncated while the history list still is.
 - `test/dashboard.js` — the numbers people are ranked on: a return subtracts from its product rather than inflating it, a product only returned today is not a "top seller", a tie shares the higher place, a blank baseline gives no percentage instead of an invented one, and the oldest unsettled consignment is chased first.
 - `test/analytics.js` — the arithmetic behind the charts and the workbook, which are the same arithmetic: a dead day is a zero on the line rather than a gap the chart draws straight through, returns subtract, wastage is valued at cost, a long tail folds into one "Other" that keeps the money, and coverage is null (not 0%) for someone with no stores. The last test writes a real workbook and reads it back — six sheets, bold filled frozen headers, ₹ formats, and dates that arrive as dates rather than as text that cannot be sorted.
-- `test/wisdom.js` — the planner: a day's message is the same every time it is asked and does not depend on the order the database returned rows in, a message pinned to a date beats the rotation, a switched-off line is never shown, an empty planner is null rather than a crash, and the relevance filter keeps "Let food be thy medicine" while rejecting "Be the change you wish to see" — and is not fooled by "create" containing "ate" or "wealthy" containing "health".
+- `test/wisdom.js` — the daily line (the planner page it was written for is gone, but `lib/wisdom.js` still picks the staff card's message): a day's message is the same every time it is asked and does not depend on the order the database returned rows in, a message pinned to a date beats the rotation, a switched-off line is never shown, an empty planner is null rather than a crash, and the relevance filter keeps "Let food be thy medicine" while rejecting "Be the change you wish to see" — and is not fooled by "create" containing "ate" or "wealthy" containing "health".
 - `test/offline-import.js` — the offline CSV import end to end without a database: the parser (quotes, CRLF, a UTF-8 BOM), every rule that stops a bad row reaching the ledger, and the write path against the same in-memory Prisma stub — a re-import creates no second bill and adds no second lot of wastage, a corrected file applies the difference, and wastage entered by hand is not swallowed.
 
 - `test/wastage.js` — the end-of-shift count's rules, which are mostly about what is *not* an error: the modal posts every product in the catalogue and most of them are blank, so a blank is skipped rather than written as a zero or rejected, an empty submission is caught as "nothing counted", a fractional count is refused before it can hit an Int column, the same product twice is refused rather than double-counted, and there is no upper bound because there is nothing to bound it against. The summary values at cost and keeps the reason split.

@@ -13,7 +13,6 @@ import {
   ScrollText,
   TrendingUp,
   Store,
-  Flame,
   Users,
   LogOut,
   KeyRound,
@@ -49,7 +48,6 @@ const NAV = [
   { to: '/stock-history', icon: ScrollText, label: 'Stock History', roles: STAFF },
   { to: '/reports', icon: TrendingUp, label: 'Reports', roles: STAFF },
   { to: '/stores', icon: Store, label: 'Stores', roles: 'ADMIN' },
-  { to: '/wisdom', icon: Flame, label: 'Wisdom Planner', short: 'Wisdom', roles: 'ADMIN' },
   { to: '/users', icon: Users, label: 'Users', roles: 'ADMIN' },
 ];
 

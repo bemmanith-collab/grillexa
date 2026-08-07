@@ -733,51 +733,6 @@ select {
   color: var(--text-muted);
 }
 
-/* ---------- Wisdom Planner ---------- */
-
-.wisdom-today-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
-  gap: 16px;
-  margin-bottom: 8px;
-}
-
-.wisdom-today-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--primary);
-}
-
-.suggestion-list {
-  list-style: none;
-  margin: 16px 0 0;
-  padding: 0;
-  display: grid;
-  gap: 12px;
-}
-
-.suggestion-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg);
-}
-
-.suggestion-list .wisdom-quote,
-.suggestion-list .wisdom-author {
-  margin: 0;
-}
-
 /* ---------- Charts & filters ---------- */
 
 /* One row of filters above the charts, wrapping rather than scrolling — on a
@@ -1045,34 +1000,6 @@ select {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
-}
-
-.wisdom-refresh {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-}
-
-.wisdom-refresh:hover:not(:disabled) {
-  background: #f3f4f6;
-  color: var(--text);
-}
-
-.wisdom-spin {
-  animation: wisdom-spin 0.8s linear infinite;
-}
-
-@keyframes wisdom-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .wisdom-quote {
