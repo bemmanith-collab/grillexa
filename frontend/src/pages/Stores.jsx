@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { Search, MapPin, Navigation, Phone, Map } from 'lucide-react';
@@ -60,6 +62,7 @@ export default function Stores() {
   const [editForm, setEditForm] = useState({});
   const [search, setSearch] = useState('');
   const [geo, setGeo] = useState({ busy: false, error: '', note: '' });
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const filteredStores = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -83,6 +86,33 @@ export default function Stores() {
   useEffect(() => {
     load();
   }, []);
+
+  // Where a tapped notification lands. There is no store detail page — the row
+  // already shows everything one would hold, so the notification scrolls to it
+  // and highlights it rather than opening a page built only to be linked to.
+  //
+  // The id is copied into state before the URL parameter is dropped, because
+  // the two have different lifetimes: the parameter must go immediately so a
+  // refresh doesn't re-trigger the highlight, while the highlight itself has
+  // to outlive it long enough to be seen. It fades on a CSS animation rather
+  // than a timer, so nothing has to be cleaned up.
+  const focusParam = Number(searchParams.get('focus')) || null;
+  const [highlightId, setHighlightId] = useState(null);
+  const focusedRef = useRef(null);
+
+  useEffect(() => {
+    // Waits for `stores`: opening from a cold tap renders before the list
+    // loads, and there is no row to scroll to yet.
+    if (!focusParam || !stores.length) return;
+    setHighlightId(focusParam);
+    const next = new URLSearchParams(searchParams);
+    next.delete('focus');
+    setSearchParams(next, { replace: true });
+  }, [focusParam, stores.length]);
+
+  useEffect(() => {
+    if (highlightId) focusedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightId]);
 
   // Shared by the add form and the row editor: a store added before pins
   // existed can only get one here, and there are fifty of those.
@@ -198,7 +228,11 @@ export default function Stores() {
     setError('');
     setCreating(true);
     try {
-      await client.post('/stores', form);
+      const res = await client.post('/stores', form);
+      // The person who added it gets the toast; everyone else gets the push.
+      // Notifying yourself of your own action is noise, and this is the one
+      // notification guaranteed to arrive with the app already open.
+      toast.success(`🏪 ${res.data.store.name} added`, { icon: '🏪' });
       setForm(EMPTY_FORM);
       setFormOpen(false);
       setGeo({ busy: false, error: '', note: '' });
@@ -337,11 +371,11 @@ export default function Stores() {
           <h1>Stores</h1>
           <p className="page-subtitle">{stores.length} retail stores</p>
         </div>
-        {isAdmin && (
-          <button className="btn-primary" onClick={() => setFormOpen((v) => !v)}>
-            {formOpen ? 'Cancel' : '+ Add Store'}
-          </button>
-        )}
+        {/* Adding is open to every role — see the note on POST /stores. Editing
+            and deleting stay Admin-only, further down the table. */}
+        <button className="btn-primary" onClick={() => setFormOpen((v) => !v)}>
+          {formOpen ? 'Cancel' : '+ Add Store'}
+        </button>
       </div>
 
       {error && <div className="form-error">{error}</div>}
@@ -412,7 +446,11 @@ export default function Stores() {
                 const isEditing = editingId === s.id;
                 const tel = telHref(s.phone);
                 return (
-                  <tr key={s.id}>
+                  <tr
+                    key={s.id}
+                    ref={s.id === highlightId ? focusedRef : null}
+                    className={s.id === highlightId ? 'row-focused' : undefined}
+                  >
                     {isEditing ? (
                       <>
                         <td>

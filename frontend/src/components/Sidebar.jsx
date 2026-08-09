@@ -23,6 +23,7 @@ import {
 import logoIcon from '../assets/grillexa-icon.png';
 import ChangePasswordModal from './ChangePasswordModal';
 import InstallAppButton from './InstallAppButton';
+import NotificationsButton from './NotificationsButton';
 
 const ROLE_LABELS = {
   ADMIN: 'Admin',
@@ -47,7 +48,10 @@ const NAV = [
   { to: '/products', icon: Tag, label: 'Products', roles: STAFF },
   { to: '/stock-history', icon: ScrollText, label: 'Stock History', roles: STAFF },
   { to: '/reports', icon: TrendingUp, label: 'Reports', roles: STAFF },
-  { to: '/stores', icon: Store, label: 'Stores', roles: 'ADMIN' },
+  // Everyone: a salesperson standing outside a new shop is the person who can
+  // capture its pin, so they need the page. What they can do there is still
+  // narrower — see the isAdmin gates in Stores.jsx.
+  { to: '/stores', icon: Store, label: 'Stores', roles: ALL },
   { to: '/users', icon: Users, label: 'Users', roles: 'ADMIN' },
 ];
 
@@ -138,6 +142,7 @@ export default function Sidebar() {
         {/* Desktop's equivalent of the More sheet's install button — Chrome
             offers this from an icon in the address bar that is easy to miss. */}
         <InstallAppButton className="btn-secondary sidebar-install" />
+        <NotificationsButton className="btn-secondary sidebar-install" />
 
         <div className="sidebar-user">
           <div className="avatar">{initials}</div>
@@ -212,6 +217,9 @@ export default function Sidebar() {
             </div>
 
             <InstallAppButton className="btn-primary more-install" />
+            {/* The phone is the device that matters here — it is the one in a
+                pocket when someone else adds a shop. */}
+            <NotificationsButton className="btn-secondary more-install" />
 
             <div className="more-actions">
               <button type="button" className="btn-secondary" onClick={() => { setMoreOpen(false); setChangePasswordOpen(true); }}>

@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import Sidebar from './components/Sidebar';
 import GreetingOverlay from './components/GreetingOverlay';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -68,6 +69,21 @@ export default function App() {
 
   return (
     <div className={user ? 'app-shell' : ''}>
+      {/* Themed off the app's own tokens rather than the library's defaults,
+          which are a fixed white card that turns into a bright rectangle in
+          dark mode. Below the tab bar's z-index so it never covers it. */}
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 5000,
+          style: {
+            background: 'var(--surface)',
+            color: 'var(--text)',
+            border: '1px solid var(--border)',
+            boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
+          },
+        }}
+      />
       <GreetingOverlay />
       {user && <Sidebar />}
       <main className={user ? 'app-main' : ''}>
@@ -161,7 +177,7 @@ export default function App() {
             <Route
               path="/stores"
               element={
-                <ProtectedRoute roles={['ADMIN']}>
+                <ProtectedRoute>
                   <Stores />
                 </ProtectedRoute>
               }

@@ -35,6 +35,38 @@ model User {
   consignments     Consignment[]
   settlements      Settlement[]
   wastages         Wastage[]
+  // Distinct from `stores`, which is the many-to-many "who covers this shop".
+  // This is authorship: who walked up to it and put it in the system. Named
+  // because two relations now join User and Store and Prisma cannot guess.
+  createdStores    Store[]           @relation("StoreCreatedBy")
+  pushSubscriptions PushSubscription[]
+}
+
+// One row per browser-and-device that agreed to receive notifications, not one
+// per user: the same person signing in on a phone and a laptop is two
+// endpoints, and both should buzz.
+//
+// The endpoint is the address the push service gave us and is the natural key —
+// re-subscribing on the same device returns the same endpoint, so upserting on
+// it is what stops duplicates accumulating every time the app is opened.
+//
+// Rows die on their own: a push service answers 404 or 410 once a subscription
+// is dead (app uninstalled, permission revoked, browser data cleared), and the
+// send path deletes them then. Nothing else prunes this table.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  auth      String
+  p256dh    String
+  // Nullable so a subscription is never orphaned into uselessness if the user
+  // is removed — but in practice always set, since subscribing requires a session.
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  // The send path asks "every subscription except this user's", never "which
+  // user owns this endpoint", so the index that matters is on userId.
+  @@index([userId])
 }
 
 // The Grilling Wisdom Planner: what the business wants said today, and to
@@ -80,6 +112,11 @@ model Store {
   // wrong road. Null for a pin typed in by hand, which has no sensor estimate.
   accuracyM Float?
   createdAt DateTime @default(now())
+  // Who added it. Nullable because every store already in the table was added
+  // before anyone recorded this, and those cannot be attributed after the fact.
+  // SetNull rather than Cascade: deleting a user must never delete their shops.
+  createdById Int?
+  createdBy   User?  @relation("StoreCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   salesUsers        User[]
   dailyStockEntries DailyStockEntry[]

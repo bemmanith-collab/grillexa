@@ -2574,6 +2574,27 @@ a.btn-danger {
   margin: 0;
 }
 
+/* The row a notification was tapped to reach. Fades on its own so nothing has
+   to clear it, and leaves no permanent mark on a row that is otherwise
+   ordinary — it answers "which one is new" and then gets out of the way. */
+@keyframes row-focused-fade {
+  from { background: var(--info-soft); }
+  to   { background: transparent; }
+}
+
+.row-focused td {
+  animation: row-focused-fade 4s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Still marked, just without the fade — the highlight is information, not
+     decoration, so it must not vanish for someone who asked for less motion. */
+  .row-focused td {
+    animation: none;
+    background: var(--info-soft);
+  }
+}
+
 /* How far the fix could be off. Colour-coded because the number alone means
    nothing to someone who has never thought about GPS accuracy. */
 .accuracy-badge {

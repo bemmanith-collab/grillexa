@@ -23,6 +23,7 @@ const consignmentRoutes = require('./routes/consignments');
 const importRoutes = require('./routes/import');
 const dashboardRoutes = require('./routes/dashboard');
 const wastageRoutes = require('./routes/wastage');
+const pushRoutes = require('./routes/push');
 
 const app = express();
 
@@ -102,6 +103,7 @@ app.use('/api/consignments', consignmentRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/wastage', wastageRoutes);
+app.use('/api/push', pushRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

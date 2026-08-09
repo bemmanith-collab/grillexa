@@ -101,6 +101,32 @@ The same button sits in the row editor as **📍 Re-capture**, because fifty sto
 
 The address is stored as the single `Store.address` string the table already had, composed from the geocoded parts. The coordinates and the address text are **independent fields** — editing one never touches the other, and Directions always prefers the coordinates. Schema additions: `lat`, `lng`, `accuracyM`, and `phone` (`phone` because a Call button needs a number and there was nowhere to keep one).
 
+## New-store notifications
+
+A shop nobody knows about is a shop nobody delivers to. When someone adds a store, **everyone else on the team is notified** — a web push to every device they have switched on, and a toast on screen for the person who added it.
+
+**Adding a store is open to every role**, which is the change that makes this worth having: a salesperson standing outside a new shop is the one who can capture its pin, and making them relay it to an Admin is how it gets typed in later from memory, or not at all. **Editing and deleting stay Admin-only** — adding a shop is additive and visible, while renaming or removing one rewrites history that invoices and stock ledgers already point at.
+
+**The notification skips whoever performed the action.** Being buzzed about your own action is noise, and it is the one notification guaranteed to arrive with the app already open in front of you. They get the toast instead.
+
+**Subscriptions are per device, not per account.** The same person on a phone and a laptop is two rows in `PushSubscription`, and both should buzz — the phone is the one in a pocket when someone else adds a shop. The push service's `endpoint` is the natural key: a browser hands back the same one every time it re-subscribes, so upserting on it is what stops a row accumulating on every app open.
+
+**Dead subscriptions delete themselves.** A push service answers `404` or `410` once a subscription is gone for good — app uninstalled, permission revoked, browser data cleared. The send path deletes those rows then, and nothing else prunes the table; any other error (network, 5xx, rate limit) is transient and the row is kept. Sends run through `Promise.allSettled`, so one dead device cannot stop the rest of the team being told.
+
+**A notification failing never fails the action.** `POST /stores` responds without waiting on the push services, and errors are logged rather than thrown. The store was created; that is the part that had to be durable.
+
+**Tapping a notification opens `/stores?focus=<id>`**, which scrolls to that row and highlights it for four seconds. There is deliberately no store detail page — the row already shows everything one would hold, and a page built only to be linked to is a page to maintain. The id is copied into state before the URL parameter is dropped, because the two have different lifetimes: the parameter must go immediately so a refresh doesn't re-trigger the highlight, while the highlight has to outlive it long enough to be seen.
+
+**A salesperson also sees the stores they added**, not only the ones they are assigned to (`GET /stores`). Adding a store does not assign it to them, so without that clause a shop would vanish the instant it was saved — which reads as data loss, not as a scoping rule.
+
+**Notifications are optional and degrade quietly.** Without `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` the app boots normally, `GET /api/push/key` answers `503`, and the send path returns early. A missing key is a notifications outage, not an outage.
+
+**The VAPID public key is served, not bundled.** Vite would inline a `VITE_`-prefixed variable during `npm run build`, which happens inside the Docker image where Fly secrets do not exist — the key would have to become a build argument, and rotating it would mean rebuilding. `GET /api/push/key` costs one request and removes both problems. The key is public by design: it is handed to every browser that subscribes.
+
+**iOS needs the app on the Home Screen.** Safari only exposes `PushManager` to an installed PWA (16.4+), so on an iPhone browsing the site normally, notifications are genuinely unavailable — the button says how to install rather than offering something that cannot work. The same applies to any plain-`http` origin, including a LAN address during development: no secure context, no service worker, no push.
+
+The service worker (`frontend/public/sw.js`) gained `push` and `notificationclick` handlers and **still caches nothing** — a notification is a message, not a stored copy of a page, so the network-only rule that file exists to protect is intact.
+
 ## The daily grilling line (staff dashboard only)
 
 Sales people get one line a day on the dashboard card when they open the app. It comes from the `WisdomMessage` table via `GET /api/quotes/today?audience=STAFF`, cached per device for the day.
@@ -202,10 +228,11 @@ Every row records **who counted it** (`createdById`). An end-of-shift count belo
 | Dispatches (historical) | ✅ | ✅ | ❌ |
 | Add / edit products | ✅ | ✅ | ❌ |
 | Delete products | ✅ | ❌ | ❌ |
-| Manage stores | ✅ | ❌ | ❌ |
+| **Add** a store | ✅ | ✅ | ✅ — whoever is standing outside it can capture the pin |
+| Edit / delete a store | ✅ | ❌ | ❌ |
 | Manage users, reset passwords | ✅ | ❌ | ❌ |
 | Change own password | ✅ | ✅ | ✅ |
-| Store list | ✅ all, with staff | ✅ all, with staff | own stores, no staff names |
+| Store list | ✅ all, with staff | ✅ all, with staff | own stores **plus any they added**, no staff names |
 
 Enforced **server-side**, not merely hidden in the UI. Role and store assignments are re-read from the database on *every* request rather than trusted from the JWT, so a change takes effect immediately instead of at next login.
 
@@ -455,6 +482,9 @@ The service worker caches nothing, deliberately — this app writes bills, and a
 | `CORS_ORIGIN` | Comma-separated allowed origins. Unset means "reflect the caller's origin" — a literal `*` is illegal alongside the credentialed cookie, so the config sends back the caller instead. Not needed on Fly, where Nginx serves the app and API from one origin |
 | `NODE_ENV` | `production` in the Fly image. Sets `secure` on the session cookie, and makes `npm run seed` refuse to run |
 | `BUSINESS_UTC_OFFSET_MINUTES` | Business day offset, default `330` (IST). Both the server and the browser resolve "today" with this, so a device in another timezone can't disagree with the ledger |
+| `VAPID_PUBLIC_KEY` | Public half of the web-push keypair, handed to browsers so they can address a subscription to this server. Public by design. Generate both with `npx web-push generate-vapid-keys` |
+| `VAPID_PRIVATE_KEY` | Signs each push. A Fly secret, never committed. **Rotating the pair invalidates every existing subscription**, so it is not routine |
+| `VAPID_SUBJECT` | Contact address a push service uses to reach an operator about a misbehaving sender. Must be a `mailto:` or `https:` URL. Defaults to the maintainer's address |
 | `ZENQUOTES_KEY` | **Optional, and currently pointless.** It configured the Wisdom Planner's suggestion button, and that page has been removed — `GET /api/quotes/suggestions` still honours the key but nothing calls it. Safe to leave unset |
 
 Read from the environment or `.env`. One exception worth knowing: the business's own name, address and FSSAI licence number are hardcoded in `frontend/src/lib/businessInfo.js` because they are printed on every invoice. Not secret, but they are per-business and would need changing for anyone else.
