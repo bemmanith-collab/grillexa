@@ -6,6 +6,7 @@
 // 'self' so the page can't call a third-party host anyway.
 
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
+const NOMINATIM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 const USER_AGENT = 'grillexa/1.0 (https://grillexa.fly.dev; stock and billing for retail stores)';
 const TIMEOUT_MS = 8000;
 
@@ -65,6 +66,39 @@ async function reverseGeocode(lat, lng, fetchImpl = fetch) {
   return describe(await res.json());
 }
 
+// The other direction: a typed place name to a handful of candidate points, so
+// the map can jump somewhere near the shop before anyone drags a pin.
+//
+// Biased to India (`countrycodes=in`) because every store is here, and without
+// it "Adyar" also matches places in three other countries — a list where the
+// right answer is fourth is a list nobody reads to the end of. Capped at five
+// for the same reason.
+//
+// Returns [] rather than throwing for a query that matched nothing: an empty
+// result is an ordinary answer to "find this", not a failure.
+async function searchPlaces(query, fetchImpl = fetch) {
+  const q = String(query || '').trim();
+  if (q.length < 3) return [];
+  const url = `${NOMINATIM_SEARCH_URL}?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5&countrycodes=in`;
+  const res = await fetchImpl(url, {
+    headers: { 'User-Agent': USER_AGENT, 'Accept-Language': 'en' },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`Nominatim responded ${res.status}`);
+  const rows = await res.json();
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => ({
+      lat: Number(row.lat),
+      lng: Number(row.lon),
+      label: String(row.display_name || '').trim(),
+      address: describe(row).address,
+    }))
+    // A row without a usable pair is no use to a map, and Nominatim has been
+    // known to return one for oddly mapped features.
+    .filter((row) => isLatLng(row.lat, row.lng) && row.label);
+}
+
 // What a store's pin should become, given a request body. A pin without its
 // pair is meaningless and a number out of range is a bug upstream, not a
 // location — either both arrive valid or the store has no pin, never half of
@@ -84,4 +118,4 @@ function readCoords(body) {
   return { ok: true, data: { lat: latNum, lng: lngNum, accuracyM: Number.isFinite(acc) && acc > 0 ? acc : null } };
 }
 
-module.exports = { isLatLng, describe, reverseGeocode, toParts, toAddressLine, readCoords };
+module.exports = { isLatLng, describe, reverseGeocode, searchPlaces, toParts, toAddressLine, readCoords };

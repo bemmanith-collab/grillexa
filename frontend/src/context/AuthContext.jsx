@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import client from '../api/client';
 import { greetingFor } from '../lib/greeting';
+import { dropPushSubscription } from '../lib/push';
 import { todayStr } from '../utils/date';
 
 const AuthContext = createContext(null);
@@ -75,6 +76,15 @@ export function AuthProvider({ children }) {
 
   async function logout() {
     setGreeting('');
+    // Drop this device's push subscription first, while the session cookie is
+    // still valid — the endpoint is scoped to the calling user and a signed-out
+    // request cannot reach it. Without this, a shared phone would keep buzzing
+    // for whoever used it last, and they would be reading a colleague's
+    // notifications with no way to make it stop short of browser settings.
+    //
+    // Never blocks signing out: a failure here must not strand someone on a
+    // screen they are trying to leave.
+    await dropPushSubscription().catch(() => {});
     // Server-side: the browser will not let a script delete a cookie it cannot
     // read. The local state is cleared regardless, so a failed request still
     // signs the user out of this tab rather than stranding them.

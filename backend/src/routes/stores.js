@@ -3,7 +3,7 @@ const rateLimit = require('express-rate-limit');
 const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
-const { isLatLng, reverseGeocode, readCoords } = require('../lib/geocode');
+const { isLatLng, reverseGeocode, searchPlaces, readCoords } = require('../lib/geocode');
 const { notifyOthers } = require('../lib/push');
 
 const router = express.Router();
@@ -49,7 +49,10 @@ const geocodeLimiter = rateLimit({
   message: { error: 'Too many address lookups — wait a minute and try again.' },
 });
 
-router.get('/reverse-geocode', requireRole('ADMIN'), geocodeLimiter, async (req, res) => {
+// Not ADMIN-only any more: anyone who can add a store needs the address that
+// goes with the pin they just dropped. The rate limiter, not the role, is what
+// protects Nominatim here.
+router.get('/reverse-geocode', geocodeLimiter, async (req, res) => {
   const [lat, lng] = [Number(req.query.lat), Number(req.query.lng)];
   if (!isLatLng(lat, lng)) return res.status(400).json({ error: 'lat and lng must be a valid coordinate pair' });
   try {
@@ -58,6 +61,26 @@ router.get('/reverse-geocode', requireRole('ADMIN'), geocodeLimiter, async (req,
     // The pin is already in hand on the client; only the label failed. 502
     // says "not your fault, try typing it" rather than losing the fix.
     res.status(502).json({ error: 'Address lookup is unavailable — type the address instead.' });
+  }
+});
+
+// Typed place name to candidate points, for the map picker's search box. Goes
+// through the server for the same two reasons reverse geocoding does: the page
+// cannot set the User-Agent Nominatim's policy asks for, and connect-src stays
+// 'self' so it could not reach the host anyway.
+//
+// Shares the limiter deliberately. Both directions hit the same donated
+// hardware from the same outbound IP, so they have to share one budget — a
+// search box that fires per keystroke would otherwise spend it alone.
+router.get('/geocode', geocodeLimiter, async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  // Two characters match half of India; the floor is here rather than only in
+  // the browser so a stray request cannot spend the shared budget on noise.
+  if (q.length < 3) return res.json({ results: [] });
+  try {
+    res.json({ results: await searchPlaces(q) });
+  } catch (err) {
+    res.status(502).json({ error: 'Place search is unavailable — drop the pin by hand instead.' });
   }
 });
 

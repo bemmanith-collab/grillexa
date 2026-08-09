@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import client from '../api/client';
@@ -22,6 +22,11 @@ import {
   ACCURACY_GOOD_M,
   ACCURACY_PERFECT_M,
 } from '../lib/storeLinks';
+
+// Leaflet and its stylesheet are ~150KB that most visits to this page never
+// need — the map only opens when someone asks for it. Lazily loaded so the
+// Stores list itself stays as quick to reach as it was.
+const MapPicker = lazy(() => import('../components/MapPicker'));
 
 const EMPTY_FORM = { name: '', address: '', phone: '', lat: null, lng: null, accuracyM: null };
 
@@ -63,6 +68,10 @@ export default function Stores() {
   const [search, setSearch] = useState('');
   const [geo, setGeo] = useState({ busy: false, error: '', note: '' });
   const [searchParams, setSearchParams] = useSearchParams();
+  // Which form has its map open — 'new' for the add form, or a store id. Not a
+  // boolean: the add form and a row editor can be open at once, and one shared
+  // flag would open both maps and load two Leaflet instances.
+  const [mapOpenFor, setMapOpenFor] = useState(null);
 
   const filteredStores = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -279,9 +288,17 @@ export default function Stores() {
   // of Google Maps, so the lat box takes "13.0878, 80.2103" as one paste and
   // splits it. Typing here clears the accuracy reading: it described the
   // sensor's guess, not this hand-entered pin.
-  function coordFields(values, apply) {
+  function coordFields(values, apply, formKey) {
     const tier = accuracyTier(values.accuracyM);
     const err = coordError(values.lat, values.lng);
+    const mapOpen = mapOpenFor === formKey;
+    // A pin dropped on a map has no sensor estimate, exactly like one typed by
+    // hand — so accuracyM is cleared rather than invented. That is what makes
+    // it read as 'unknown' in the badge instead of claiming a precision no
+    // instrument measured.
+    function pickFromMap(lat, lng) {
+      apply({ lat, lng, accuracyM: null });
+    }
     // Only when the pin is doubtful or missing — a good fix needs no escape
     // hatch, and offering one there just invites second-guessing.
     const mapsPick = tier === 'good' || tier === 'perfect' ? '' : mapsPickUrl(values);
@@ -338,11 +355,35 @@ export default function Stores() {
             Find it on Google Maps
           </a>
         )}
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          onClick={() => setMapOpenFor(mapOpen ? null : formKey)}
+        >
+          <Map size={14} />
+          {mapOpen ? 'Hide map' : 'Pick on map'}
+        </button>
         <span className="form-hint coord-hint">
           {mapsPick
             ? 'On Google Maps, long-press the shop → copy the coordinates → paste them into the Latitude box.'
             : 'Paste a “lat, lng” pair from Google Maps into either box.'}
         </span>
+        {mapOpen && (
+          <Suspense fallback={<div className="map-loading">Loading map…</div>}>
+            <MapPicker
+              lat={values.lat}
+              lng={values.lng}
+              onPick={pickFromMap}
+              // A search result carries an address, but it names the building
+              // the geocoder matched, not the shop. Offered only into an empty
+              // field: overwriting something already typed would lose the one
+              // version a person actually checked.
+              onSearchPick={(r) => {
+                if (!values.address && r.address) apply({ address: r.address });
+              }}
+            />
+          </Suspense>
+        )}
       </div>
     );
   }
@@ -389,7 +430,7 @@ export default function Stores() {
             </div>
             {geo.note && <div className="form-success">{geo.note}</div>}
             {geo.error && <div className="form-warning">{geo.error}</div>}
-            {coordFields(form, applyToForm)}
+            {coordFields(form, applyToForm, 'new')}
             <div className="inline-form">
               <input
                 placeholder="Store name"
@@ -474,7 +515,7 @@ export default function Stores() {
                             onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                           />
                           {geo.error && <div className="form-warning">{geo.error}</div>}
-                          {coordFields(editForm, applyToEdit)}
+                          {coordFields(editForm, applyToEdit, s.id)}
                         </td>
                         <td className="actions-cell">
                           {locateButton(editForm, applyToEdit, hasPin(editForm) ? '📍 Re-capture' : '📍 Capture GPS')}

@@ -2574,6 +2574,118 @@ a.btn-danger {
   margin: 0;
 }
 
+/* The store map picker. Leaflet ships its own stylesheet, which knows nothing
+   about this app's tokens — everything below is the seam between the two. */
+.map-picker {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.map-canvas {
+  height: 320px;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  /* Leaflet puts panes and controls on z-indexes up to 1000, which would sit
+     over the app's own sticky headers and the phone tab bar. Confining it to a
+     stacking context of its own is what keeps the map inside its box. */
+  isolation: isolate;
+  z-index: 0;
+}
+
+/* Taller is better for aiming at a shutter, but a phone still has to show the
+   fields underneath without a scroll marathon. */
+@media (max-width: 640px) {
+  .map-canvas { height: 260px; }
+}
+
+.map-search {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.map-search .line-input { flex: 1; min-width: 0; }
+
+.map-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.map-results li + li { border-top: 1px solid var(--border); }
+.map-results button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  cursor: pointer;
+  /* 44px minimum by way of padding — these are tapped on a phone. */
+  min-height: 44px;
+}
+.map-results button:hover,
+.map-results button:focus-visible { background: var(--info-soft); }
+
+.map-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  flex-basis: 100%;
+}
+
+.map-loading {
+  flex-basis: 100%;
+  height: 320px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+/* The marker. A divIcon rather than Leaflet's default PNG, whose URL a bundler
+   rewrites into a broken image — this is markup, so there is nothing to
+   resolve. The ring is what makes a dark dot findable on a dark map tile. */
+.map-pin-dot {
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: 3px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: grab;
+}
+
+/* Leaflet's attribution and zoom controls are hardcoded to a white card. On a
+   dark theme that is a bright rectangle stapled to the corner of the map. */
+.map-canvas .leaflet-control-attribution {
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.65rem;
+}
+.map-canvas .leaflet-control-attribution a { color: var(--info); }
+
+.map-canvas .leaflet-bar a {
+  background: var(--surface);
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+.map-canvas .leaflet-bar a:hover { background: var(--info-soft); }
+
 /* The row a notification was tapped to reach. Fades on its own so nothing has
    to clear it, and leaves no permanent mark on a row that is otherwise
    ordinary — it answers "which one is new" and then gets out of the way. */

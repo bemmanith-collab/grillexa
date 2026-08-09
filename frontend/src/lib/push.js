@@ -44,3 +44,28 @@ export function pushSupport() {
 export function permissionState() {
   return 'Notification' in window ? Notification.permission : 'unsupported';
 }
+
+// Unregister this device, server first. Called on logout, where the ordering
+// matters twice over: the DELETE needs the session cookie that logout is about
+// to destroy, and unsubscribing locally before telling the server would leave a
+// row pointing at an endpoint nobody can receive — every future store would
+// push into a void until the service reported it dead.
+//
+// The controller check is what makes this cheap on the common path: a browser
+// with no active service worker has no subscription to drop, and
+// serviceWorker.ready would otherwise hang forever waiting for one.
+//
+// The client is imported inside the function, not at the top of the file, so
+// that test/push.js can import this module under plain Node — which cannot
+// resolve the extensionless paths Vite accepts. Rollup warns that the dynamic
+// import wins nothing, and it is right; keeping the test able to run is the
+// reason, not code splitting.
+export async function dropPushSubscription() {
+  if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) return;
+  const { default: client } = await import('../api/client');
+  await client.delete('/push/subscribe', { data: { endpoint: subscription.endpoint } });
+  await subscription.unsubscribe();
+}

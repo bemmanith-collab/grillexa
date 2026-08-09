@@ -7,7 +7,7 @@
 // pure, and reverseGeocode() is handed a fake fetch.
 const assert = require('assert');
 
-const { isLatLng, describe: describeFix, reverseGeocode, readCoords } = require('../src/lib/geocode');
+const { isLatLng, describe: describeFix, reverseGeocode, searchPlaces, readCoords } = require('../src/lib/geocode');
 
 // A real Nominatim reply, trimmed to the fields used.
 const chennai = {
@@ -119,6 +119,52 @@ const tests = {
       () => reverseGeocode(13, 80, async () => ({ ok: false, status: 429 })),
       /429/
     );
+  },
+
+  // Place search, the other direction: what the map picker's search box calls.
+  'a search result carries a usable pair, a label and an address': async () => {
+    const fake = async () => ({
+      ok: true,
+      json: async () => [{ lat: '13.0067', lon: '80.2570', display_name: 'Adyar, Chennai', address: chennai.address }],
+    });
+    const [first] = await searchPlaces('Adyar', fake);
+    assert.strictEqual(first.lat, 13.0067);
+    assert.strictEqual(first.lng, 80.257);
+    assert.strictEqual(first.label, 'Adyar, Chennai');
+    // Composed by the same rules the reverse lookup uses, so a searched
+    // address and a captured one read identically.
+    assert.strictEqual(first.address, '12 2nd Avenue, Anna Nagar, Chennai, Tamil Nadu 600040');
+  },
+  'a row without a usable pair is dropped rather than pinned at zero': async () => {
+    // Nominatim has returned rows like this for oddly mapped features. Passing
+    // one through puts a marker in the Gulf of Guinea with no error anywhere.
+    const fake = async () => ({
+      ok: true,
+      json: async () => [
+        { lat: 'not-a-number', lon: '80.2', display_name: 'Broken' },
+        { lat: '13.1', lon: '80.2', display_name: '' },
+        { lat: '13.2', lon: '80.3', display_name: 'Good one' },
+      ],
+    });
+    const results = await searchPlaces('anything', fake);
+    assert.strictEqual(results.length, 1);
+    assert.strictEqual(results[0].label, 'Good one');
+  },
+  'a query too short to mean anything never reaches Nominatim': async () => {
+    // The shared outbound IP has one rate-limit budget for the whole app, so a
+    // two-character query must not spend a request from it.
+    let called = false;
+    const fake = async () => {
+      called = true;
+      return { ok: true, json: async () => [] };
+    };
+    assert.deepStrictEqual(await searchPlaces('ad', fake), []);
+    assert.deepStrictEqual(await searchPlaces('  ', fake), []);
+    assert.strictEqual(called, false);
+  },
+  'a non-array reply is an empty result, not a crash': async () => {
+    const fake = async () => ({ ok: true, json: async () => ({ error: 'Unable to geocode' }) });
+    assert.deepStrictEqual(await searchPlaces('nowhere', fake), []);
   },
 };
 
