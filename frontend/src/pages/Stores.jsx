@@ -155,11 +155,19 @@ export default function Stores() {
       // A fix this coarse would reverse-geocode to a confidently wrong street.
       // Filling that in is worse than leaving it blank: it looks authoritative
       // and someone has to notice it is wrong. Keep the pin, skip the address.
-      if (tier === 'poor') {
+      //
+      // Only perfect and good earn the lookup. A fair fix usually does land on
+      // the right road — but "usually" is the problem: nobody can tell the
+      // times it didn't from the times it did, and an address nobody checks is
+      // an address nobody trusts.
+      if (tier === 'fair' || tier === 'poor') {
         setGeo({
           busy: false,
           note: '',
-          error: `📍 ${accuracyLabel(accuracy)}. Your phone used wifi or the mobile network, not GPS — that happens indoors and between tall buildings. Step outside and try again, or open Google Maps below and paste the exact coordinates.`,
+          error:
+            tier === 'poor'
+              ? `📍 ${accuracyLabel(accuracy)}. Your phone used wifi or the mobile network, not GPS — that happens indoors and between tall buildings. Step outside and try again, or open Google Maps below and paste the exact coordinates.`
+              : `📍 ${accuracyLabel(accuracy)}. Close, but not close enough to name the street — type the address below, or step outside and try again for a tighter pin.`,
         });
         return;
       }
@@ -168,15 +176,11 @@ export default function Stores() {
       try {
         const res = await client.get('/stores/reverse-geocode', { params: { lat, lng } });
         if (res.data.address) apply({ address: res.data.address });
-        const caveat =
-          tier === 'fair'
-            ? ' Step outside and try again if you want a tighter pin.'
-            : '';
         setGeo({
           busy: false,
           error: '',
           note: res.data.address
-            ? `📍 ${accuracyLabel(accuracy)}. Address filled in — correct it if it looks wrong.${caveat}`
+            ? `📍 ${accuracyLabel(accuracy)}. Address filled in — correct it if it looks wrong.`
             : `📍 ${accuracyLabel(accuracy)}. No address found for this point, so type it below.`,
         });
       } catch (err) {
