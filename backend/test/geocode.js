@@ -7,7 +7,16 @@
 // pure, and reverseGeocode() is handed a fake fetch.
 const assert = require('assert');
 
-const { isLatLng, describe: describeFix, reverseGeocode, searchPlaces, readCoords } = require('../src/lib/geocode');
+const {
+  isLatLng,
+  describe: describeFix,
+  reverseGeocode,
+  searchPlaces,
+  isMapLink,
+  coordsFromMapUrl,
+  resolveMapLink,
+  readCoords,
+} = require('../src/lib/geocode');
 
 // A real Nominatim reply, trimmed to the fields used.
 const chennai = {
@@ -210,6 +219,66 @@ const tests = {
     assert.ok(!seen.includes('viewbox'), seen);
     await searchPlaces('MG Road', [999, 999], fake);
     assert.ok(!seen.includes('viewbox'), seen);
+  },
+  // Google Maps share links — what people actually have to hand.
+  'only Google map hosts are ever fetched': () => {
+    // The allowlist is the entire defence against the server being told to
+    // fetch an internal address or a cloud metadata endpoint.
+    assert.strictEqual(isMapLink('https://maps.app.goo.gl/abc123'), true);
+    assert.strictEqual(isMapLink('https://www.google.com/maps/place/x/@17.3,78.5,17z'), true);
+    assert.strictEqual(isMapLink('http://169.254.169.254/latest/meta-data/'), false);
+    assert.strictEqual(isMapLink('https://evil.example.com/maps.app.goo.gl'), false);
+    assert.strictEqual(isMapLink('https://maps.app.goo.gl.evil.com/x'), false);
+    assert.strictEqual(isMapLink('file:///etc/passwd'), false);
+    assert.strictEqual(isMapLink('500060'), false);
+  },
+  'coordinates are read from the URL, in every shape Maps uses': () => {
+    assert.deepStrictEqual(coordsFromMapUrl('https://www.google.com/maps/@17.3779,78.5174,17z'), {
+      lat: 17.3779,
+      lng: 78.5174,
+    });
+    assert.deepStrictEqual(coordsFromMapUrl('https://www.google.com/maps/place/X/data=!3d17.3779!4d78.5174'), {
+      lat: 17.3779,
+      lng: 78.5174,
+    });
+    assert.deepStrictEqual(coordsFromMapUrl('https://maps.google.com/?q=17.3779,78.5174'), {
+      lat: 17.3779,
+      lng: 78.5174,
+    });
+    // A link carrying only a Google place id has no position in it. Null means
+    // "say so" — the alternative, scraping the page body, matches unrelated
+    // numbers in Google's HTML and pins a Hyderabad shop in New Jersey.
+    assert.strictEqual(coordsFromMapUrl('https://www.google.com/maps?ftid=0x3bcb98c154ed3a7d:0x40369d'), null);
+    assert.strictEqual(coordsFromMapUrl('https://www.google.com/maps/@999,999,17z'), null);
+  },
+  'a long link with coordinates is resolved without any request': async () => {
+    let called = false;
+    const fake = async () => {
+      called = true;
+      return { ok: true, url: '' };
+    };
+    const point = await resolveMapLink('https://www.google.com/maps/@17.3779,78.5174,17z', fake);
+    assert.deepStrictEqual(point, { lat: 17.3779, lng: 78.5174 });
+    assert.strictEqual(called, false, 'no fetch needed when the link already carries the pair');
+  },
+  'a short link is followed, and read only from where it lands': async () => {
+    const fake = async () => ({
+      ok: true,
+      url: 'https://www.google.com/maps/place/Shop/@17.3779,78.5174,19z',
+      text: async () => 'body containing 40.5051,-74.1867 which must be ignored',
+    });
+    assert.deepStrictEqual(await resolveMapLink('https://maps.app.goo.gl/abc', fake), {
+      lat: 17.3779,
+      lng: 78.5174,
+    });
+  },
+  'a link that resolves to a place id yields null, never a guess': async () => {
+    const fake = async () => ({
+      ok: true,
+      url: 'https://www.google.com/maps?ftid=0x3bcb98c154ed3a7d:0x40369d16c03e2ef0&entry=gps',
+      text: async () => '[null,null,40.5051,-74.1867]',
+    });
+    assert.strictEqual(await resolveMapLink('https://maps.app.goo.gl/abc', fake), null);
   },
   'a non-array reply is an empty result, not a crash': async () => {
     const fake = async () => ({ ok: true, json: async () => ({ error: 'Unable to geocode' }) });

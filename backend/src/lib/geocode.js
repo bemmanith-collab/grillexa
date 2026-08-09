@@ -125,6 +125,73 @@ async function searchPlaces(query, near = null, fetchImpl = fetch) {
     .filter((row) => isLatLng(row.lat, row.lng) && row.label);
 }
 
+// Resolving a Google Maps share link — the thing everyone actually has to
+// hand, because the way you send someone a shop is to share it from Maps.
+//
+// Only these hosts are followed. The server fetching a URL a user supplied is
+// a request-forgery hole otherwise: an internal address, a cloud metadata
+// endpoint, anything reachable from inside the network. An allowlist is the
+// whole defence, so it is a literal list and not a pattern.
+const MAP_LINK_HOSTS = new Set([
+  'maps.app.goo.gl',
+  'goo.gl',
+  'maps.google.com',
+  'www.google.com',
+  'google.com',
+]);
+
+// Read from the final URL only, never the page body. Google's HTML contains
+// unrelated coordinate-shaped numbers — a naive body scrape on a Hyderabad
+// shop returns a point in New Jersey, with nothing to say it is wrong. A
+// silently misplaced pin is worse than no pin: it survives into Directions
+// and sends a driver to another state.
+//
+// Four shapes, in the order they are trustworthy: the @ in a map URL, the
+// !3d!4d pair in a place URL, and the explicit q=/ll= parameters.
+function coordsFromMapUrl(urlText) {
+  const patterns = [
+    /@(-?\d{1,2}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
+    /!3d(-?\d{1,2}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)/,
+    /[?&](?:q|ll|daddr|center)=(-?\d{1,2}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
+  ];
+  for (const re of patterns) {
+    const m = String(urlText).match(re);
+    if (!m) continue;
+    const [lat, lng] = [Number(m[1]), Number(m[2])];
+    if (isLatLng(lat, lng)) return { lat, lng };
+  }
+  return null;
+}
+
+function isMapLink(text) {
+  try {
+    const url = new URL(String(text).trim());
+    return (url.protocol === 'https:' || url.protocol === 'http:') && MAP_LINK_HOSTS.has(url.hostname);
+  } catch (err) {
+    return false;
+  }
+}
+
+// Returns {lat, lng} when the link carries a position, or null when it only
+// carries a Google place id — a short link often resolves to `ftid=…` with no
+// coordinates anywhere, and turning that into a point needs the paid Places
+// API. Null means "say so", not "guess".
+async function resolveMapLink(link, fetchImpl = fetch) {
+  if (!isMapLink(link)) return null;
+  // A long link may already carry the pair, in which case there is nothing to
+  // fetch and no request to make.
+  const direct = coordsFromMapUrl(link);
+  if (direct) return direct;
+  const res = await fetchImpl(String(link).trim(), {
+    redirect: 'follow',
+    headers: { 'User-Agent': USER_AGENT },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`Google responded ${res.status}`);
+  // res.url is where the redirects landed. Only that.
+  return coordsFromMapUrl(res.url);
+}
+
 // What a store's pin should become, given a request body. A pin without its
 // pair is meaningless and a number out of range is a bug upstream, not a
 // location — either both arrive valid or the store has no pin, never half of
@@ -144,4 +211,15 @@ function readCoords(body) {
   return { ok: true, data: { lat: latNum, lng: lngNum, accuracyM: Number.isFinite(acc) && acc > 0 ? acc : null } };
 }
 
-module.exports = { isLatLng, describe, reverseGeocode, searchPlaces, toParts, toAddressLine, readCoords };
+module.exports = {
+  isLatLng,
+  describe,
+  reverseGeocode,
+  searchPlaces,
+  isMapLink,
+  coordsFromMapUrl,
+  resolveMapLink,
+  toParts,
+  toAddressLine,
+  readCoords,
+};

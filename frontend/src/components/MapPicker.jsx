@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-lea
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import client from '../api/client';
+import { parseCoordInput, coordError } from '../lib/storeLinks';
 
 // Picking a shop off a map, for when standing outside it with GPS is not on
 // offer — a store added from the office, or one whose fix came back 2km wide.
@@ -88,6 +89,20 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby }) {
 
   async function search() {
     const q = query.trim();
+
+    // A pasted "17.3779, 78.5174" is already the answer. No lookup, no network,
+    // no rate limit, and exact — which is more than any search can promise.
+    // This is the reliable route out of Google Maps: long-press the shop, copy
+    // the numbers it shows, paste them here.
+    const pasted = parseCoordInput(q);
+    if (pasted && pasted.lng !== undefined && !coordError(pasted.lat, pasted.lng)) {
+      setResults([]);
+      setQuery('');
+      setSearchNote('');
+      setExternalCentre([pasted.lat, pasted.lng]);
+      onPick(pasted.lat, pasted.lng);
+      return;
+    }
     // Matches the server's floor, so a short query is answered here rather
     // than spending a request from the shared Nominatim budget.
     if (q.length < 3) {
@@ -143,8 +158,8 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby }) {
               search();
             }
           }}
-          placeholder="Search a PIN code, road, landmark or area…"
-          aria-label="Search for a place or PIN code"
+          placeholder="Paste coordinates, or search a PIN code, road or landmark…"
+          aria-label="Paste coordinates, or search for a place or PIN code"
         />
         <button type="button" className="btn-secondary btn-sm" onClick={search} disabled={searching}>
           {searching ? 'Searching…' : 'Search'}
@@ -188,6 +203,9 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby }) {
         {hasPin
           ? 'Tap the map to move the pin, or drag it. Zoom in until you can see the shutter.'
           : 'Tap the map where the shop is. Search above to get to the right street first.'}
+        {' '}
+        Have it in Google Maps? Press and hold the shop there until a pin drops, copy the numbers it
+        shows, and paste them into the box above.
       </p>
     </div>
   );

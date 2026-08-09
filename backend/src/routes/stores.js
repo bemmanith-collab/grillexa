@@ -3,7 +3,7 @@ const rateLimit = require('express-rate-limit');
 const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
-const { isLatLng, reverseGeocode, searchPlaces, readCoords } = require('../lib/geocode');
+const { isLatLng, reverseGeocode, searchPlaces, isMapLink, resolveMapLink, readCoords } = require('../lib/geocode');
 const { notifyOthers } = require('../lib/push');
 
 const router = express.Router();
@@ -82,6 +82,25 @@ router.get('/geocode', geocodeLimiter, async (req, res) => {
   // mapped, which puts Bengaluru and Chennai above Hyderabad every time.
   const [nearLat, nearLng] = String(req.query.near || '').split(',').map(Number);
   const near = isLatLng(nearLat, nearLng) ? [nearLat, nearLng] : null;
+  // A Google Maps share link is what people actually have to hand: the way you
+  // send someone a shop is to share it from Maps. Handled here rather than as
+  // a separate endpoint so pasting one into the search box just works.
+  if (isMapLink(q)) {
+    try {
+      const point = await resolveMapLink(q);
+      if (point) return res.json({ results: [{ ...point, label: 'From your Google Maps link', address: '' }] });
+      // A short link often resolves to a Google place id with no coordinates
+      // anywhere in the URL. Turning that into a point needs the paid Places
+      // API, so the honest answer is to say so and give the manual route.
+      return res.status(422).json({
+        error:
+          "That link doesn't carry coordinates. Open it in Google Maps, press and hold the shop until a pin drops, then copy the numbers it shows and paste them here.",
+      });
+    } catch (err) {
+      return res.status(502).json({ error: 'Could not open that link — paste the coordinates instead.' });
+    }
+  }
+
   try {
     res.json({ results: await searchPlaces(q, near) });
   } catch (err) {
