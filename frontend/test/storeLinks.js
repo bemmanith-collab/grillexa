@@ -115,8 +115,11 @@ check('a transposed or out-of-range pair is caught at the keyboard', () => {
 
 check('accuracy tiers separate a GPS fix from a wifi guess', () => {
   assert.equal(accuracyTier(8), 'good');
-  assert.equal(accuracyTier(50), 'good');
-  assert.equal(accuracyTier(51), 'fair');
+  // 65m is the boundary, not 50: a real GNSS fix on a street between two tall
+  // buildings sits in that band, and calling it 'fair' sends people back
+  // outside to re-capture a pin that was already right.
+  assert.equal(accuracyTier(65), 'good');
+  assert.equal(accuracyTier(66), 'fair');
   assert.equal(accuracyTier(500), 'fair');
   assert.equal(accuracyTier(3000), 'poor');
   assert.equal(accuracyTier(null), 'unknown');

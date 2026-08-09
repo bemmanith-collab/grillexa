@@ -18,14 +18,24 @@ import {
   parseCoordInput,
   coordError,
   ACCURACY_GOOD_M,
+  ACCURACY_PERFECT_M,
 } from '../lib/storeLinks';
 
 const EMPTY_FORM = { name: '', address: '', phone: '', lat: null, lng: null, accuracyM: null };
 
 // How long to keep watching for a better fix before settling for the best one
-// seen. Long enough for a cold GNSS start, short enough that nobody standing
-// on a footpath gives up on it.
-const WATCH_MS = 12000;
+// seen. Long enough for a cold GNSS start on a street where the sky is a strip
+// between two buildings — which is most of them here.
+const WATCH_MS = 25000;
+
+// The watch rarely runs the full 25s, because readings stop improving long
+// before they stop arriving. These settle it once that happens: a short pause
+// after a usable fix in case a better one is right behind it, and a longer one
+// for a fix still too coarse to keep. The second doubles as the stall guard —
+// a phone on a weak network goes quiet without ever calling the error handler,
+// and a silent watch would otherwise spin to the full WATCH_MS.
+const SETTLE_MS = 2500;
+const STALL_MS = 8000;
 
 // getCurrentPosition's error codes, in the words of someone holding the phone.
 // A denial is the common one and is not a failure — the address can always be
@@ -94,31 +104,44 @@ export default function Stores() {
     // the most accurate reading seen, and stop early once it is good enough.
     let best = null;
     let done = false;
+    let settle = null;
+
+    // Don't watch forever: a phone that never gets a clean fix must still hand
+    // back the best it managed rather than spinning.
+    const maxTimer = setTimeout(() => finish(), WATCH_MS);
+
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         if (!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
         setGeo({ busy: true, error: '', note: `Locating… best so far ${formatAccuracy(best.coords.accuracy)}` });
-        if (best.coords.accuracy <= ACCURACY_GOOD_M) finish();
+        // Open sky: this is as good as the hardware gets, so stop asking.
+        if (best.coords.accuracy <= ACCURACY_PERFECT_M) return finish();
+        // Otherwise wait out a quiet spell — re-armed on each reading, so it
+        // fires once the fix stops improving rather than once it first lands.
+        clearTimeout(settle);
+        settle = setTimeout(finish, best.coords.accuracy <= ACCURACY_GOOD_M ? SETTLE_MS : STALL_MS);
       },
       (err) => {
         if (done) return;
         // A later error after a good reading isn't a failure — keep what we have.
         if (best) return finish();
         done = true;
-        navigator.geolocation.clearWatch(watchId);
+        stop();
         setGeo({ busy: false, error: geoMessage(err), note: '' });
       },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: WATCH_MS, maximumAge: 0 }
     );
-    // Don't watch forever: a phone that never gets a clean fix must still hand
-    // back the best it managed rather than spinning.
-    const timer = setTimeout(() => finish(), WATCH_MS);
+
+    function stop() {
+      clearTimeout(maxTimer);
+      clearTimeout(settle);
+      navigator.geolocation.clearWatch(watchId);
+    }
 
     async function finish() {
       if (done) return;
       done = true;
-      clearTimeout(timer);
-      navigator.geolocation.clearWatch(watchId);
+      stop();
       if (!best) {
         setGeo({ busy: false, error: "Couldn't get a fix — type the address or coordinates below.", note: '' });
         return;

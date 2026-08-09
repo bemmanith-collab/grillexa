@@ -47,12 +47,20 @@ export function formatPin(store) {
 
 // How much to trust a fix. The browser reports `accuracy` as a radius in
 // metres, and the three tiers are really three different sensors: a true GNSS
-// fix outdoors lands under ~50m, a wifi-derived one in the hundreds, and an
+// fix lands in the tens of metres, a wifi-derived one in the hundreds, and an
 // IP-derived one — which is what a phone indoors with weak GPS often returns —
 // can be kilometres out while looking exactly like the good one on screen.
 // That is how a wrong pin gets saved and then trusted by Directions forever.
-export const ACCURACY_GOOD_M = 50;
+//
+// 65m, not the textbook 50: on a dense Chennai street the sky is a strip
+// between two buildings, and a genuine GNSS fix there settles in the 50-65m
+// band. Holding out for 50 mostly buys a longer spinner and the same pin.
+// Tune this against real captures, not against what the spec says GPS can do.
+export const ACCURACY_GOOD_M = 65;
 export const ACCURACY_POOR_M = 500;
+
+// Open sky, hardware GPS, nothing left to wait for — stop the watch on sight.
+export const ACCURACY_PERFECT_M = 15;
 
 export function accuracyTier(metres) {
   if (!Number.isFinite(metres) || metres <= 0) return 'unknown';
