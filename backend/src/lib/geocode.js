@@ -76,10 +76,19 @@ async function reverseGeocode(lat, lng, fetchImpl = fetch) {
 //
 // Returns [] rather than throwing for a query that matched nothing: an empty
 // result is an ordinary answer to "find this", not a failure.
+// An Indian PIN code is exactly six digits. Nominatim will find one through the
+// free-text `q`, but its structured `postalcode` parameter is what the postcode
+// index is actually built for — free text can match a house number or a road
+// that happens to contain the digits. The two cannot be combined: a request
+// carrying both `q` and a structured field is rejected, so it is one or the
+// other, chosen here.
+const PIN_CODE = /^\d{6}$/;
+
 async function searchPlaces(query, fetchImpl = fetch) {
   const q = String(query || '').trim();
   if (q.length < 3) return [];
-  const url = `${NOMINATIM_SEARCH_URL}?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5&countrycodes=in`;
+  const lookup = PIN_CODE.test(q) ? `postalcode=${q}` : `q=${encodeURIComponent(q)}`;
+  const url = `${NOMINATIM_SEARCH_URL}?${lookup}&format=json&addressdetails=1&limit=5&countrycodes=in`;
   const res = await fetchImpl(url, {
     headers: { 'User-Agent': USER_AGENT, 'Accept-Language': 'en' },
     signal: AbortSignal.timeout(TIMEOUT_MS),

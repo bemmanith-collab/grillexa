@@ -81,8 +81,7 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick }) {
     [onPick]
   );
 
-  async function search(e) {
-    e.preventDefault();
+  async function search() {
     const q = query.trim();
     // Matches the server's floor, so a short query is answered here rather
     // than spending a request from the shared Nominatim budget.
@@ -117,19 +116,31 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick }) {
 
   return (
     <div className="map-picker">
-      <form className="map-search" onSubmit={search} role="search">
+      {/* A div, not a form, and every button is type="button". This sits inside
+          the Add Store <form>, and a nested <form> is invalid HTML — the parser
+          throws the inner one away, so onSubmit never fires and a submit button
+          submits the OUTER form. Searching would have tried to save the store. */}
+      <div className="map-search" role="search">
         <input
           type="search"
           className="line-input"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search a road, landmark or area…"
-          aria-label="Search for a place"
+          onKeyDown={(e) => {
+            // Enter in a text input submits the enclosing form. Intercepted for
+            // the same reason as above: here it means "search", never "save".
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              search();
+            }
+          }}
+          placeholder="Search a PIN code, road, landmark or area…"
+          aria-label="Search for a place or PIN code"
         />
-        <button type="submit" className="btn-secondary btn-sm" disabled={searching}>
+        <button type="button" className="btn-secondary btn-sm" onClick={search} disabled={searching}>
           {searching ? 'Searching…' : 'Search'}
         </button>
-      </form>
+      </div>
 
       {results.length > 0 && (
         <ul className="map-results">

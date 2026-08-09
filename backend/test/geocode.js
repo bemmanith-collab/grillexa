@@ -162,6 +162,31 @@ const tests = {
     assert.deepStrictEqual(await searchPlaces('  ', fake), []);
     assert.strictEqual(called, false);
   },
+  'a six-digit query is looked up as a PIN code, not as free text': async () => {
+    // Nominatim rejects a request carrying both `q` and a structured field, so
+    // this is one or the other — and free text can match a house number or a
+    // road that happens to contain the digits.
+    let seen = '';
+    const fake = async (url) => {
+      seen = url;
+      return { ok: true, json: async () => [] };
+    };
+    await searchPlaces('600040', fake);
+    assert.ok(seen.includes('postalcode=600040'), seen);
+    assert.ok(!seen.includes('q='), 'must not send q alongside postalcode');
+  },
+  'anything that is not six digits stays a free-text search': async () => {
+    let seen = '';
+    const fake = async (url) => {
+      seen = url;
+      return { ok: true, json: async () => [] };
+    };
+    await searchPlaces('60004', fake);
+    assert.ok(seen.includes('q=60004'), seen);
+    await searchPlaces('Anna Nagar', fake);
+    assert.ok(seen.includes('q=Anna%20Nagar'), seen);
+    assert.ok(!seen.includes('postalcode='), seen);
+  },
   'a non-array reply is an empty result, not a crash': async () => {
     const fake = async () => ({ ok: true, json: async () => ({ error: 'Unable to geocode' }) });
     assert.deepStrictEqual(await searchPlaces('nowhere', fake), []);
