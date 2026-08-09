@@ -57,15 +57,24 @@ export function formatPin(store) {
 // band. Holding out for 50 mostly buys a longer spinner and the same pin.
 // Tune this against real captures, not against what the spec says GPS can do.
 export const ACCURACY_GOOD_M = 65;
-export const ACCURACY_POOR_M = 500;
 
 // Open sky, hardware GPS, nothing left to wait for — stop the watch on sight.
 export const ACCURACY_PERFECT_M = 15;
 
+// The line between "check this" and "don't trust this". 200m still reverse
+// geocodes to the right road most of the time; past it the answer is a street
+// someone never stood on. This was 500m, which was too generous — a 400m fix
+// was filling in addresses confidently enough that nobody thought to look.
+export const ACCURACY_FAIR_M = 200;
+
 export function accuracyTier(metres) {
+  // Null is not zero metres — it's a pin typed by hand, or one saved before
+  // accuracy was recorded. Calling that 'perfect' would be the worst possible
+  // guess, since nothing measured it at all.
   if (!Number.isFinite(metres) || metres <= 0) return 'unknown';
+  if (metres <= ACCURACY_PERFECT_M) return 'perfect';
   if (metres <= ACCURACY_GOOD_M) return 'good';
-  if (metres <= ACCURACY_POOR_M) return 'fair';
+  if (metres <= ACCURACY_FAIR_M) return 'fair';
   return 'poor';
 }
 
@@ -76,6 +85,7 @@ export function accuracyLabel(metres) {
   const tier = accuracyTier(metres);
   if (tier === 'unknown') return '';
   const size = formatAccuracy(metres);
+  if (tier === 'perfect') return `GPS accuracy: ${size} (perfect)`;
   if (tier === 'good') return `GPS accuracy: ${size} (good)`;
   if (tier === 'fair') return `GPS accuracy: ${size} (fair — check the address)`;
   return `GPS accuracy: ${size} (poor — step outside)`;

@@ -2585,6 +2585,10 @@ a.btn-danger {
   white-space: nowrap;
 }
 
+/* Four tiers, three colours: perfect and good both mean "no action", so they
+   share the green and the tier word in the badge carries the difference.
+   Colour is for urgency, wording is for gradation. */
+.accuracy-perfect,
 .accuracy-good {
   background: var(--success-soft);
   color: var(--success);
@@ -2598,6 +2602,12 @@ a.btn-danger {
 .accuracy-poor {
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+/* No sensor estimate at all — a hand-typed pin. Neither reassuring nor alarming. */
+.accuracy-unknown {
+  background: transparent;
+  color: var(--text-muted);
 }
 
 .store-pin-readout {

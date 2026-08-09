@@ -246,7 +246,7 @@ export default function Stores() {
     const err = coordError(values.lat, values.lng);
     // Only when the pin is doubtful or missing — a good fix needs no escape
     // hatch, and offering one there just invites second-guessing.
-    const mapsPick = tier === 'good' ? '' : mapsPickUrl(values);
+    const mapsPick = tier === 'good' || tier === 'perfect' ? '' : mapsPickUrl(values);
     function setPart(part, text) {
       const parsed = parseCoordInput(text);
       if (parsed && parsed.lng !== undefined) return apply({ lat: parsed.lat, lng: parsed.lng, accuracyM: null });

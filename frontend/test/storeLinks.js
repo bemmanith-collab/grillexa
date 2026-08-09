@@ -114,14 +114,20 @@ check('a transposed or out-of-range pair is caught at the keyboard', () => {
 });
 
 check('accuracy tiers separate a GPS fix from a wifi guess', () => {
-  assert.equal(accuracyTier(8), 'good');
-  // 65m is the boundary, not 50: a real GNSS fix on a street between two tall
-  // buildings sits in that band, and calling it 'fair' sends people back
+  assert.equal(accuracyTier(8), 'perfect');
+  assert.equal(accuracyTier(15), 'perfect');
+  // 65m is the good boundary, not 50: a real GNSS fix on a street between two
+  // tall buildings sits in that band, and calling it 'fair' sends people back
   // outside to re-capture a pin that was already right.
+  assert.equal(accuracyTier(16), 'good');
   assert.equal(accuracyTier(65), 'good');
   assert.equal(accuracyTier(66), 'fair');
-  assert.equal(accuracyTier(500), 'fair');
+  assert.equal(accuracyTier(200), 'fair');
+  // Past 200m the address lookup is skipped, so this boundary decides whether
+  // a street name gets filled in at all.
+  assert.equal(accuracyTier(201), 'poor');
   assert.equal(accuracyTier(3000), 'poor');
+  // Null is a hand-typed pin, not a flawless one.
   assert.equal(accuracyTier(null), 'unknown');
   assert.equal(accuracyTier(0), 'unknown');
 });
@@ -134,14 +140,16 @@ check('accuracy reads in the unit a person would say it in', () => {
 });
 
 check('the accuracy label names the tier and says what to do about it', () => {
-  assert.equal(accuracyLabel(9), 'GPS accuracy: ±9m (good)');
-  assert.equal(accuracyLabel(240), 'GPS accuracy: ±240m (fair — check the address)');
+  assert.equal(accuracyLabel(9), 'GPS accuracy: ±9m (perfect)');
+  assert.equal(accuracyLabel(40), 'GPS accuracy: ±40m (good)');
+  assert.equal(accuracyLabel(150), 'GPS accuracy: ±150m (fair — check the address)');
   assert.equal(accuracyLabel(2000), 'GPS accuracy: ±2.0km (poor — step outside)');
   assert.equal(accuracyLabel(null), '');
 });
 
 check('the row badge is the short form of the same thing', () => {
-  assert.equal(accuracyBadge(9), '±9m good');
+  assert.equal(accuracyBadge(9), '±9m perfect');
+  assert.equal(accuracyBadge(40), '±40m good');
   assert.equal(accuracyBadge(2000), '±2.0km poor');
   assert.equal(accuracyBadge(null), '');
 });
