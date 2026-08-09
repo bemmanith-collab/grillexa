@@ -127,7 +127,7 @@ const tests = {
       ok: true,
       json: async () => [{ lat: '13.0067', lon: '80.2570', display_name: 'Adyar, Chennai', address: chennai.address }],
     });
-    const [first] = await searchPlaces('Adyar', fake);
+    const [first] = await searchPlaces('Adyar', null, fake);
     assert.strictEqual(first.lat, 13.0067);
     assert.strictEqual(first.lng, 80.257);
     assert.strictEqual(first.label, 'Adyar, Chennai');
@@ -146,7 +146,7 @@ const tests = {
         { lat: '13.2', lon: '80.3', display_name: 'Good one' },
       ],
     });
-    const results = await searchPlaces('anything', fake);
+    const results = await searchPlaces('anything', null, fake);
     assert.strictEqual(results.length, 1);
     assert.strictEqual(results[0].label, 'Good one');
   },
@@ -158,8 +158,8 @@ const tests = {
       called = true;
       return { ok: true, json: async () => [] };
     };
-    assert.deepStrictEqual(await searchPlaces('ad', fake), []);
-    assert.deepStrictEqual(await searchPlaces('  ', fake), []);
+    assert.deepStrictEqual(await searchPlaces('ad', null, fake), []);
+    assert.deepStrictEqual(await searchPlaces('  ', null, fake), []);
     assert.strictEqual(called, false);
   },
   'a six-digit query is looked up as a PIN code, not as free text': async () => {
@@ -171,7 +171,7 @@ const tests = {
       seen = url;
       return { ok: true, json: async () => [] };
     };
-    await searchPlaces('600040', fake);
+    await searchPlaces('600040', null, fake);
     assert.ok(seen.includes('postalcode=600040'), seen);
     assert.ok(!seen.includes('q='), 'must not send q alongside postalcode');
   },
@@ -181,15 +181,39 @@ const tests = {
       seen = url;
       return { ok: true, json: async () => [] };
     };
-    await searchPlaces('60004', fake);
+    await searchPlaces('60004', null, fake);
     assert.ok(seen.includes('q=60004'), seen);
-    await searchPlaces('Anna Nagar', fake);
+    await searchPlaces('Anna Nagar', null, fake);
     assert.ok(seen.includes('q=Anna%20Nagar'), seen);
     assert.ok(!seen.includes('postalcode='), seen);
   },
+  'a nearby pin biases results without excluding anywhere else': async () => {
+    let seen = '';
+    const fake = async (url) => {
+      seen = url;
+      return { ok: true, json: async () => [] };
+    };
+    // Hyderabad, where the stores actually are.
+    await searchPlaces('MG Road', [17.385, 78.4867], fake);
+    assert.ok(seen.includes('viewbox=77.9867,16.885,78.9867,17.885'), seen);
+    // bounded=0 is the whole point: a shop in a new city must still be
+    // findable through the screen used to add the first store there.
+    assert.ok(seen.includes('bounded=0'), seen);
+  },
+  'a missing or nonsense nearby pin is simply ignored': async () => {
+    let seen = '';
+    const fake = async (url) => {
+      seen = url;
+      return { ok: true, json: async () => [] };
+    };
+    await searchPlaces('MG Road', null, fake);
+    assert.ok(!seen.includes('viewbox'), seen);
+    await searchPlaces('MG Road', [999, 999], fake);
+    assert.ok(!seen.includes('viewbox'), seen);
+  },
   'a non-array reply is an empty result, not a crash': async () => {
     const fake = async () => ({ ok: true, json: async () => ({ error: 'Unable to geocode' }) });
-    assert.deepStrictEqual(await searchPlaces('nowhere', fake), []);
+    assert.deepStrictEqual(await searchPlaces('nowhere', null, fake), []);
   },
 };
 

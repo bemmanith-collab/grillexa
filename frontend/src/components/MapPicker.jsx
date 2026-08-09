@@ -7,10 +7,14 @@ import client from '../api/client';
 // Picking a shop off a map, for when standing outside it with GPS is not on
 // offer — a store added from the office, or one whose fix came back 2km wide.
 //
-// Chennai. Only used when there is no pin yet and nothing typed to search:
-// a map that opens on the null island is a map everyone has to drag across the
-// planet before it is any use.
-const DEFAULT_CENTRE = [13.0827, 80.2707];
+// Where the map opens when the store has no pin yet. The caller passes the
+// last store that *does* have one, which is the best available guess at where
+// the next shop is — someone adding stores today is working one area.
+//
+// This constant is only reached before any store anywhere has a pin, i.e. once
+// in the life of the database. Hyderabad because that is where the business
+// is; do not hardcode a city anywhere else, it will be wrong within a year.
+const LAST_RESORT_CENTRE = [17.385, 78.4867];
 const DEFAULT_ZOOM = 12;
 // Close enough to tell one shutter from the next, the same zoom the Google
 // Maps escape hatch uses.
@@ -50,9 +54,10 @@ function Recentre({ centre, zoom }) {
   return null;
 }
 
-export default function MapPicker({ lat, lng, onPick, onSearchPick }) {
+export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby }) {
   const hasPin = Number.isFinite(lat) && Number.isFinite(lng);
   const position = hasPin ? [lat, lng] : null;
+  const openAt = position || nearby || LAST_RESORT_CENTRE;
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -93,7 +98,11 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick }) {
     setSearchNote('');
     setResults([]);
     try {
-      const { data } = await client.get('/stores/geocode', { params: { q } });
+      const { data } = await client.get('/stores/geocode', {
+        // Rank results near the shops we already have. A colony name typed on
+        // its own otherwise matches whichever city OpenStreetMap knows best.
+        params: { q, ...(nearby ? { near: `${nearby[0]},${nearby[1]}` } : {}) },
+      });
       setResults(data.results);
       if (!data.results.length) setSearchNote('Nothing found. Try a landmark or a road name, or drop the pin by hand.');
     } catch (err) {
@@ -156,7 +165,7 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick }) {
       {searchNote && <p className="map-note">{searchNote}</p>}
 
       <MapContainer
-        center={position || DEFAULT_CENTRE}
+        center={openAt}
         zoom={position ? PIN_ZOOM : DEFAULT_ZOOM}
         scrollWheelZoom
         className="map-canvas"

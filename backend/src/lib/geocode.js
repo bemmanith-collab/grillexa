@@ -84,11 +84,28 @@ async function reverseGeocode(lat, lng, fetchImpl = fetch) {
 // other, chosen here.
 const PIN_CODE = /^\d{6}$/;
 
-async function searchPlaces(query, fetchImpl = fetch) {
+// Half a degree is roughly 55km — a metro and its outskirts. Wide enough that
+// a shop on the far edge of the city still ranks, narrow enough that the box
+// means something.
+const NEAR_BOX_DEG = 0.5;
+
+// `near` is the last known store pin, and it only *prefers* results in that
+// box (`bounded=0`) rather than restricting to it — a genuinely distant place
+// must still be findable, or expanding to a new city becomes impossible
+// through the very screen used to add the first store there.
+function viewboxFor(near) {
+  if (!Array.isArray(near)) return '';
+  const [lat, lng] = near.map(Number);
+  if (!isLatLng(lat, lng)) return '';
+  const [w, s, e, n] = [lng - NEAR_BOX_DEG, lat - NEAR_BOX_DEG, lng + NEAR_BOX_DEG, lat + NEAR_BOX_DEG];
+  return `&viewbox=${w},${s},${e},${n}&bounded=0`;
+}
+
+async function searchPlaces(query, near = null, fetchImpl = fetch) {
   const q = String(query || '').trim();
   if (q.length < 3) return [];
   const lookup = PIN_CODE.test(q) ? `postalcode=${q}` : `q=${encodeURIComponent(q)}`;
-  const url = `${NOMINATIM_SEARCH_URL}?${lookup}&format=json&addressdetails=1&limit=5&countrycodes=in`;
+  const url = `${NOMINATIM_SEARCH_URL}?${lookup}&format=json&addressdetails=1&limit=5&countrycodes=in${viewboxFor(near)}`;
   const res = await fetchImpl(url, {
     headers: { 'User-Agent': USER_AGENT, 'Accept-Language': 'en' },
     signal: AbortSignal.timeout(TIMEOUT_MS),

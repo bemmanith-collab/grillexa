@@ -77,8 +77,13 @@ router.get('/geocode', geocodeLimiter, async (req, res) => {
   // Two characters match half of India; the floor is here rather than only in
   // the browser so a stray request cannot spend the shared budget on noise.
   if (q.length < 3) return res.json({ results: [] });
+  // Optional "somewhere near here" hint — the last store pin the page knows of.
+  // Without it, a common road or colony name ranks by how well a city is
+  // mapped, which puts Bengaluru and Chennai above Hyderabad every time.
+  const [nearLat, nearLng] = String(req.query.near || '').split(',').map(Number);
+  const near = isLatLng(nearLat, nearLng) ? [nearLat, nearLng] : null;
   try {
-    res.json({ results: await searchPlaces(q) });
+    res.json({ results: await searchPlaces(q, near) });
   } catch (err) {
     res.status(502).json({ error: 'Place search is unavailable — drop the pin by hand instead.' });
   }

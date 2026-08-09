@@ -73,6 +73,18 @@ export default function Stores() {
   // flag would open both maps and load two Leaflet instances.
   const [mapOpenFor, setMapOpenFor] = useState(null);
 
+  // Where to open the map for a store that has no pin. The most recently added
+  // store that does have one, because someone adding shops today is working one
+  // area — and because a hardcoded city is wrong the moment the business opens
+  // in another. Not an average of every pin: across two cities that lands the
+  // map in the countryside between them, which is nowhere at all.
+  const nearbyPin = useMemo(() => {
+    const pinned = stores.filter(hasPin);
+    if (!pinned.length) return null;
+    const latest = pinned.reduce((a, b) => (a.id > b.id ? a : b));
+    return [latest.lat, latest.lng];
+  }, [stores]);
+
   const filteredStores = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return stores;
@@ -373,6 +385,7 @@ export default function Stores() {
             <MapPicker
               lat={values.lat}
               lng={values.lng}
+              nearby={nearbyPin}
               onPick={pickFromMap}
               // A search result carries an address, but it names the building
               // the geocoder matched, not the shop. Offered only into an empty
