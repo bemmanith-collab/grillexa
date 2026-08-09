@@ -108,7 +108,7 @@ export default function NotificationsButton({ className = 'btn-secondary' }) {
     <>
       <button type="button" className={className} onClick={enabled ? disable : enable} disabled={busy}>
         {enabled ? <BellOff size={16} strokeWidth={1.8} /> : <Bell size={16} strokeWidth={1.8} />}
-        {busy ? 'Working…' : enabled ? 'Turn off notifications' : 'Notify me of new stores'}
+        {busy ? 'Working…' : enabled ? 'Turn off notifications' : 'Notifications'}
       </button>
       {note && <p className="install-hint">{note}</p>}
     </>
