@@ -15,7 +15,12 @@ primary_region = "sin"
   # Kept warm deliberately. Cold boot is ~26s (entrypoint.sh runs
   # `prisma migrate deploy` before nginx binds), and once the app is
   # installed to a phone home screen that delay is a blank splash screen
-  # staff read as "broken". Costs ~$1.30/mo more than scaling to zero.
+  # staff read as "broken".
+  #
+  # One machine pinned on costs ~$4.19/mo at sin rates ($2.55 compute +
+  # $1.64 for the 256MB above the shared-cpu-1x preset). Letting it stop
+  # when idle billed $2.04 in July 2026, so the warmth costs ~$2/mo, not
+  # the ~$1.30 claimed here before the invoice was actually read.
   min_machines_running = 1
   processes = ["app"]
 

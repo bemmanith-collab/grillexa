@@ -483,11 +483,19 @@ Database is **Neon** (free tier, `ap-southeast-1` Singapore), reached over the p
 
 Moved off Fly Managed Postgres on 2026-08-05: a Basic cluster provisioned 10GB to hold **9.6MB** of data, at ~$38/month against ~$0. Migration was `pg_dump --schema=public --no-owner --no-acl` → `psql`, verified by comparing exact row counts, all 13 sequence `last_value`s, constraint/index counts and `_prisma_migrations` on both sides, then running `integrity-check.js` against the new database before cutting over.
 
+**Cutting over is not the same as switching it off.** The cluster (`kyzl60x136lopj9g` / `grillexa-db`) kept running until it was destroyed on 2026-08-10, billing the whole time for a database nothing connected to — 93% of the July 2026 invoice ($26.83 compute + $1.98 storage of $30.85), on track for ~$42/month once a full month was billed. It stayed invisible because **Managed Postgres does not appear in `flyctl apps list`, `flyctl volumes list`, or the GraphQL `addOns` query**; the only command that shows it is:
+
+```bash
+flyctl mpg list --org personal
+```
+
+Destroy it with `flyctl mpg destroy <cluster-id>`, never `flyctl mpg detach` — detach strips the app's `DATABASE_URL` secret, which by then holds the *Neon* URL. Confirm the secret's digest is unchanged afterwards (`flyctl secrets list -a grillexa`), and check a real query rather than `/health`, which never touches the database.
+
 Two things that bite on this restore path, both already handled in the dump command above: extensions (`pg_stat_monitor`, `pgaudit` are Percona/Fly-specific and do not exist on Neon — scoping the dump to `--schema=public` leaves them out), and `CREATE SCHEMA public` colliding with the one Neon creates for a new database.
 
 The app image is stateless and holds no volume, so replacing a machine cannot lose data.
 
-`min_machines_running = 1` is deliberate: a cold boot is ~26 seconds because `prisma migrate deploy` runs before Nginx binds, and once the app is installed to a phone home screen that delay is a blank splash screen.
+`min_machines_running = 1` is deliberate: a cold boot is ~26 seconds because `prisma migrate deploy` runs before Nginx binds, and once the app is installed to a phone home screen that delay is a blank splash screen. It costs ~$4.19/month to hold one machine on at `sin` rates, about $2/month more than letting it stop when idle — with the Postgres cluster gone this is now essentially the entire Fly bill.
 
 ## Installing on a phone
 
