@@ -2153,6 +2153,57 @@ button:disabled {
     display: none;
   }
 
+  /* Profit & Loss opts out of the card layout: 65 stores at four labelled
+     fields each is a card per store and a screen of scrolling every three.
+     The list is ranked by profit and the question it answers is "which shops
+     made money", so a phone gets that on one line — name, profit, margin —
+     and leaves Revenue and COGS to the desktop table and the Excel export. */
+  .pnl-table tbody tr {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 13px;
+    margin-bottom: 6px;
+  }
+
+  .pnl-table tbody td {
+    padding: 0;
+  }
+
+  .pnl-table tbody td::before {
+    display: none;
+  }
+
+  .pnl-table tbody td:nth-child(2),
+  .pnl-table tbody td:nth-child(3) {
+    display: none;
+  }
+
+  .pnl-table tbody td:first-child {
+    grid-column: auto;
+    flex: 1;
+    min-width: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding-bottom: 0;
+    margin-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .pnl-table tbody td:nth-child(4) {
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .pnl-table tbody td:nth-child(5) {
+    min-width: 3.1rem;
+    text-align: right;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
   /* The actions cell carries no heading; it spans the card and right-aligns. */
   .data-table tbody td:not([data-label]) {
     grid-column: 1 / -1;

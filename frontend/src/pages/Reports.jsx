@@ -344,7 +344,7 @@ export default function Reports() {
       <h2 className="section-title">Profit &amp; Loss by Store</h2>
       <div className="card">
         <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table pnl-table">
           <thead>
             <tr>
               <th>Store</th>
