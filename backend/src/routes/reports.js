@@ -416,10 +416,17 @@ router.get('/pnl', async (req, res) => {
     from: from.toISOString().slice(0, 10),
     to: to.toISOString().slice(0, 10),
     overall: shape(overallRevenue, overallCogs),
-    stores: stores.map((s) => {
-      const b = byStore.get(s.id) || { revenue: 0, cogs: 0 };
-      return { storeId: s.id, store: s.name, ...shape(b.revenue, b.cogs) };
-    }),
+    // Only stores that traded in the window, biggest profit first. Every store
+    // ever opened was listed alphabetically with zeros filled in, so a phone
+    // showed 80 cards to answer "which shops made money" — 14 of them empty,
+    // and the best one somewhere in the middle of the alphabet.
+    stores: stores
+      .map((s) => {
+        const b = byStore.get(s.id) || { revenue: 0, cogs: 0 };
+        return { storeId: s.id, store: s.name, ...shape(b.revenue, b.cogs) };
+      })
+      .filter((s) => s.revenue !== 0 || s.cogs !== 0)
+      .sort((a, b) => b.profit - a.profit),
   });
 });
 
