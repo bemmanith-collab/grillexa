@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { Search, MapPin, Navigation, Phone, Map } from 'lucide-react';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
+import SearchSelect from '../components/SearchSelect';
 import { StoreIcon } from '../components/icons';
 import {
   directionsUrl,
@@ -29,6 +30,9 @@ import {
 const MapPicker = lazy(() => import('../components/MapPicker'));
 
 const EMPTY_FORM = { name: '', address: '', phone: '', lat: null, lng: null, accuracyM: null };
+
+// Empty id, like the filters on Reports — '' reads as "no filter" everywhere.
+const ALL_PEOPLE = { id: '', name: 'All sales people' };
 
 // How long to keep watching for a better fix before settling for the best one
 // seen. Long enough for a cold GNSS start on a street where the sky is a strip
@@ -66,6 +70,8 @@ export default function Stores() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [search, setSearch] = useState('');
+  // Admin only, and a string: SearchSelect hands back the option's own id.
+  const [salesId, setSalesId] = useState('');
   const [geo, setGeo] = useState({ busy: false, error: '', note: '' });
   const [searchParams, setSearchParams] = useSearchParams();
   // Which form has its map open — 'new' for the add form, or a store id. Not a
@@ -85,11 +91,24 @@ export default function Stores() {
     return [latest.lat, latest.lng];
   }, [stores]);
 
+  // The people to offer, taken from the assignments already on the response —
+  // a salesperson covering no store would only ever filter the list to empty,
+  // so there is nothing to fetch. Sales accounts get no salesUsers at all, and
+  // land here with an empty list and no dropdown.
+  const salespeople = useMemo(() => {
+    const byId = new Map();
+    for (const s of stores) for (const u of s.salesUsers || []) byId.set(u.id, u);
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [stores]);
+
   const filteredStores = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return stores;
-    return stores.filter((s) => s.name.toLowerCase().includes(q) || (s.address || '').toLowerCase().includes(q));
-  }, [stores, search]);
+    return stores.filter(
+      (s) =>
+        (!q || s.name.toLowerCase().includes(q) || (s.address || '').toLowerCase().includes(q)) &&
+        (!salesId || (s.salesUsers || []).some((u) => String(u.id) === salesId))
+    );
+  }, [stores, search, salesId]);
 
   async function load() {
     setLoading(true);
@@ -472,9 +491,23 @@ export default function Stores() {
 
       {!loading && (
         <div className="card form-card">
-          <div className="search-input">
-            <Search size={16} />
-            <input placeholder="Search stores…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div className="filter-group">
+            <div className="search-input">
+              <Search size={16} />
+              <input placeholder="Search stores…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            {/* Eighty stores in one flat list is only readable to the
+                salesperson who sees six of them. SearchSelect drops back to a
+                native <select> for five people or fewer on its own. */}
+            {isAdmin && salespeople.length > 0 && (
+              <SearchSelect
+                options={salespeople}
+                value={salesId}
+                firstOption={ALL_PEOPLE}
+                onChange={(id) => setSalesId(String(id))}
+                placeholder="Filter by salesperson"
+              />
+            )}
           </div>
         </div>
       )}
@@ -610,7 +643,7 @@ export default function Stores() {
                   <td colSpan={3}>
                     <EmptyState
                       icon={StoreIcon}
-                      message={stores.length === 0 ? 'No stores yet.' : 'No stores match your search.'}
+                      message={stores.length === 0 ? 'No stores yet.' : 'No stores match your filters.'}
                     />
                   </td>
                 </tr>
