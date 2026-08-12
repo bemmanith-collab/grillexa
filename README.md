@@ -197,6 +197,8 @@ Reports carries five charts and one filter bar — date range (Today / This week
 
 **Profit & Loss by store lists only stores that traded, biggest profit first.** It used to list every store ever opened, alphabetically, with zeros filled in for the ones that sold nothing — 80 cards on a phone to answer "which shops made money", 14 of them empty, the best one buried mid-alphabet. A store with no movement in the range contributes nothing to a P&L, so it is left out rather than scrolled past.
 
+The filter bar's three pickers are `SearchSelect`, not plain dropdowns. The store one was the last place in the app that put all eighty stores into a native `<select>`; products and people fall back to a `<select>` automatically, because `SearchSelect` does that for five options or fewer.
+
 On a phone the P&L table opts out of the shared card layout (`.pnl-table`): one line per store — name, profit, margin — because the list is ranked by profit and that is the question it answers. Revenue and COGS stay in the desktop table and the Excel export rather than costing four screens of scrolling.
 
 **Units Moved by Store is one collapsed row per store.** Each store's product table is a `<details>`, closed by default — the mobile layout renders every table row as a card, so 60-odd stores expanded was a page nobody scrolled to the end of. Stores with no movement in the range are dropped server-side, same as the P&L.

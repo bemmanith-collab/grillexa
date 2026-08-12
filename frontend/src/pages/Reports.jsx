@@ -7,6 +7,12 @@ import { AlertIcon } from '../components/icons';
 import { formatCurrency } from '../lib/format';
 import { formatDate, todayStr, startOfWeekStr, startOfMonthStr } from '../utils/date';
 import Chart, { lineData, barData, doughnutData, TEAL, FLAME, WARN, money } from '../components/Chart';
+import SearchSelect, { RECENT_STORES } from '../components/SearchSelect';
+
+// Empty id, not 'all': every filter here already treats '' as "no filter".
+const ALL_STORES = { id: '', name: 'All stores' };
+const ALL_PRODUCTS = { id: '', name: 'All products' };
+const ALL_PEOPLE = { id: '', name: 'All sales people' };
 
 // The four ranges a manager actually asks for, plus a custom pair. Each one
 // resolves to a from/to here rather than on the server, so every endpoint on
@@ -163,31 +169,33 @@ export default function Reports() {
           </div>
         )}
 
+        {/* The store filter was the last plain <select> holding the full store
+            list — eighty options in a native picker on a phone. SearchSelect
+            drops back to a <select> on its own for five options or fewer, so
+            products and people keep the native control without a branch here. */}
         <div className="filter-group">
-          <select value={storeId} onChange={(e) => setStoreId(e.target.value)} aria-label="Store">
-            <option value="">All stores</option>
-            {analytics.filters.stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <select value={productId} onChange={(e) => setProductId(e.target.value)} aria-label="Product">
-            <option value="">All products</option>
-            {analytics.filters.products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <select value={userId} onChange={(e) => setUserId(e.target.value)} aria-label="Sales person">
-            <option value="">All sales people</option>
-            {analytics.filters.people.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          {/* SearchSelect hands back the option's own id, a number for a store;
+              the filter-chip lookups below compare String(id) to this state, so
+              it stays a string here rather than making three call sites agree. */}
+          <SearchSelect
+            options={analytics.filters.stores}
+            value={storeId}
+            firstOption={ALL_STORES}
+            onChange={(id) => setStoreId(String(id))}
+            recentKey={RECENT_STORES}
+          />
+          <SearchSelect
+            options={analytics.filters.products}
+            value={productId}
+            firstOption={ALL_PRODUCTS}
+            onChange={(id) => setProductId(String(id))}
+          />
+          <SearchSelect
+            options={analytics.filters.people}
+            value={userId}
+            firstOption={ALL_PEOPLE}
+            onChange={(id) => setUserId(String(id))}
+          />
         </div>
 
         {(storeId || productId || userId) && (
