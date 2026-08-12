@@ -197,6 +197,8 @@ Reports carries five charts and one filter bar — date range (Today / This week
 
 **Profit & Loss by store lists only stores that traded, biggest profit first.** It used to list every store ever opened, alphabetically, with zeros filled in for the ones that sold nothing — 80 cards on a phone to answer "which shops made money", 14 of them empty, the best one buried mid-alphabet. A store with no movement in the range contributes nothing to a P&L, so it is left out rather than scrolled past.
 
+**Units Moved by Store is one collapsed row per store.** Each store's product table is a `<details>`, closed by default — the mobile layout renders every table row as a card, so 60-odd stores expanded was a page nobody scrolled to the end of. Stores with no movement in the range are dropped server-side, same as the P&L.
+
 **The person filter reaches what the data attributes, and says so where it does not.** Sales are credited by who rang the bill up (`createdById`) — the same rule the personal dashboard uses — so the trend, the product mix, the store bars and the P&L table all narrow to one person. Wastage and Units Moved cannot: a stock ledger row records a store and a day and nobody's name, so those two keep showing everything in range, with a line above each saying why rather than leaving someone to notice a chart that did not move. The Excel export is store-and-range wide for the same reason; its Salesperson Performance sheet is where per-person figures live.
 
 All five series arrive in **one** response (`GET /api/reports/analytics`). Five endpoints would mean five round trips on a phone and five slightly different moments in time on one screen.

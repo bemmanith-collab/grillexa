@@ -472,14 +472,19 @@ router.get('/product-sales', async (req, res) => {
     byProduct.set(key, agg);
   }
 
-  const result = stores.map((store) => {
-    const byProduct = byStore.get(store.id) || new Map();
-    return {
-      storeId: store.id,
-      store: store.name,
-      products: Array.from(byProduct.values()).sort((a, b) => b.totalSold - a.totalSold),
-    };
-  });
+  // Same as /pnl above: every store ever opened came back, and the ones with
+  // nothing in the range each cost a card saying "No activity in this period."
+  // Kept alphabetical — this list is browsed by name, not ranked.
+  const result = stores
+    .map((store) => {
+      const byProduct = byStore.get(store.id) || new Map();
+      return {
+        storeId: store.id,
+        store: store.name,
+        products: Array.from(byProduct.values()).sort((a, b) => b.totalSold - a.totalSold),
+      };
+    })
+    .filter((store) => store.products.length > 0);
 
   res.json({
     days,

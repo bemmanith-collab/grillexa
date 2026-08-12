@@ -386,12 +386,12 @@ export default function Reports() {
 
       <div className="store-report-grid">
         {productSales.stores.map((store) => (
-          <div key={store.storeId} className="card store-report-card">
-            <h3>{store.store}</h3>
-            {store.products.length === 0 ? (
-              <p className="form-hint">No activity in this period.</p>
-            ) : (
-              <div className="table-scroll">
+          <details key={store.storeId} className="card store-report-card">
+            {/* Closed by default: on a phone every row of every store's table
+                is a card, so 60-odd stores expanded is a page nobody reaches
+                the end of. A summary per store is one line each. */}
+            <summary>{store.store}</summary>
+            <div className="table-scroll">
               <table className="data-table">
                 <thead>
                   <tr>
@@ -412,9 +412,8 @@ export default function Reports() {
                   ))}
                 </tbody>
               </table>
-              </div>
-            )}
-          </div>
+            </div>
+          </details>
         ))}
       </div>
     </div>
