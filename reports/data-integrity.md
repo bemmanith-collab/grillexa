@@ -916,3 +916,144 @@ Run at 2026-08-12T03:04:59.088Z (business day 2026-08-12, UTC+330m)
     … and 36 more
 [INFO] zero-price: No zero-priced sale lines and no zero-total bills.
 ```
+
+---
+
+## 2026-08-13 (run 15, exit 0)
+
+```
+Connecting to fdaa:98:810d:a7b:86e:df1b:a4bb:2...
+# Integrity check 2026-08-01 to 2026-08-15
+Run at 2026-08-13T03:08:10.161Z (business day 2026-08-13, UTC+330m)
+0 error(s), 2 warning(s)
+
+[WARN] missing-stores: 501 store-days with no ledger row (80 stores, 2026-08-01..2026-08-12).
+    2026-08-01  Aj cafe
+    2026-08-01  Alekya tea point 
+    2026-08-01  Anjanelu
+    2026-08-01  Arokya Heritage chaitanyapuri (vj)
+    2026-08-01  Babai Pävan sai
+    2026-08-01  Balaji eggs 
+    2026-08-01  Bhagya lakshmi
+    2026-08-01  Chai bar (vj)
+    2026-08-01  Friends tea shop 
+    2026-08-01  Ganapathi store
+    2026-08-01  Ganesh kirana store 
+    2026-08-01  Guru krupa Kirana store 
+    2026-08-01  KDP KIRANA STORE 
+    2026-08-01  Kalpana kirana store
+    2026-08-01  Kavitha kirana (vj)
+    2026-08-01  Kirrak chai (vj)
+    2026-08-01  Laddu Anna  chai
+    2026-08-01  Lakshmi kirana rock town 
+    2026-08-01  Manjunadha
+    2026-08-01  Manoj kirana store
+    2026-08-01  Maruthi kirana store 
+    2026-08-01  Mounika kirana store
+    2026-08-01  Munna shop 
+    2026-08-01  Narendar medical store
+    2026-08-01  Naresh kirana store
+    2026-08-01  Ohm Sri sai kirana store 
+    2026-08-01  Omkar dairy parlour (vj)
+    2026-08-01  Pandu seth kirana (vj)
+    2026-08-01  Prasad tea shop 
+    2026-08-01  Raghavendra stores sripuram (vj)
+    2026-08-01  Raja Rajeshwari 
+    2026-08-01  Rajeshwari kirana store
+    2026-08-01  Sahasra stationary (vj)
+    2026-08-01  Sai baba kirana store 
+    2026-08-01  Saraswathi stores
+    2026-08-01  Sathya kirana (vj)
+    2026-08-01  Shalivahana mart (vj)
+    2026-08-01  Siddirameshwara
+    2026-08-01  Sree laksmi padmavathi kirana
+    2026-08-01  Sri Laxmi kirana NTR nagar
+    … and 461 more
+[INFO] negative-received: 71 rows have a negative received, fully accounted for by unsold stock going back to HQ that day. This is how a settlement records a return — the gross figure is in the Returned column.
+    2026-08-01  Sathyanarayana kirana   Green sprouts   received=-2 sold=2 wastage=0 returnedToHq=2
+    2026-08-01  Sathyanarayana kirana   Mixed fruit bowl   received=-1 sold=0 wastage=0 returnedToHq=1
+    2026-08-01  Sathyanarayana kirana   Mixed sprouts   received=-2 sold=0 wastage=0 returnedToHq=2
+    2026-08-01  Sathyanarayana kirana   Single fruit bowl   received=-1 sold=0 wastage=0 returnedToHq=1
+    2026-08-02  Chandra stores (vj)  Banana   received=-5 sold=26 wastage=0 returnedToHq=5
+    2026-08-02  Chandra stores (vj)  Green sprouts   received=-5 sold=0 wastage=0 returnedToHq=5
+    2026-08-02  Chandra stores (vj)  Mixed sprouts   received=-3 sold=2 wastage=0 returnedToHq=3
+    2026-08-02  Mamata kirana (vj)  Green sprouts   received=-2 sold=3 wastage=0 returnedToHq=2
+    2026-08-02  Mamata kirana (vj)  Mixed fruit bowl   received=-1 sold=2 wastage=0 returnedToHq=1
+    2026-08-02  Mamata kirana (vj)  Mixed sprouts   received=-2 sold=1 wastage=0 returnedToHq=2
+    2026-08-02  Manikanta kirana (vj)  Green sprouts   received=-1 sold=9 wastage=0 returnedToHq=1
+    2026-08-03  AN milk beauty parlour (vj)  Green sprouts   received=-2 sold=0 wastage=0 returnedToHq=2
+    2026-08-03  AN milk beauty parlour (vj)  Mixed fruit bowl   received=-5 sold=4 wastage=0 returnedToHq=5
+    2026-08-03  AN milk beauty parlour (vj)  Mixed sprouts   received=-4 sold=1 wastage=0 returnedToHq=4
+    2026-08-03  Anjji kirana store   Banana   received=-2 sold=0 wastage=0 returnedToHq=2
+    2026-08-03  Anjji kirana store   Green sprouts   received=-5 sold=2 wastage=0 returnedToHq=5
+    2026-08-03  Anjji kirana store   Mixed fruit bowl   received=-3 sold=0 wastage=0 returnedToHq=3
+    2026-08-03  Anjji kirana store   Mixed sprouts   received=-6 sold=1 wastage=0 returnedToHq=6
+    2026-08-03  Boom milk parlour (vj)  Green sprouts   received=-6 sold=3 wastage=0 returnedToHq=11
+    2026-08-03  Boom milk parlour (vj)  Mixed fruit bowl   received=-3 sold=1 wastage=0 returnedToHq=5
+    2026-08-03  Boom milk parlour (vj)  Mixed sprouts   received=-1 sold=2 wastage=0 returnedToHq=7
+    2026-08-03  Harini food mall (vj)  Green sprouts   received=-3 sold=0 wastage=0 returnedToHq=7
+    2026-08-03  Harini food mall (vj)  Mixed fruit bowl   received=-2 sold=0 wastage=0 returnedToHq=2
+    2026-08-03  Mahalakshmi kirana (vj)  Green sprouts   received=-5 sold=0 wastage=0 returnedToHq=5
+    2026-08-03  Mahalakshmi kirana (vj)  Mixed fruit bowl   received=-2 sold=0 wastage=0 returnedToHq=2
+    2026-08-03  Mahalakshmi kirana (vj)  Mixed sprouts   received=-3 sold=0 wastage=0 returnedToHq=3
+    2026-08-03  Mamata kirana (vj)  Green sprouts   received=-4 sold=0 wastage=0 returnedToHq=7
+    2026-08-03  Mamata kirana (vj)  Mixed fruit bowl   received=-2 sold=0 wastage=0 returnedToHq=5
+    2026-08-03  Mamata kirana (vj)  Mixed sprouts   received=-3 sold=0 wastage=0 returnedToHq=5
+    2026-08-03  Omkar dairy parlour (vj)  Green sprouts   received=-3 sold=0 wastage=0 returnedToHq=3
+    2026-08-03  Omkar dairy parlour (vj)  Mixed sprouts   received=-1 sold=0 wastage=0 returnedToHq=1
+    2026-08-03  Pushpa kirana (vj)  Mixed fruit bowl   received=-1 sold=3 wastage=0 returnedToHq=1
+    2026-08-03  Santoshi mata kirana  Green sprouts   received=-4 sold=1 wastage=0 returnedToHq=9
+    2026-08-03  Santoshi mata kirana  Mixed sprouts   received=-3 sold=1 wastage=0 returnedToHq=8
+    2026-08-03  Sathya kirana (vj)  Green sprouts   received=-1 sold=0 wastage=0 returnedToHq=4
+    2026-08-03  Sri laxmi Narasimha kirana store   Green sprouts   received=-1 sold=0 wastage=0 returnedToHq=4
+    2026-08-03  Sri laxmi Narasimha kirana store   Mixed fruit bowl   received=-1 sold=0 wastage=0 returnedToHq=4
+    2026-08-03  Vasavi kirana  Green sprouts   received=-2 sold=8 wastage=0 returnedToHq=2
+    2026-08-03  Vasavi kirana  Mixed fruit bowl   received=-4 sold=4 wastage=0 returnedToHq=4
+    2026-08-03  Vasavi kirana  Mixed sprouts   received=-4 sold=6 wastage=0 returnedToHq=4
+    … and 31 more
+[INFO] negative-closing: 325 rows have closing < 0. Expected: stock is not booked in before it is billed, so the running balance drifts negative and is not displayed anywhere.
+[INFO] negative-movements: No unaccounted-for negative movements and no over-settled consignment items.
+[WARN] stale-consignments: 92 consignments delivered more than 7 days ago are still unsettled, holding Rs.7767.00 of unreported stock.
+    2026-07-31  CN-000048  Mahalakshmi kirana (vj)  PARTIAL_SETTLED  Rs.24.00
+    2026-07-31  CN-000036  Heritage Krishna Kumari (vj)  PARTIAL_SETTLED  Rs.39.00
+    2026-07-31  CN-000037  Chandra stores (vj)  PARTIAL_SETTLED  Rs.30.00
+    2026-07-31  CN-000033  Santoshi mata kirana  DELIVERED  Rs.129.00
+    2026-07-31  CN-000050  Dwarakamai kirana (vj)  PARTIAL_SETTLED  Rs.16.00
+    2026-07-31  CN-000045  Lakshmi pharmacy (vj)  PARTIAL_SETTLED  Rs.32.00
+    2026-07-31  CN-000046  Venkateshwara juice centre   PARTIAL_SETTLED  Rs.64.00
+    2026-07-31  CN-000060  Ohm Sri sai kirana store   DELIVERED  Rs.160.00
+    2026-07-31  CN-000030  Vasavi kirana  DELIVERED  Rs.131.00
+    2026-07-31  CN-000039  Anjji kirana store   PARTIAL_SETTLED  Rs.75.00
+    2026-07-31  CN-000040  Anjji kirana store   DELIVERED  Rs.175.00
+    2026-07-31  CN-000053  Guru krupa Kirana store   DELIVERED  Rs.249.00
+    2026-07-31  CN-000041  Rajeshwari kirana store  DELIVERED  Rs.307.00
+    2026-08-01  CN-000064  Venkateshwara juice centre   PARTIAL_SETTLED  Rs.61.00
+    2026-08-01  CN-000074  Dwarakamai kirana (vj)  PARTIAL_SETTLED  Rs.24.00
+    2026-08-01  CN-000075  Santoshi mata kirana  PARTIAL_SETTLED  Rs.80.00
+    2026-08-01  CN-000076  Lakshmi pharmacy (vj)  PARTIAL_SETTLED  Rs.72.00
+    2026-08-01  CN-000069  AN milk beauty parlour (vj)  DELIVERED  Rs.127.00
+    2026-08-01  CN-000073  Venkateshwara juice centre   DELIVERED  Rs.77.00
+    2026-08-01  CN-000077  Masqati dairy parlour (vj)  DELIVERED  Rs.207.00
+    2026-08-01  CN-000078  Anjji kirana store   DELIVERED  Rs.48.00
+    2026-08-01  CN-000080  Harini food mall (vj)  DELIVERED  Rs.48.00
+    2026-08-01  CN-000072  Mahalakshmi kirana (vj)  DELIVERED  Rs.125.00
+    2026-08-01  CN-000070  Sri Balaji kg kirana  PARTIAL_SETTLED  Rs.37.00
+    2026-08-01  CN-000071  Rk kirana (vj)  PARTIAL_SETTLED  Rs.67.00
+    2026-08-02  CN-000096  Venkateshwara juice centre   PARTIAL_SETTLED  Rs.151.00
+    2026-08-02  CN-000084  National kirana (vj)  PARTIAL_SETTLED  Rs.64.00
+    2026-08-02  CN-000083  Sathyanarayana kirana   PARTIAL_SETTLED  Rs.61.00
+    2026-08-02  CN-000086  Mahalakshmi kirana (vj)  DELIVERED  Rs.138.00
+    2026-08-02  CN-000094  Masqati dairy parlour (vj)  PARTIAL_SETTLED  Rs.40.00
+    2026-08-02  CN-000085  Boom milk parlour (vj)  PARTIAL_SETTLED  Rs.148.00
+    2026-08-02  CN-000090  Anjji kirana store   DELIVERED  Rs.72.00
+    2026-08-02  CN-000092  Lakshmi pharmacy (vj)  PARTIAL_SETTLED  Rs.80.00
+    2026-08-02  CN-000091  Sri sai fancy cool drinks  PARTIAL_SETTLED  Rs.32.00
+    2026-08-02  CN-000095  Dwarakamai kirana (vj)  DELIVERED  Rs.48.00
+    2026-08-02  CN-000087  AN milk beauty parlour (vj)  PARTIAL_SETTLED  Rs.32.00
+    2026-08-02  CN-000088  Sri Balaji kg kirana  PARTIAL_SETTLED  Rs.45.00
+    2026-08-03  CN-000129  Harini food mall (vj)  PARTIAL_SETTLED  Rs.48.00
+    2026-08-03  CN-000101  Venkateshwara juice centre   PARTIAL_SETTLED  Rs.85.00
+    2026-08-03  CN-000114  Sri Mahalaxmi (R)  DELIVERED  Rs.162.00
+    … and 52 more
+[INFO] zero-price: No zero-priced sale lines and no zero-total bills.
+```
