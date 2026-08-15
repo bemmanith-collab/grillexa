@@ -485,7 +485,7 @@ export default function Stores() {
           to keep working. */}
       {isAdmin && mapConfig?.usage && (
         <div className="card map-usage">
-          <span className="map-usage-title">Mapbox free tier · {mapConfig.usage.month}</span>
+          <span className="map-usage-title">Mapbox tier · {mapConfig.usage.month}</span>
           {[
             ['Map loads', mapConfig.usage.loads],
             ['Geocoding', mapConfig.usage.geocodes],
