@@ -17,6 +17,9 @@ const {
   resolveMapLink,
   readCoords,
 } = require('../src/lib/geocode');
+// Namespaced as well, for answerWith — it takes the two providers as arguments,
+// so the tests below need no token and no network.
+const geocode = require('../src/lib/geocode');
 
 // A real Nominatim reply, trimmed to the fields used.
 const chennai = {
@@ -283,6 +286,57 @@ const tests = {
   'a non-array reply is an empty result, not a crash': async () => {
     const fake = async () => ({ ok: true, json: async () => ({ error: 'Unable to geocode' }) });
     assert.deepStrictEqual(await searchPlaces('nowhere', null, fake), []);
+  },
+
+  // The one that took geocoding down in production. A token WAS configured, so
+  // the Nominatim path was unreachable — but it carried a URL restriction, and
+  // Mapbox answers 403 to a server, which sends no Referer. Place search
+  // returned 502 and the address after a GPS capture failed, on a deploy whose
+  // only fault was a token in the wrong slot.
+  'a refused Mapbox token falls back instead of failing the lookup': async () => {
+    const errors = [];
+    const refused = async () => {
+      throw new Error('Mapbox responded 403');
+    };
+    const answer = await geocode.answerWith(true, refused, async () => 'from nominatim', (e) =>
+      errors.push(e.message)
+    );
+    assert.deepStrictEqual(answer, { value: 'from nominatim', provider: 'nominatim' });
+    // The status has to reach a log, or a 403 is indistinguishable from an outage.
+    assert.deepStrictEqual(errors, ['Mapbox responded 403']);
+  },
+
+  'Mapbox answering is reported as Mapbox, so only it is billed': async () => {
+    const answer = await geocode.answerWith(
+      true,
+      async () => 'from mapbox',
+      async () => assert.fail('Nominatim must not be called when Mapbox answered')
+    );
+    assert.deepStrictEqual(answer, { value: 'from mapbox', provider: 'mapbox' });
+  },
+
+  'no token skips Mapbox entirely rather than failing first': async () => {
+    const answer = await geocode.answerWith(
+      false,
+      async () => assert.fail('Mapbox must not be called without a token'),
+      async () => 'from nominatim'
+    );
+    assert.deepStrictEqual(answer, { value: 'from nominatim', provider: 'nominatim' });
+  },
+
+  'a Nominatim failure still throws, because nothing is left to try': async () => {
+    await assert.rejects(
+      geocode.answerWith(
+        true,
+        async () => {
+          throw new Error('Mapbox responded 429');
+        },
+        async () => {
+          throw new Error('Nominatim responded 503');
+        }
+      ),
+      /Nominatim responded 503/
+    );
   },
 };
 

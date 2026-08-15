@@ -543,9 +543,12 @@ export default function Stores() {
               the map gives wrong locations, with nothing naming the cause. */}
           {mapConfig.geocoding === 'nominatim' && (
             <p className="map-note map-note-warn">
-              Geocoding is running on Nominatim, not Mapbox — <code>MAPBOX_ACCESS_TOKEN</code> is not
-              set on the server. Place search and the address filled in after a GPS capture are much
-              weaker in India this way. The pin itself is unaffected.
+              Geocoding is running on Nominatim, not Mapbox. Either{' '}
+              <code>MAPBOX_ACCESS_TOKEN</code> is not set on the server, or it is set and Mapbox
+              refused it — most often a token carrying a URL restriction, which the server cannot
+              use because it sends no <code>Referer</code>. The server log names the status. Place
+              search and the address filled in after a GPS capture are much weaker in India this
+              way. The pin itself is unaffected.
             </p>
           )}
         </div>

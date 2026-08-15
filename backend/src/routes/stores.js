@@ -3,7 +3,15 @@ const rateLimit = require('express-rate-limit');
 const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
-const { isLatLng, reverseGeocode, searchPlaces, isMapLink, resolveMapLink, readCoords } = require('../lib/geocode');
+const {
+  isLatLng,
+  reverseGeocode,
+  searchPlaces,
+  isMapLink,
+  resolveMapLink,
+  readCoords,
+  answerWith,
+} = require('../lib/geocode');
 const mapbox = require('../lib/mapbox');
 const mapUsage = require('../lib/mapUsage');
 const { notifyOthers } = require('../lib/push');
@@ -56,10 +64,22 @@ const geocodeLimiter = rateLimit({
 // fresh figures so the meter on the page moves as the requests are made, and
 // null rather than throwing if the counter itself failed: a lookup that worked
 // must not be reported as broken because a tally missed.
-function countGeocode() {
-  if (!mapbox.hasMapbox()) return Promise.resolve(null);
+//
+// Keyed on who actually answered, not on whether a token is set. Those are
+// different questions now that a refused token falls back, and billing the
+// meter for a request Mapbox turned down would be the wrong kind of wrong.
+function countGeocode(provider) {
+  if (provider !== 'mapbox') return Promise.resolve(null);
   return mapUsage.record(prisma, 'geocodes').catch(() => null);
 }
+
+// Who answered the last lookup, which is not the same as who is configured — a
+// token can be present and refused on every call. The banner on Stores exists
+// to stop a silent downgrade to Nominatim, and it would be lying if it read the
+// environment instead of the outcome. Null until the first lookup of a boot,
+// and deliberately in memory: it describes this process, and a restart is
+// exactly when it should stop being believed.
+let lastProvider = null;
 
 // Not ADMIN-only any more: anyone who can add a store needs the address that
 // goes with the pin they just dropped. The rate limiter, not the role, is what
@@ -68,10 +88,17 @@ router.get('/reverse-geocode', geocodeLimiter, async (req, res) => {
   const [lat, lng] = [Number(req.query.lat), Number(req.query.lng)];
   if (!isLatLng(lat, lng)) return res.status(400).json({ error: 'lat and lng must be a valid coordinate pair' });
   try {
-    // Mapbox when a token is configured, Nominatim when it is not. Both return
-    // the same {parts, address}, so nothing downstream branches on which ran.
-    const found = mapbox.hasMapbox() ? await mapbox.reverseGeocode(lat, lng) : await reverseGeocode(lat, lng);
-    res.json({ ...found, usage: await countGeocode() });
+    // Mapbox when a token is configured AND accepted, Nominatim otherwise. Both
+    // return the same {parts, address}, so nothing downstream branches on which
+    // ran. Only a Nominatim failure can reach the catch below now.
+    const { value, provider } = await answerWith(
+      mapbox.hasMapbox(),
+      () => mapbox.reverseGeocode(lat, lng),
+      () => reverseGeocode(lat, lng),
+      (err) => console.warn(`Mapbox reverse geocode failed, using Nominatim: ${err.message}`)
+    );
+    lastProvider = provider;
+    res.json({ ...value, usage: await countGeocode(provider) });
   } catch (err) {
     // The pin is already in hand on the client; only the label failed. 502
     // says "not your fault, try typing it" rather than losing the fix.
@@ -117,8 +144,14 @@ router.get('/geocode', geocodeLimiter, async (req, res) => {
   }
 
   try {
-    const results = mapbox.hasMapbox() ? await mapbox.searchPlaces(q, near) : await searchPlaces(q, near);
-    res.json({ results, usage: await countGeocode() });
+    const { value: results, provider } = await answerWith(
+      mapbox.hasMapbox(),
+      () => mapbox.searchPlaces(q, near),
+      () => searchPlaces(q, near),
+      (err) => console.warn(`Mapbox place search failed, using Nominatim: ${err.message}`)
+    );
+    lastProvider = provider;
+    res.json({ results, usage: await countGeocode(provider) });
   } catch (err) {
     res.status(502).json({ error: 'Place search is unavailable — drop the pin by hand instead.' });
   }
@@ -140,10 +173,15 @@ router.get('/geocode', geocodeLimiter, async (req, res) => {
 // every search and every reverse lookup to Nominatim — whose Indian coverage is
 // thin enough that the visible symptom is "the map gives wrong locations", with
 // nothing anywhere naming the cause.
+//
+// The last outcome beats the environment when there has been one. A configured
+// token that Mapbox refuses — a URL restriction, an expired key, a spent
+// quota — reads as 'mapbox' from the environment and answers as Nominatim in
+// fact, which is the same silent downgrade wearing a better disguise.
 router.get('/map-config', async (req, res) => {
   res.json({
     token: String(process.env.MAPBOX_PUBLIC_TOKEN || '').trim(),
-    geocoding: mapbox.hasMapbox() ? 'mapbox' : 'nominatim',
+    geocoding: lastProvider || (mapbox.hasMapbox() ? 'mapbox' : 'nominatim'),
     usage: await mapUsage.read(prisma),
   });
 });

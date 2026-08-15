@@ -192,6 +192,37 @@ async function resolveMapLink(link, fetchImpl = fetch) {
   return coordsFromMapUrl(res.url);
 }
 
+// Mapbox first, Nominatim when Mapbox fails or was never configured.
+//
+// `hasMapbox` only says a token is CONFIGURED. It never says Mapbox will accept
+// it, and the two came apart badly: a token carrying a URL restriction is
+// refused 403 on every call this server makes, because a server sends no
+// Referer. An exhausted quota is a 429, an expired token a 401. Every one of
+// those took geocoding down completely — place search returned 502 and the
+// address after a GPS capture failed — because the Nominatim path was reachable
+// only when no token was set at all. That is a default, not a fallback.
+//
+// Takes the calls as functions rather than importing lib/mapbox: this file is
+// the Nominatim half, and having it reach for the other provider would make the
+// pair circular. It also keeps this testable without a token.
+//
+// Reports which provider answered, so the caller charges Mapbox's quota only
+// when Mapbox actually spent it, and the page can say what is really answering
+// rather than what is merely installed.
+async function answerWith(hasMapbox, viaMapbox, viaNominatim, onError = () => {}) {
+  if (hasMapbox) {
+    try {
+      return { value: await viaMapbox(), provider: 'mapbox' };
+    } catch (err) {
+      // Handed out rather than swallowed. lib/mapbox.js puts the HTTP status in
+      // the message for exactly this, and it was going nowhere — a 403 from a
+      // URL-restricted token read identically to Mapbox being down.
+      onError(err);
+    }
+  }
+  return { value: await viaNominatim(), provider: 'nominatim' };
+}
+
 // What a store's pin should become, given a request body. A pin without its
 // pair is meaningless and a number out of range is a bug upstream, not a
 // location — either both arrive valid or the store has no pin, never half of
@@ -222,4 +253,5 @@ module.exports = {
   toParts,
   toAddressLine,
   readCoords,
+  answerWith,
 };
