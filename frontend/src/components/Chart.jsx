@@ -14,6 +14,9 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import { sliceColours } from '../lib/seriesColour';
+
+export { SERIES } from '../lib/seriesColour';
 
 // Registered piece by piece rather than with chart.js/auto: auto pulls in every
 // controller, scale and plugin the library has, and this app draws three kinds
@@ -38,26 +41,6 @@ ChartJS.register(
 export const TEAL = '#12889b';
 export const FLAME = '#e2551b';
 export const WARN = '#b54708';
-
-// The categorical set, for the one chart where colour means identity. Fixed
-// order, never cycled: a product keeps its colour when a filter removes the
-// one above it. Validated as a set for colour-blind separation and against
-// this app's white cards — the three lighter hues sit under 3:1 on white,
-// which is why every slice is also labelled in the legend rather than
-// identified by colour alone.
-export const SERIES = [
-  '#2a78d6',
-  '#eb6834',
-  '#1baf7a',
-  '#eda100',
-  '#e87ba4',
-  '#008300',
-  '#4a3aa7',
-  '#e34948',
-];
-// The "Other" bucket is a remainder, not an identity, so it gets grey and is
-// never one of the eight.
-const OTHER = '#98a9ad';
 
 const INK = '#06222a';
 const MUTED = '#5d7a82';
@@ -209,7 +192,7 @@ export function doughnutData(rows, { label, x = 'label', y = 'amount' }) {
       {
         label,
         data: rows.map((r) => r[y]),
-        backgroundColor: rows.map((r, i) => (r.id == null ? OTHER : SERIES[i % SERIES.length])),
+        backgroundColor: sliceColours(rows),
         // A ring of white between slices; without it two adjacent hues share
         // an edge and read as one shape.
         borderColor: '#ffffff',
