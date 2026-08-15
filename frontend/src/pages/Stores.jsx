@@ -3,7 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Search, MapPin, Navigation, Phone, Map } from 'lucide-react';
+// MapIcon, not Map: the bare name would shadow the Map constructor for this
+// whole module, and `new Map()` below would build an icon and throw.
+import { Search, MapPin, Navigation, Phone, Map as MapIcon } from 'lucide-react';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import SearchSelect from '../components/SearchSelect';
@@ -382,7 +384,7 @@ export default function Stores() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            <Map size={14} />
+            <MapIcon size={14} />
             Find it on Google Maps
           </a>
         )}
@@ -391,7 +393,7 @@ export default function Stores() {
           className="btn-secondary btn-sm"
           onClick={() => setMapOpenFor(mapOpen ? null : formKey)}
         >
-          <Map size={14} />
+          <MapIcon size={14} />
           {mapOpen ? 'Hide map' : 'Pick on map'}
         </button>
         <span className="form-hint coord-hint">
