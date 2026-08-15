@@ -129,6 +129,26 @@ check('an address is never mistaken for a coordinate pair', () => {
   }
 });
 
+// The coordinate boxes feed this the whole box on every keystroke, so it has to
+// read a half-typed number as the number so far. It did not: "17." parsed to
+// nothing, the field dropped to null mid-word, and combined with a box that
+// rendered itself from the parsed number, "17.4400" typed by hand arrived as
+// 4400. The box holds the typed text now (CoordInput in pages/Stores.jsx); this
+// is the other half of that — every prefix has to come back as what it says.
+check('a half-typed coordinate reads as the number so far', () => {
+  for (const full of ['17.4400', '13.0878', '78.4867', '-33.8688', '0.5']) {
+    for (let i = 1; i <= full.length; i++) {
+      const prefix = full.slice(0, i);
+      // "-" on its own is not a number yet and is allowed to parse to nothing.
+      if (!Number.isFinite(Number(prefix))) continue;
+      const parsed = parseCoordInput(prefix);
+      assert.ok(parsed, `"${prefix}" should parse while it is being typed`);
+      assert.equal(parsed.lng, undefined, `"${prefix}" is one number, not a pair`);
+      assert.equal(parsed.lat, Number(prefix), `"${prefix}" came back as ${parsed.lat}`);
+    }
+  }
+});
+
 check('a transposed or out-of-range pair is caught at the keyboard', () => {
   assert.equal(coordError(13.0878, 80.2103), '');
   assert.equal(coordError(null, null), '');

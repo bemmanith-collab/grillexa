@@ -125,7 +125,18 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby, toke
     } else {
       markerRef.current.setLngLat([lng, lat]);
     }
-    if (!draggingRef.current) map.easeTo({ center: [lng, lat], zoom: PIN_ZOOM });
+    // Chase the pin only when it is somewhere the user cannot see, and never
+    // zoom OUT to do it. This used to recentre and force zoom 18 on every pin
+    // change — including a tap on the map and a drag of the marker, which are
+    // not "from outside" at all. The note under the map says to zoom in until
+    // the shutter is visible; the map then snapped back to 18 and slid the pin
+    // to the middle on the very next tap, undoing it. What is left is the case
+    // this was for: a fix from GPS, a pasted pair or a search result landing
+    // off-screen, where not moving would look like nothing happened.
+    // ?. because a map torn down mid-effect has no transform to ask; falling
+    // through to easeTo is the harmless direction to be wrong in.
+    if (draggingRef.current || map.getBounds()?.contains([lng, lat])) return;
+    map.easeTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), PIN_ZOOM) });
   }, [lat, lng, hasPin, mapReady]);
 
   async function search() {

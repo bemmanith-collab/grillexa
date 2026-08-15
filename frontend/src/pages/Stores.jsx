@@ -51,6 +51,37 @@ const WATCH_MS = 25000;
 const SETTLE_MS = 2500;
 const STALL_MS = 8000;
 
+// A coordinate box. It holds the TEXT that was typed, and that is the entire
+// reason it is a component rather than an <input> inline in coordFields.
+//
+// It used to be controlled by the parsed number, which cannot be typed into:
+// press "." after "17" and the box contains "17.", the parse re-renders it from
+// the number, and the dot is gone before the next digit lands. Typing
+// "17.4400" by hand came out as 4400, and backspacing through the dot of a
+// saved pin wiped the pin. Pasting a pair always worked — a paste is one change
+// event — which is exactly why this survived: the README tells people to paste.
+//
+// The parsed number still goes up to the form on every keystroke, so nothing
+// downstream ever sees a string, and a fix from GPS or the map still lands in
+// the box: onType returns true when one paste filled both fields, and blur
+// settles the box back on the form's canonical number.
+function CoordInput({ value, label, onType }) {
+  const [draft, setDraft] = useState(null);
+  return (
+    <input
+      className="line-input coord-input"
+      inputMode="decimal"
+      placeholder={label}
+      aria-label={label}
+      // ?? not ||: an emptied box is '' and must stay empty, and 0 is a real
+      // coordinate rather than a missing one.
+      value={draft ?? value ?? ''}
+      onChange={(e) => setDraft(onType(e.target.value) ? null : e.target.value)}
+      onBlur={() => setDraft(null)}
+    />
+  );
+}
+
 // getCurrentPosition's error codes, in the words of someone holding the phone.
 // A denial is the common one and is not a failure — the address can always be
 // typed, so it reads as a redirection rather than an error.
@@ -200,12 +231,20 @@ export default function Stores() {
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        if (!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
+        const improved = !best || pos.coords.accuracy < best.coords.accuracy;
+        if (improved) best = pos;
         setGeo({ busy: true, error: '', note: `Locating… best so far ${formatAccuracy(best.coords.accuracy)}` });
         // Open sky: this is as good as the hardware gets, so stop asking.
         if (best.coords.accuracy <= ACCURACY_PERFECT_M) return finish();
-        // Otherwise wait out a quiet spell — re-armed on each reading, so it
-        // fires once the fix stops improving rather than once it first lands.
+        // Wait out a quiet spell, re-armed only when the fix actually got
+        // BETTER. Re-arming on every reading instead meant it never fired: a
+        // phone delivers a fix about once a second and almost all of them are
+        // no improvement on the best, so the timer was pushed back before it
+        // could ever expire and every capture ran the full 25s with someone
+        // stood in the street holding a phone. Armed on the first reading, so
+        // it is still the stall guard for a watch that goes quiet without ever
+        // calling the error handler.
+        if (!improved) return;
         clearTimeout(settle);
         settle = setTimeout(finish, best.coords.accuracy <= ACCURACY_GOOD_M ? SETTLE_MS : STALL_MS);
       },
@@ -352,30 +391,22 @@ export default function Stores() {
     // Only when the pin is doubtful or missing — a good fix needs no escape
     // hatch, and offering one there just invites second-guessing.
     const mapsPick = tier === 'good' || tier === 'perfect' ? '' : mapsPickUrl(values);
+    // Returns whether one paste filled both fields, which is the box's cue to
+    // stop showing the raw text and let the split values through.
     function setPart(part, text) {
       const parsed = parseCoordInput(text);
-      if (parsed && parsed.lng !== undefined) return apply({ lat: parsed.lat, lng: parsed.lng, accuracyM: null });
+      if (parsed && parsed.lng !== undefined) {
+        apply({ lat: parsed.lat, lng: parsed.lng, accuracyM: null });
+        return true;
+      }
       apply({ [part]: parsed ? parsed.lat : null, accuracyM: null });
+      return false;
     }
     return (
       <div className="store-coords">
         <MapPin size={14} className="store-coords-icon" />
-        <input
-          className="line-input coord-input"
-          inputMode="decimal"
-          placeholder="Latitude"
-          aria-label="Latitude"
-          value={values.lat ?? ''}
-          onChange={(e) => setPart('lat', e.target.value)}
-        />
-        <input
-          className="line-input coord-input"
-          inputMode="decimal"
-          placeholder="Longitude"
-          aria-label="Longitude"
-          value={values.lng ?? ''}
-          onChange={(e) => setPart('lng', e.target.value)}
-        />
+        <CoordInput label="Latitude" value={values.lat} onType={(t) => setPart('lat', t)} />
+        <CoordInput label="Longitude" value={values.lng} onType={(t) => setPart('lng', t)} />
         {values.accuracyM != null && (
           <span className={`accuracy-badge accuracy-${tier}`} title="How far off this pin could be">
             {accuracyLabel(values.accuracyM)}

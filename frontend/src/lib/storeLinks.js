@@ -120,8 +120,12 @@ export function formatAccuracy(metres) {
 // number, or a hyphen where the separator should be is an address, and falling
 // through to the geocoder is the safe direction to be wrong in — a search that
 // finds nothing is visible, a pin in the Atlantic is not.
+// The lone-number form allows a TRAILING DOT — "17." is what the box contains
+// for one keystroke while someone types "17.4400", and refusing it there means
+// the form's value drops to null mid-word and the "enter both latitude and
+// longitude" warning strobes on every decimal point typed.
 const COORD_PAIR = /^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/;
-const COORD_ONE = /^-?\d+(?:\.\d+)?$/;
+const COORD_ONE = /^-?\d+(?:\.\d*)?$/;
 
 export function parseCoordInput(text) {
   const s = String(text == null ? '' : text).trim();
