@@ -2734,21 +2734,53 @@ a.btn-danger {
   cursor: grab;
 }
 
-/* Leaflet's attribution and zoom controls are hardcoded to a white card. On a
-   dark theme that is a bright rectangle stapled to the corner of the map. */
-.map-canvas .leaflet-control-attribution {
+/* Mapbox's attribution and zoom controls ship their own greys, which are not
+   this app's greys — the seam shows at the corner of the map. */
+.map-canvas .mapboxgl-ctrl-attrib {
   background: var(--surface);
   color: var(--text-muted);
   font-size: 0.65rem;
 }
-.map-canvas .leaflet-control-attribution a { color: var(--info); }
+.map-canvas .mapboxgl-ctrl-attrib a { color: var(--info); }
 
-.map-canvas .leaflet-bar a {
+.map-canvas .mapboxgl-ctrl-group {
   background: var(--surface);
-  color: var(--text);
-  border-bottom-color: var(--border);
+  border: 1px solid var(--border);
 }
-.map-canvas .leaflet-bar a:hover { background: var(--info-soft); }
+.map-canvas .mapboxgl-ctrl-group button + button { border-top-color: var(--border); }
+.map-canvas .mapboxgl-ctrl-group button:hover { background: var(--info-soft); }
+
+/* The month's Mapbox spend, on the Stores page. Three columns on a desktop, and
+   the count wraps under the bar on a phone rather than squeezing it to nothing. */
+.map-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.map-usage-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.map-usage-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 0.82rem;
+}
+.map-usage-label { min-width: 84px; }
+.map-usage-row meter {
+  flex: 1;
+  min-width: 120px;
+  height: 10px;
+}
+.map-usage-count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
 
 /* The row a notification was tapped to reach. Fades on its own so nothing has
    to clear it, and leaves no permanent mark on a row that is otherwise

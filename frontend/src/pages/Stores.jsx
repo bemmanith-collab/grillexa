@@ -26,9 +26,10 @@ import {
   ACCURACY_PERFECT_M,
 } from '../lib/storeLinks';
 
-// Leaflet and its stylesheet are ~150KB that most visits to this page never
+// Mapbox GL and its stylesheet are ~1.9MB that most visits to this page never
 // need — the map only opens when someone asks for it. Lazily loaded so the
-// Stores list itself stays as quick to reach as it was.
+// Stores list itself stays as quick to reach as it was, which matters more now
+// than it did under Leaflet: this bundle is twelve times the size.
 const MapPicker = lazy(() => import('../components/MapPicker'));
 
 const EMPTY_FORM = { name: '', address: '', phone: '', lat: null, lng: null, accuracyM: null };
@@ -78,8 +79,17 @@ export default function Stores() {
   const [searchParams, setSearchParams] = useSearchParams();
   // Which form has its map open — 'new' for the add form, or a store id. Not a
   // boolean: the add form and a row editor can be open at once, and one shared
-  // flag would open both maps and load two Leaflet instances.
+  // flag would open both maps — and bill for two map loads instead of one.
   const [mapOpenFor, setMapOpenFor] = useState(null);
+  // The public Mapbox token and this month's map-load count, in one request.
+  // Fetched for everyone because the picker cannot draw without the token; the
+  // meter built from it is shown to Admin only, below — a salesperson adding a
+  // shop has no use for the billing line.
+  const [mapConfig, setMapConfig] = useState(null);
+  // Every response that spends Mapbox quota carries the month's fresh figures
+  // back, so the meter follows the request that moved it instead of being
+  // re-fetched afterwards.
+  const setUsage = (usage) => setMapConfig((c) => ({ ...c, usage }));
 
   // Where to open the map for a store that has no pin. The most recently added
   // store that does have one, because someone adding shops today is working one
@@ -127,6 +137,12 @@ export default function Stores() {
 
   useEffect(() => {
     load();
+    // Its own request, not part of load(): a failure here must not take the
+    // store list down with it, and the list is the reason the page exists.
+    client.get('/stores/map-config').then(
+      (res) => setMapConfig(res.data),
+      () => setMapConfig({ token: '', usage: null })
+    );
   }, []);
 
   // Where a tapped notification lands. There is no store detail page — the row
@@ -248,6 +264,7 @@ export default function Stores() {
       try {
         const res = await client.get('/stores/reverse-geocode', { params: { lat, lng } });
         if (res.data.address) apply({ address: res.data.address });
+        if (res.data.usage) setUsage(res.data.usage);
         setGeo({
           busy: false,
           error: '',
@@ -407,6 +424,8 @@ export default function Stores() {
               lat={values.lat}
               lng={values.lng}
               nearby={nearbyPin}
+              token={mapConfig?.token || ''}
+              onUsage={setUsage}
               onPick={pickFromMap}
               // A search result carries an address, but it names the building
               // the geocoder matched, not the shop. Offered only into an empty
@@ -454,6 +473,40 @@ export default function Stores() {
       </div>
 
       {error && <div className="form-error">{error}</div>}
+
+      {/* What the maps have cost so far this month. Admin only: it is a billing
+          figure, and a salesperson standing outside a shop can do nothing with
+          it but worry. Grouped in thousands rather than lakhs because these are
+          Mapbox's own published limits, quoted the way Mapbox quotes them.
+
+          <meter> rather than a div and a width: the browser already draws a
+          gauge against a limit, announces it to a screen reader as one, and
+          turns it amber past `high` without any of that being this app's code
+          to keep working. */}
+      {isAdmin && mapConfig?.usage && (
+        <div className="card map-usage">
+          <span className="map-usage-title">Mapbox free tier · {mapConfig.usage.month}</span>
+          {[
+            ['Map loads', mapConfig.usage.loads],
+            ['Geocoding', mapConfig.usage.geocodes],
+          ].map(([label, m]) => (
+            <div className="map-usage-row" key={label}>
+              <span className="map-usage-label">{label}</span>
+              <meter
+                value={m.used}
+                max={m.limit}
+                high={m.limit * 0.8}
+                optimum={0}
+                aria-label={`${label} used this month`}
+              />
+              <span className="map-usage-count">
+                {m.used.toLocaleString('en-US')} / {m.limit.toLocaleString('en-US')} (
+                {((m.used / m.limit) * 100).toFixed(1)}%)
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {formOpen && (
         <div className="card form-card">

@@ -4,6 +4,8 @@ const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
 const { isLatLng, reverseGeocode, searchPlaces, isMapLink, resolveMapLink, readCoords } = require('../lib/geocode');
+const mapbox = require('../lib/mapbox');
+const mapUsage = require('../lib/mapUsage');
 const { notifyOthers } = require('../lib/push');
 
 const router = express.Router();
@@ -49,6 +51,16 @@ const geocodeLimiter = rateLimit({
   message: { error: 'Too many address lookups — wait a minute and try again.' },
 });
 
+// One geocoding request against the free tier, counted only when Mapbox is the
+// one that answered — the Nominatim fallback spends none of it. Returns the
+// fresh figures so the meter on the page moves as the requests are made, and
+// null rather than throwing if the counter itself failed: a lookup that worked
+// must not be reported as broken because a tally missed.
+function countGeocode() {
+  if (!mapbox.hasMapbox()) return Promise.resolve(null);
+  return mapUsage.record(prisma, 'geocodes').catch(() => null);
+}
+
 // Not ADMIN-only any more: anyone who can add a store needs the address that
 // goes with the pin they just dropped. The rate limiter, not the role, is what
 // protects Nominatim here.
@@ -56,7 +68,10 @@ router.get('/reverse-geocode', geocodeLimiter, async (req, res) => {
   const [lat, lng] = [Number(req.query.lat), Number(req.query.lng)];
   if (!isLatLng(lat, lng)) return res.status(400).json({ error: 'lat and lng must be a valid coordinate pair' });
   try {
-    res.json(await reverseGeocode(lat, lng));
+    // Mapbox when a token is configured, Nominatim when it is not. Both return
+    // the same {parts, address}, so nothing downstream branches on which ran.
+    const found = mapbox.hasMapbox() ? await mapbox.reverseGeocode(lat, lng) : await reverseGeocode(lat, lng);
+    res.json({ ...found, usage: await countGeocode() });
   } catch (err) {
     // The pin is already in hand on the client; only the label failed. 502
     // says "not your fault, try typing it" rather than losing the fix.
@@ -102,9 +117,41 @@ router.get('/geocode', geocodeLimiter, async (req, res) => {
   }
 
   try {
-    res.json({ results: await searchPlaces(q, near) });
+    const results = mapbox.hasMapbox() ? await mapbox.searchPlaces(q, near) : await searchPlaces(q, near);
+    res.json({ results, usage: await countGeocode() });
   } catch (err) {
     res.status(502).json({ error: 'Place search is unavailable — drop the pin by hand instead.' });
+  }
+});
+
+// What the page needs before it can draw a map: the public token, and how much
+// of the month's free tier is gone.
+//
+// The token is handed out here rather than baked into the bundle at build time
+// so that rotating it is `fly secrets set` and a restart, not a rebuild and a
+// redeploy. It is a public `pk.` token — Mapbox GL sends it from the browser
+// by design, and the control that matters is the URL restriction set on it in
+// the Mapbox dashboard, not secrecy. The `sk.` token that can spend money
+// stays in lib/mapbox.js and never leaves the server.
+router.get('/map-config', async (req, res) => {
+  res.json({
+    token: String(process.env.MAPBOX_PUBLIC_TOKEN || '').trim(),
+    usage: await mapUsage.read(prisma),
+  });
+});
+
+// Counted when a map actually initialises, which is the thing Mapbox bills
+// for — not when the Stores page opens, because the picker is lazy and most
+// visits never draw one.
+//
+// A failure here must never stop the map appearing: the meter being wrong is a
+// smaller problem than the picker not opening, so the error is swallowed and
+// the last known figure returned.
+router.post('/map-load', async (req, res) => {
+  try {
+    res.json(await mapUsage.record(prisma, 'loads'));
+  } catch (err) {
+    res.json(await mapUsage.read(prisma).catch(() => null));
   }
 });
 

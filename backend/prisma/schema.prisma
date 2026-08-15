@@ -426,3 +426,13 @@ model SettlementLine {
   soldQty           Int             @default(0)
   returnedQty       Int             @default(0)
 }
+
+// Map loads drawn and geocoding requests answered this month, against the
+// Mapbox free tier. One row per calendar month in UTC ("2026-08") — see
+// src/lib/mapUsage.js for why this is counted here rather than read back from
+// Mapbox.
+model MapUsage {
+  month    String @id
+  loads    Int    @default(0)
+  geocodes Int    @default(0)
+}

@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import React, { useEffect, useRef, useState } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import client from '../api/client';
 import { parseCoordInput, coordError } from '../lib/storeLinks';
 
@@ -21,90 +20,123 @@ const DEFAULT_ZOOM = 12;
 // Maps escape hatch uses.
 const PIN_ZOOM = 18;
 
-// Leaflet's default marker is a PNG it locates by guessing a URL relative to
-// its own stylesheet, which a bundler rewrites — the classic symptom is a
-// broken-image icon, or no marker at all. A divIcon sidesteps the whole
-// mechanism: this is markup, styled by CSS we already ship, with nothing to
-// resolve and no extra request.
-const pinIcon = L.divIcon({
-  className: 'map-pin-icon',
-  html: '<span class="map-pin-dot"></span>',
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
-});
+const STYLE = 'mapbox://styles/mapbox/streets-v12';
 
-// react-leaflet gives no prop for "handle a click", so this is the documented
-// shape: a child component that subscribes to the map's own events.
-function ClickToPlace({ onPick }) {
-  useMapEvents({
-    click(e) {
-      onPick(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
+// The marker is our own element rather than Mapbox's default SVG pin, so it
+// keeps the dot the app already styles and stays the same shape it was under
+// Leaflet. Mapbox positions whatever element it is handed.
+function pinElement() {
+  const el = document.createElement('div');
+  el.className = 'map-pin-icon';
+  el.innerHTML = '<span class="map-pin-dot"></span>';
+  return el;
 }
 
-// Moves the map when the pin changes from *outside* it — the GPS button, a
-// pasted coordinate pair, a search result. Deliberately not on every pin
-// change: recentring while someone drags the marker fights their hand.
-function Recentre({ centre, zoom }) {
-  const map = useMap();
-  useEffect(() => {
-    if (centre) map.setView(centre, zoom ?? map.getZoom());
-  }, [centre?.[0], centre?.[1], zoom]);
-  return null;
-}
-
-export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby }) {
+// onUsage is handed the month's Mapbox figures every time this component spends
+// some of them — a map load, a search — so the meter on the page moves while
+// the picker is open rather than only on the next page load.
+export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby, token, onUsage }) {
   const hasPin = Number.isFinite(lat) && Number.isFinite(lng);
-  const position = hasPin ? [lat, lng] : null;
-  const openAt = position || nearby || LAST_RESORT_CENTRE;
+  const openAt = hasPin ? [lat, lng] : nearby || LAST_RESORT_CENTRE;
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searchNote, setSearchNote] = useState('');
 
-  // Only what an external change should recentre on. Keeping this separate
-  // from `position` is what stops a drag from yanking the map underneath.
-  const [externalCentre, setExternalCentre] = useState(position);
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
   const draggingRef = useRef(false);
-  useEffect(() => {
-    if (!draggingRef.current && hasPin) setExternalCentre([lat, lng]);
-  }, [lat, lng, hasPin]);
+  // The click handler is read through a ref so the map never has to be rebuilt
+  // when the parent re-renders — rebuilding it would count a second map load
+  // and bill for it.
+  const pickRef = useRef(onPick);
+  pickRef.current = onPick;
 
-  const markerHandlers = useMemo(
-    () => ({
-      dragstart() {
+  // Built once. Mapbox counts a map load per initialisation, so anything that
+  // tears this down and remakes it costs money as well as the flash.
+  useEffect(() => {
+    if (!token || mapRef.current) return undefined;
+    mapboxgl.accessToken = token;
+    const map = new mapboxgl.Map({
+      container: containerRef.current,
+      style: STYLE,
+      // Mapbox takes lng,lat — the opposite order to everything else in this
+      // app, and getting it backwards puts a Hyderabad shop in the Indian
+      // Ocean with nothing on screen to say it is wrong.
+      center: [openAt[1], openAt[0]],
+      zoom: hasPin ? PIN_ZOOM : DEFAULT_ZOOM,
+      // Nothing here is worth a second request on a phone over mobile data.
+      attributionControl: true,
+    });
+    mapRef.current = map;
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+    map.on('click', (e) => pickRef.current(e.lngLat.lat, e.lngLat.lng));
+    // Counted on 'load' rather than on construction: a map that never finished
+    // loading — offline, refused token — is not one Mapbox billed for.
+    map.once('load', () => {
+      client.post('/stores/map-load').then(
+        (res) => onUsage?.(res.data),
+        () => {}
+      );
+    });
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      markerRef.current = null;
+    };
+    // Deliberately empty: openAt/hasPin are the *opening* view, and re-running
+    // this on a pin change would rebuild the map under the user's hand.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // The marker follows the pin, and the map follows it only when the change
+  // came from outside — the GPS button, a pasted pair, a search result.
+  // Recentring while someone drags fights their hand.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!hasPin) {
+      markerRef.current?.remove();
+      markerRef.current = null;
+      return;
+    }
+    if (!markerRef.current) {
+      markerRef.current = new mapboxgl.Marker({ element: pinElement(), draggable: true })
+        .setLngLat([lng, lat])
+        .addTo(map);
+      markerRef.current.on('dragstart', () => {
         draggingRef.current = true;
-      },
-      dragend(e) {
+      });
+      markerRef.current.on('dragend', () => {
         draggingRef.current = false;
-        const { lat: dLat, lng: dLng } = e.target.getLatLng();
-        onPick(dLat, dLng);
-      },
-    }),
-    [onPick]
-  );
+        const { lat: dLat, lng: dLng } = markerRef.current.getLngLat();
+        pickRef.current(dLat, dLng);
+      });
+    } else {
+      markerRef.current.setLngLat([lng, lat]);
+    }
+    if (!draggingRef.current) map.easeTo({ center: [lng, lat], zoom: PIN_ZOOM });
+  }, [lat, lng, hasPin]);
 
   async function search() {
     const q = query.trim();
 
     // A pasted "17.3779, 78.5174" is already the answer. No lookup, no network,
-    // no rate limit, and exact — which is more than any search can promise.
-    // This is the reliable route out of Google Maps: long-press the shop, copy
-    // the numbers it shows, paste them here.
+    // no geocoding request spent, and exact — which is more than any search can
+    // promise. This is the reliable route out of Google Maps: long-press the
+    // shop, copy the numbers it shows, paste them here.
     const pasted = parseCoordInput(q);
     if (pasted && pasted.lng !== undefined && !coordError(pasted.lat, pasted.lng)) {
       setResults([]);
       setQuery('');
       setSearchNote('');
-      setExternalCentre([pasted.lat, pasted.lng]);
       onPick(pasted.lat, pasted.lng);
       return;
     }
-    // Matches the server's floor, so a short query is answered here rather
-    // than spending a request from the shared Nominatim budget.
+    // Matches the server's floor, so a short query is answered here rather than
+    // spending a geocoding request on noise.
     if (q.length < 3) {
       setSearchNote('Type at least three characters.');
       return;
@@ -115,10 +147,13 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby }) {
     try {
       const { data } = await client.get('/stores/geocode', {
         // Rank results near the shops we already have. A colony name typed on
-        // its own otherwise matches whichever city OpenStreetMap knows best.
+        // its own otherwise matches whichever city the geocoder knows best.
         params: { q, ...(nearby ? { near: `${nearby[0]},${nearby[1]}` } : {}) },
       });
       setResults(data.results);
+      // Absent when Nominatim answered — that path spends no Mapbox quota, so
+      // the meter is left alone rather than shown a zero.
+      if (data.usage) onUsage?.(data.usage);
       if (!data.results.length) setSearchNote('Nothing found. Try a landmark or a road name, or drop the pin by hand.');
     } catch (err) {
       setSearchNote(err.response?.data?.error || 'Search is unavailable — drop the pin by hand instead.');
@@ -130,10 +165,9 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby }) {
   function choose(result) {
     setResults([]);
     setQuery('');
-    setExternalCentre([result.lat, result.lng]);
-    // A search result is a rooftop guess, never the shutter. It is a way to
-    // get the map to the right street — the pin still has to be placed, so
-    // the address it came with is offered rather than written.
+    // A search result is a rooftop guess, never the shutter. It is a way to get
+    // the map to the right street — the pin still has to be placed, so the
+    // address it came with is offered rather than written.
     onSearchPick?.(result);
     onPick(result.lat, result.lng);
   }
@@ -179,25 +213,17 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby }) {
       )}
       {searchNote && <p className="map-note">{searchNote}</p>}
 
-      <MapContainer
-        center={openAt}
-        zoom={position ? PIN_ZOOM : DEFAULT_ZOOM}
-        scrollWheelZoom
-        className="map-canvas"
-      >
-        {/* Attribution is a condition of using OpenStreetMap's tiles, not a
-            decoration. Leaflet renders it into the corner of the map. */}
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          maxZoom={19}
-        />
-        <ClickToPlace onPick={onPick} />
-        <Recentre centre={externalCentre} zoom={PIN_ZOOM} />
-        {position && (
-          <Marker position={position} icon={pinIcon} draggable eventHandlers={markerHandlers} />
-        )}
-      </MapContainer>
+      {/* No token means the map cannot draw, but the search box and the
+          coordinate fields above it still work — so this says which part is
+          missing rather than showing an empty grey rectangle. */}
+      {token ? (
+        <div ref={containerRef} className="map-canvas" />
+      ) : (
+        <p className="map-note map-note-warn">
+          The map is unavailable — MAPBOX_PUBLIC_TOKEN is not set on the server. Search above, or
+          paste coordinates from Google Maps.
+        </p>
+      )}
 
       <p className="map-note">
         {hasPin

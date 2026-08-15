@@ -85,7 +85,7 @@ Four tiers, three colours — perfect and good share the green, because both mea
 
 The pin is kept in every case. It is the part that cannot be typed back in later. The pin is still saved, and the capture button relabels itself to **📍 Try again — step outside**: it always retried, but after a bad fix it has to say so, or the reasonable reading is that GPS simply failed.
 
-**Or pick it off a map.** **Pick on map** opens a Leaflet map on OpenStreetMap tiles: tap to drop a pin, drag it to adjust, and search a road or landmark to get to the right street first. It works for a store added from the office, for one whose GPS fix came back kilometres wide, and for the fifty that were added before pins existed. Editing a store opens the map already centred on its pin.
+**Or pick it off a map.** **Pick on map** opens a Mapbox GL map: tap to drop a pin, drag it to adjust, and search a road or landmark to get to the right street first. It works for a store added from the office, for one whose GPS fix came back kilometres wide, and for the fifty that were added before pins existed. Editing a store opens the map already centred on its pin.
 
 **A map-picked pin records no accuracy**, deliberately — `accuracyM` is set to null, exactly as it is for a pair typed by hand. Nothing measured it, so it reads as `unknown` in the badge rather than claiming a precision it does not have. That is the whole point of storing accuracy: an invented number would make an eyeballed pin indistinguishable from an 8m GNSS fix.
 
@@ -99,17 +99,17 @@ The pin is kept in every case. It is the part that cannot be typed back in later
 
 **Search results are ranked near those same shops.** The page passes `near=lat,lng` and the lookup adds a ±0.5° viewbox (about 55km — a metro and its outskirts). Without it, a common road name ranks by how thoroughly a city is mapped: "MG Road" returns Bengaluru, when the store is in Hyderabad. It is `bounded=0`, a preference and not a restriction, so a shop in a new city stays findable through the very screen used to add the first store there.
 
-**A six-digit query is treated as a PIN code**, not as text — it goes to Nominatim's structured `postalcode` parameter rather than free-text `q`, which is what the postcode index is built for; free text can match a house number or a road that happens to contain the digits. The two cannot be combined, since a request carrying both is rejected. `600040` lands on Anna Nagar, and from there the pin gets dragged to the shutter.
+**A six-digit query is treated as a PIN code** when Nominatim is the one answering, not as text — it goes to Nominatim's structured `postalcode` parameter rather than free-text `q`, which is what the postcode index is built for; free text can match a house number or a road that happens to contain the digits. The two cannot be combined, since a request carrying both is rejected. `600040` lands on Anna Nagar, and from there the pin gets dragged to the shutter.
 
 **The search box is a `<div>`, not a `<form>`.** It renders inside the Add Store form, and a nested `<form>` is invalid HTML — the parser discards the inner one, so `onSubmit` never fires and the submit button submits the *outer* form. Searching for a place was attempting to save the store. Every button in the picker is `type="button"`, and Enter in the search box is intercepted, for the same reason.
 
-**The search goes through the server** (`GET /api/stores/geocode?q=`), for the same two reasons reverse geocoding does — the page cannot set the User-Agent Nominatim's policy asks for, and `connect-src` stays `'self'`. It shares the reverse lookup's rate limiter, because both directions hit the same donated hardware from the same outbound IP and have to share one budget. Results are capped at five and biased to India: without `countrycodes=in`, "Adyar" also matches places in three other countries, and a list whose right answer is fourth is a list nobody reads to the end of.
+**The search goes through the server** (`GET /api/stores/geocode?q=`), for the same reasons reverse geocoding does — the paid Mapbox token never reaches a browser, the page cannot set the User-Agent Nominatim's policy asks for, and `connect-src` needs no geocoding host. It shares the reverse lookup's rate limiter, because both directions spend one budget. Results are capped at five and biased to India: without the country filter, "Adyar" also matches places in three other countries, and a list whose right answer is fourth is a list nobody reads to the end of.
 
-**One CSP entry had to change** (`nginx.conf`): `img-src` now allows `https://*.tile.openstreetmap.org`. Tiles are images and nothing else — Leaflet itself is bundled and served from `'self'`, and the search is proxied, so `connect-src` stays `'self'` and no third-party script can run. Without that entry the map renders as a blank grey square, with no error anyone would connect to a header.
+**Two CSP entries had to change** for Mapbox (`nginx.conf`): `connect-src` gained `api.mapbox.com`, `events.mapbox.com` and `*.tiles.mapbox.com`, and `worker-src` gained `blob:`. Vector tiles, the style, sprites and glyphs are *fetched* rather than `<img>` loaded, so unlike the OpenStreetMap tiles this replaced they cannot go in `img-src`; and Mapbox GL runs its tile parser in a worker built from a blob URL, without which the library throws on construction. `script-src` is untouched — nothing third-party executes. Geocoding is deliberately absent from that list: it stays proxied.
 
-**The marker is a `divIcon`, not Leaflet's default.** The default is a PNG whose URL Leaflet derives relative to its own stylesheet, which a bundler rewrites — the symptom is a broken-image icon, or no marker at all. Markup has nothing to resolve.
+**The marker is our own element**, not Mapbox's default SVG pin, so it keeps the dot the rest of the app styles.
 
-**Leaflet is lazily loaded** (~156KB in its own chunk) because most visits to the Stores page never open a map. The map also gets `isolation: isolate`, since Leaflet's panes and controls climb to `z-index: 1000` and would otherwise sit over the app's sticky headers and the phone tab bar.
+**Mapbox GL is lazily loaded** (~1.9MB in its own chunk) because most visits to the Stores page never open a map. That mattered under Leaflet's 156KB; at twelve times the size it is the difference between a page that opens and one that thinks about it. The map also gets `isolation: isolate`, since map controls climb to high z-indexes and would otherwise sit over the app's sticky headers and the phone tab bar.
 
 **Where GPS won't cooperate, Google Maps will.** On a fair or poor fix — or when there is no pin at all — a **Find it on Google Maps** link opens the map centred on the rough position (or searching the typed address), so the shop can be found by eye, long-pressed, and its coordinates pasted back. In dense Indian streets, and indoors, this is the dependable path rather than the fallback.
 
@@ -121,11 +121,38 @@ The same button sits in the row editor as **📍 Re-capture**, because fifty sto
 
 **Directions and Call are for every role**, not just an Admin: the people who drive to these shops are the ones who can't edit them. Directions opens `maps/dir/?api=1&destination=LAT,LNG` when there's a pin, and falls back to a name-and-address search when there isn't — labelled *(approx.)*, so the difference is visible before the drive rather than after. Call is a `tel:` link, shown only when the store has a number. Both are in `frontend/src/lib/storeLinks.js`, covered by `frontend/test/storeLinks.js`.
 
-**Reverse geocoding goes through the API, not the page** (`GET /api/stores/reverse-geocode`, any signed-in role — it was Admin-only until Sales could add stores, at which point a salesperson capturing a pin got a 403 on the address that goes with it; the rate limiter, not the role, is what protects Nominatim). Nominatim is free and asks in return for a User-Agent identifying the application — which a browser will not let script set — so the page cannot make this call politely. Routing it through the server also keeps `connect-src 'self'` intact, and gives somewhere to put a rate limit: the whole app shares one outbound IP, and a stuck retry loop would get that IP blocked for everyone. `backend/src/lib/geocode.js` composes the address; Nominatim files the same field under different keys depending on how an area was mapped, so a Chennai suburb arrives as `suburb`, `neighbourhood` or `city_district` and a city as `city`, `town`, `village` or `state_district`.
+**Reverse geocoding goes through the API, not the page** (`GET /api/stores/reverse-geocode`, any signed-in role — it was Admin-only until Sales could add stores, at which point a salesperson capturing a pin got a 403 on the address that goes with it; the rate limiter, not the role, is what protects the provider). Mapbox answers when `MAPBOX_ACCESS_TOKEN` is set and Nominatim when it is not, in exactly the same `{parts, address}` shape — nothing downstream can tell which replied. Nominatim is free and asks in return for a User-Agent identifying the application — which a browser will not let script set — so the page cannot make this call politely. Routing it through the server also keeps `connect-src 'self'` intact, and gives somewhere to put a rate limit: the whole app shares one outbound IP, and a stuck retry loop would get that IP blocked for everyone. `backend/src/lib/geocode.js` composes the address; Nominatim files the same field under different keys depending on how an area was mapped, so a Chennai suburb arrives as `suburb`, `neighbourhood` or `city_district` and a city as `city`, `town`, `village` or `state_district`.
 
-**Two headers had to change** (`nginx.conf`). `Permissions-Policy` denied geolocation to the whole app, so the button would have failed before the browser ever asked the user — it is now `geolocation=(self)`, still denied to any embedded frame. The CSP is unchanged: the geocode proxy is what makes that possible.
+**`Permissions-Policy` had to change** (`nginx.conf`). It denied geolocation to the whole app, so the button would have failed before the browser ever asked the user — it is now `geolocation=(self)`, still denied to any embedded frame.
 
 The address is stored as the single `Store.address` string the table already had, composed from the geocoded parts. The coordinates and the address text are **independent fields** — editing one never touches the other, and Directions always prefers the coordinates. Schema additions: `lat`, `lng`, `accuracyM`, and `phone` (`phone` because a Call button needs a number and there was nowhere to keep one).
+
+## Mapbox, and the meter that watches the bill
+
+The map and both directions of geocoding are Mapbox's. **Two tokens, and they are not interchangeable:**
+
+| Variable | Kind | Where it lives | What it does |
+| --- | --- | --- | --- |
+| `MAPBOX_ACCESS_TOKEN` | secret `sk.` | server only, never serialised to a response | forward and reverse geocoding, in `backend/src/lib/mapbox.js` |
+| `MAPBOX_PUBLIC_TOKEN` | public `pk.` | handed to the page by `GET /api/stores/map-config` | draws the map in the browser |
+
+The public token is fetched at runtime rather than baked in at build time, so rotating it is `fly secrets set` and a restart instead of a rebuild and a redeploy. Mapbox expects a `pk.` token to be visible — the control that matters is the **URL restriction set on it in the Mapbox dashboard**, not secrecy. The `sk.` token is the one that can spend money, and it never leaves the server.
+
+**Neither token is required.** With `MAPBOX_ACCESS_TOKEN` unset the Nominatim path answers both lookups exactly as before; with `MAPBOX_PUBLIC_TOKEN` unset the picker says which variable is missing and still offers search, pasted coordinates and the Google Maps route, rather than showing an empty grey rectangle. A local checkout with no secrets works.
+
+**The free tier is metered on the page, for Admin only** (Stores → top of the page). Two `<meter>` bars: map loads out of 50,000 and geocoding requests out of 100,000, with the percentage, for the current calendar month.
+
+- **Counted here, not read back from Mapbox.** There is no usage endpoint on the free plan.
+- **A load is counted when a map finishes initialising** (`map.once('load')` → `POST /api/stores/map-load`), not when the Stores page opens. The picker is lazy and most visits never draw one; a map that never loaded — offline, refused token — is not one Mapbox billed for.
+- **A geocode is counted only when Mapbox answered it.** The Nominatim fallback spends none of this quota, so it moves no counter.
+- **One row per calendar month** (`MapUsage`, keyed `"2026-08"`), incremented with `upsert`, never read-then-written: two phones opening a map at once would otherwise both read the same number and one load would vanish. 150,000 rows a month existing only to be counted is a table that answers its own question slower every day.
+- **The month key is UTC**, because Mapbox bills in UTC — a boundary read in IST would file five and a half hours of every night under the wrong month.
+- **The figures ride back on the responses that moved them**, so the bars step up while the picker is open rather than on the next page load.
+- **A failed count never fails the request.** The meter being wrong is a smaller problem than the map not opening or the address not filling in.
+
+It is Admin-only because it is a billing figure: a salesperson standing outside a shop can do nothing with it but worry. And it is a meter, not a cap — going over the free tier costs money, it does not break, and cutting off the map because a counter is high would be worse than the bill. At the paid rates ($5 per 1,000 map loads, $0.75 per 1,000 geocodes) the free tier is roughly a thousand times this app's actual use.
+
+`backend/src/lib/mapUsage.js` holds the counters, `backend/test/mapbox.js` covers both it and the geocoding shape — no database and no network, the request functions get a fake `fetch` and the meter a fake `prisma`.
 
 ## New-store notifications
 
@@ -384,7 +411,9 @@ grillexa/
 │   │   │                wisdom.js (which line runs today, and what
 │   │   │                counts as on-topic from a quote API),
 │   │   │                catalogue.js (one product order for every list),
-│   │   │                geocode.js (reverse geocode via Nominatim),
+│   │   │                geocode.js (geocoding via Nominatim, the fallback),
+│   │   │                mapbox.js (geocoding via Mapbox, the default),
+│   │   │                mapUsage.js (the free-tier meter, per month),
 │   │   │                offlineImport.js (CSV parse, validate, write)
 │   │   ├── middleware/  auth.js (cookie session), role.js
 │   │   ├── routes/      auth, users, products, stores, stock, consignments,
@@ -395,7 +424,8 @@ grillexa/
 │   │   └── index.js
 │   ├── test/            crash-guards.js, stock-cascade.js, stock-rollup.js,
 │   │                    pricing.js, consignment-list.js, offline-import.js,
-│   │                    geocode.js, dashboard.js, analytics.js, wisdom.js,
+│   │                    geocode.js, mapbox.js, dashboard.js, analytics.js,
+│   │                    wisdom.js,
 │   │                    wastage.js,
 │   │                    fake-tx.js (shared in-memory Prisma)   (npm test)
 │   └── .env.example
