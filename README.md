@@ -7,6 +7,8 @@ Stock and billing for a distributed retail business (sprouts, fruit bowls, banan
 - **Database**: PostgreSQL (Neon, Singapore)
 - **Hosted**: Fly.io, region `sin`
 
+**[TEAM-GUIDE.md](TEAM-GUIDE.md)** is the staff-facing how-to — install, the daily flow, adding a shop. This file is the design record and is not written for them.
+
 ## The consignment model
 
 This is the core of the app. Everything else supports it.
