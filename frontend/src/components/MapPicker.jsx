@@ -48,6 +48,12 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby, toke
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const draggingRef = useRef(false);
+  // State, not just the ref, because the marker effect below has to re-run when
+  // the map appears. The token arrives from /stores/map-config, so opening the
+  // picker before that lands renders with no map at all: the marker effect bails
+  // on the empty ref, and its own deps never change afterwards — leaving a map
+  // with no pin on it and no way to see where the store already was.
+  const [mapReady, setMapReady] = useState(false);
   // The click handler is read through a ref so the map never has to be rebuilt
   // when the parent re-renders — rebuilding it would count a second map load
   // and bill for it.
@@ -71,6 +77,7 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby, toke
       attributionControl: true,
     });
     mapRef.current = map;
+    setMapReady(true);
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
     map.on('click', (e) => pickRef.current(e.lngLat.lat, e.lngLat.lng));
     // Counted on 'load' rather than on construction: a map that never finished
@@ -85,6 +92,7 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby, toke
       map.remove();
       mapRef.current = null;
       markerRef.current = null;
+      setMapReady(false);
     };
     // Deliberately empty: openAt/hasPin are the *opening* view, and re-running
     // this on a pin change would rebuild the map under the user's hand.
@@ -118,7 +126,7 @@ export default function MapPicker({ lat, lng, onPick, onSearchPick, nearby, toke
       markerRef.current.setLngLat([lng, lat]);
     }
     if (!draggingRef.current) map.easeTo({ center: [lng, lat], zoom: PIN_ZOOM });
-  }, [lat, lng, hasPin]);
+  }, [lat, lng, hasPin, mapReady]);
 
   async function search() {
     const q = query.trim();

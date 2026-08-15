@@ -106,16 +106,36 @@ export function formatAccuracy(metres) {
 // Google Maps ("13.0878, 80.2103", which is how everyone copies a location),
 // or a single number typed into the lat or lng box on its own. Returns
 // {lat, lng} when a pair was recognised, {lat} for a lone number, or null.
+//
+// Both patterns are anchored to the WHOLE string, and that anchoring is the
+// entire point. This used to pull every number out of the text and take the
+// first two, which meant an Indian door number was a coordinate pair:
+// "8-2-120/1, Banjara Hills" read as (8, -2) — the Gulf of Guinea — and the
+// picker's search box dropped a pin there instead of searching, with no lookup
+// and nothing on screen to say it had guessed. "Shop 17, Road 78" is the same
+// bug wearing a disguise: (17, 78) is in Maharashtra, so it looks like an
+// ordinary Indian pin and nobody catches it until a driver does.
+//
+// A pair is two numbers and nothing else. Anything with a word in it, a third
+// number, or a hyphen where the separator should be is an address, and falling
+// through to the geocoder is the safe direction to be wrong in — a search that
+// finds nothing is visible, a pin in the Atlantic is not.
+const COORD_PAIR = /^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/;
+const COORD_ONE = /^-?\d+(?:\.\d+)?$/;
+
 export function parseCoordInput(text) {
   const s = String(text == null ? '' : text).trim();
   if (!s) return null;
-  // Strip the decorations Maps and messaging apps add around a pair.
-  const cleaned = s.replace(/[()\[\]]/g, ' ').replace(/[;|]/g, ',');
-  const nums = cleaned.match(/-?\d+(?:\.\d+)?/g);
-  if (!nums) return null;
-  const [a, b] = nums.map(Number);
-  if (nums.length >= 2 && Number.isFinite(a) && Number.isFinite(b)) return { lat: a, lng: b };
-  return Number.isFinite(a) ? { lat: a } : null;
+  // Strip the decorations Maps and messaging apps put around a pair, and
+  // collapse the whitespace so " 13.0878 ,  80.2103 " is still one pair.
+  const cleaned = s
+    .replace(/[()\[\]]/g, ' ')
+    .replace(/[;|]/g, ',')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const pair = cleaned.match(COORD_PAIR);
+  if (pair) return { lat: Number(pair[1]), lng: Number(pair[2]) };
+  return COORD_ONE.test(cleaned) ? { lat: Number(cleaned) } : null;
 }
 
 // Range check, so a transposed pair (Chennai typed as 80.2, 13.0 lands in

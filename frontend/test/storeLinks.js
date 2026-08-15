@@ -105,6 +105,30 @@ check('nothing usable parses to nothing', () => {
   for (const junk of ['', '   ', 'abc', null, undefined]) assert.equal(parseCoordInput(junk), null);
 });
 
+// The one that was dropping pins in the Atlantic. An Indian door number is a
+// string of numbers separated by hyphens and slashes, and a street address
+// routinely carries two — "8-2-120/1, Banjara Hills" was read as the pair
+// (8, -2), which is in the Gulf of Guinea and passes every range check there
+// is. Typed into the picker's search box it dropped a pin there instead of
+// searching, silently. "Shop 17, Road 78" is worse: (17, 78) is in Maharashtra,
+// so it looks like an ordinary Indian pin and nothing on screen says otherwise.
+//
+// A coordinate pair is TWO numbers and nothing else. Anything with a word, a
+// third number or a hyphen where the separator should be is an address, and an
+// address belongs in the geocoder.
+check('an address is never mistaken for a coordinate pair', () => {
+  for (const address of [
+    '8-2-120/1, Banjara Hills',
+    '12-3-456, Ameerpet',
+    'Plot 12, Road 45',
+    'Shop 17, Road 78',
+    '1st Main, 4th Cross',
+    '13.0878, 80.2103, extra',
+  ]) {
+    assert.equal(parseCoordInput(address), null, `${address} must not parse as a pin`);
+  }
+});
+
 check('a transposed or out-of-range pair is caught at the keyboard', () => {
   assert.equal(coordError(13.0878, 80.2103), '');
   assert.equal(coordError(null, null), '');

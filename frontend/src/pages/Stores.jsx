@@ -505,6 +505,18 @@ export default function Stores() {
               </span>
             </div>
           ))}
+          {/* The two tokens are independent, and a drawn map is no evidence
+              that geocoding is on. With only the public one set, every search
+              and every address lookup goes to Nominatim while this meter reads
+              a confident Mapbox zero — and the symptom people report is that
+              the map gives wrong locations, with nothing naming the cause. */}
+          {mapConfig.geocoding === 'nominatim' && (
+            <p className="map-note map-note-warn">
+              Geocoding is running on Nominatim, not Mapbox — <code>MAPBOX_ACCESS_TOKEN</code> is not
+              set on the server. Place search and the address filled in after a GPS capture are much
+              weaker in India this way. The pin itself is unaffected.
+            </p>
+          )}
         </div>
       )}
 

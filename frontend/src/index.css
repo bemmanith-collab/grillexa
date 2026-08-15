@@ -2708,6 +2708,20 @@ a.btn-danger {
   flex-basis: 100%;
 }
 
+/* A missing token is not a hint, and this had been rendering as one — the same
+   muted grey as "tap the map to move the pin", which is the tone you read past.
+   These say a provider is missing and the app is quietly degraded. */
+.map-note-warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.map-note-warn code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.95em;
+}
+
 .map-loading {
   flex-basis: 100%;
   height: 320px;

@@ -133,9 +133,17 @@ router.get('/geocode', geocodeLimiter, async (req, res) => {
 // by design, and the control that matters is the URL restriction set on it in
 // the Mapbox dashboard, not secrecy. The `sk.` token that can spend money
 // stays in lib/mapbox.js and never leaves the server.
+// `geocoding` says which provider is actually answering lookups, because the
+// two tokens are independent and the map drawing is no evidence that geocoding
+// is on. With MAPBOX_PUBLIC_TOKEN set and MAPBOX_ACCESS_TOKEN not, the page
+// draws a Mapbox map, shows a Mapbox meter reading zero, and quietly sends
+// every search and every reverse lookup to Nominatim — whose Indian coverage is
+// thin enough that the visible symptom is "the map gives wrong locations", with
+// nothing anywhere naming the cause.
 router.get('/map-config', async (req, res) => {
   res.json({
     token: String(process.env.MAPBOX_PUBLIC_TOKEN || '').trim(),
+    geocoding: mapbox.hasMapbox() ? 'mapbox' : 'nominatim',
     usage: await mapUsage.read(prisma),
   });
 });
