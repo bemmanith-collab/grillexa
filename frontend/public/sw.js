@@ -43,6 +43,49 @@ self.addEventListener('push', (event) => {
   );
 });
 
+// A browser may replace a push subscription on its own — key rotation, a
+// storage eviction, a browser update. When it does, this event is the *only*
+// notice given, and the device starts listening on a new endpoint while the
+// server keeps pushing to the old one.
+//
+// The old endpoint does not necessarily start failing: FCM answers 201 on a
+// superseded endpoint rather than 410, so the send path sees success, the
+// prune never fires, and that person silently stops receiving anything —
+// forever, because nothing else ever re-registers them.
+//
+// oldEndpoint goes up with the new one so the server can drop the stale row
+// immediately rather than waiting for a 404 that may never come.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(
+    (async () => {
+      // Chrome usually hands over the replacement; Safari does not, so fall
+      // back to re-subscribing with the key the old one was created from.
+      let subscription = event.newSubscription;
+      if (!subscription) {
+        const key = event.oldSubscription?.options?.applicationServerKey;
+        if (!key) return;
+        subscription = await self.registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: key,
+        });
+      }
+      const body = subscription.toJSON();
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        // The session cookie is httpOnly, so it has to be asked for explicitly
+        // here — a worker fetch does not attach credentials by default.
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: body.endpoint,
+          keys: body.keys,
+          oldEndpoint: event.oldSubscription?.endpoint,
+        }),
+      });
+    })()
+  );
+});
+
 // Focus an open tab rather than opening a second one. Someone with Grillexa
 // already open should be taken to the store, not handed a duplicate app.
 self.addEventListener('notificationclick', (event) => {

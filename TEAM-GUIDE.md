@@ -14,6 +14,8 @@ App: **https://grillexa.fly.dev**
    - **iPhone:** there is no button. Tap **Share** → **Add to Home Screen**.
 4. Open it from the Home Screen from now on. On iPhone this is the only way notifications work.
 5. Tap **Change password** (the key icon, bottom of the menu) and set your own.
+6. **Tap Notifications, and allow it when the phone asks.** On a phone it's under **More**; on a computer it's at the bottom of the left-hand menu. You will not be told when anyone adds a shop until you do this — it is off until you turn it on, on **each** phone or computer you use.
+7. **Android only:** Settings → Apps → **Chrome** → Battery → **Unrestricted**. Android holds notifications back for hours otherwise, and they arrive that evening instead of when the shop was added.
 
 You stay logged in. If you're on a shared phone, **log out at the end of the shift** — that also stops the phone buzzing with your notifications.
 
@@ -77,7 +79,7 @@ Got it wrong? Switch to the view that includes settled ones and correct the last
    - **perfect / good** (green) — done, the address fills in too.
    - **fair** or **poor** — the pin saved but it's rough. Tap **📍 Try again — step outside**, or fix it by hand (next point).
 4. To fix a pin by hand: **Pick on map**, then tap/drag to the shutter. Or open **Find it on Google Maps**, long-press the shop there, copy the coordinates, and paste them into the latitude box — it splits the pair for you.
-5. Save. Everyone else on the team gets a notification.
+5. Save. Everyone else who has switched notifications on gets one — not the whole team automatically, only the devices that were registered in step 6 of the setup above.
 
 Editing or deleting a store is Admin only — ask them.
 
@@ -117,4 +119,8 @@ Editing or deleting a store is Admin only — ask them.
 
 **Nothing happens when I press save.** Check for a red note next to the fields, particularly the **Remaining** column on Settle Consignment. On a phone the message at the top of the page is often scrolled out of sight.
 
-**No notifications on my iPhone.** They only work if the app was added to the Home Screen and you opened it from there.
+**I'm not getting notifications.** They're off until you turn them on, on every device separately — tap **Notifications** (under **More** on a phone) and allow it when asked. If the button already says *Turn off notifications*, that device is registered and the problem is below.
+
+**No notifications on my iPhone.** They only work if the app was added to the Home Screen and you opened it from there. Then check Settings → Notifications → **Grillexa**: *Allow Notifications* on, and **Banners** enabled. Set to *Deliver Quietly* they go straight to the Notification Center without a sound, which looks exactly like nothing arriving. Check Focus and Do Not Disturb too.
+
+**Notifications arrive hours late on Android.** Settings → Apps → **Chrome** → Battery → **Unrestricted**, and turn off Data Saver. Android otherwise holds them until it next wakes the app up, so a shop added at nine in the morning gets announced after the round is finished.

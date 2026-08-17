@@ -28,10 +28,20 @@ router.get('/key', (req, res) => {
 //
 // The userId is taken from the session, never the body: otherwise anyone could
 // register a device against a colleague's account and read their notifications.
+//
+// oldEndpoint is sent by the service worker's pushsubscriptionchange handler
+// when the browser has replaced a subscription. The superseded row has to go
+// explicitly: a push service can keep answering 201 on it long after it stops
+// reaching the device, so the send path's 404/410 prune never fires and the
+// dead row outlives the person's ability to receive anything. Scoped to the
+// calling user, so a known endpoint alone cannot delete someone else's device.
 router.post('/subscribe', async (req, res) => {
-  const { endpoint, keys } = req.body || {};
+  const { endpoint, keys, oldEndpoint } = req.body || {};
   if (!endpoint || !keys?.auth || !keys?.p256dh) {
     return res.status(400).json({ error: 'A push subscription with endpoint and keys is required.' });
+  }
+  if (oldEndpoint && oldEndpoint !== endpoint) {
+    await prisma.pushSubscription.deleteMany({ where: { endpoint: oldEndpoint, userId: req.user.id } });
   }
   const data = { endpoint, auth: keys.auth, p256dh: keys.p256dh, userId: req.user.id };
   const subscription = await prisma.pushSubscription.upsert({

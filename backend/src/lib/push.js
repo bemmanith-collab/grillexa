@@ -55,17 +55,48 @@ async function sendToUsers(userIds, payload) {
   // of the team from being told.
   await Promise.allSettled(
     subs.map(async (sub) => {
+      // The host is the only part of an endpoint worth logging: it says which
+      // push service answered (Apple, FCM, Mozilla) without putting the
+      // subscription's secret path into the log.
+      const host = (() => {
+        try {
+          return new URL(sub.endpoint).host;
+        } catch (err) {
+          return 'unknown-host';
+        }
+      })();
       try {
-        await webpush.sendNotification(
+        const res = await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { auth: sub.auth, p256dh: sub.p256dh } },
-          body
+          body,
+          // urgency high, because the default lets a push service hold the
+          // message until the device next wakes on its own. On Android under
+          // Doze that is hours, and a shop added this morning announced this
+          // evening reads as "notifications don't work" — which is how this
+          // was reported. It asks for an immediate wake; the device's own
+          // battery settings can still overrule it.
+          //
+          // TTL one hour, against a default of four weeks. If it could not be
+          // delivered within the hour the moment has passed, and a push service
+          // flushing a fortnight of "New Store Added" at once is worse than
+          // silence.
+          { urgency: 'high', TTL: 3600 }
         );
         sent += 1;
+        // Logged per send, and on success too. A status code here is the only
+        // evidence that a notification ever left, and without it the question
+        // "was anything sent when store 107 was created?" is unanswerable
+        // after the fact — which cost an afternoon of guessing once already.
+        //
+        // 201 means the push service accepted it for delivery. It is not proof
+        // the device displayed anything, and must never be read as one.
+        console.log(`Push accepted user=${sub.userId} ${host} status=${res.statusCode}`);
       } catch (err) {
         if (err.statusCode === 404 || err.statusCode === 410) {
           dead.push(sub.id);
+          console.log(`Push gone user=${sub.userId} ${host} status=${err.statusCode} (subscription deleted)`);
         } else {
-          console.warn('Push send failed (kept for retry):', sub.endpoint, err.statusCode || err.message);
+          console.warn(`Push failed user=${sub.userId} ${host} status=${err.statusCode || err.message} (kept for retry)`);
         }
       }
     })
@@ -74,6 +105,7 @@ async function sendToUsers(userIds, payload) {
   if (dead.length) {
     await prisma.pushSubscription.deleteMany({ where: { id: { in: dead } } });
   }
+  console.log(`Push batch: ${subs.length} subscription(s), ${sent} accepted, ${dead.length} removed`);
   return { sent, removed: dead.length };
 }
 

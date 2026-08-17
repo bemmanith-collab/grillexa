@@ -184,9 +184,19 @@ A shop nobody knows about is a shop nobody delivers to. When someone adds a stor
 
 **Signing out drops this device's subscription**, server-side first while the session cookie is still valid — the endpoint is scoped to the calling user, and a signed-out request cannot reach it. Without that, a shared phone would keep buzzing for whoever used it last, and they would be reading a colleague's notifications with no way to stop it short of browser settings. It never blocks signing out: a failure there must not strand someone on a screen they are trying to leave.
 
-**Subscriptions are per device, not per account.** The same person on a phone and a laptop is two rows in `PushSubscription`, and both should buzz — the phone is the one in a pocket when someone else adds a shop. The push service's `endpoint` is the natural key: a browser hands back the same one every time it re-subscribes, so upserting on it is what stops a row accumulating on every app open.
+**Subscriptions are per device, not per account.** The same person on a phone and a laptop is two rows in `PushSubscription`, and both should buzz — the phone is the one in a pocket when someone else adds a shop. The push service's `endpoint` is the key, and upserting on it is what stops a row accumulating on every app open.
+
+**An endpoint is not stable, which this used to assume.** A browser replaces a subscription whenever it feels like it — key rotation, storage eviction, a browser update — and `pushsubscriptionchange` in the service worker is the only notice given. Miss it and the device listens on a new endpoint while the server pushes to the old one, which is a silent, permanent outage for that person: **a superseded endpoint does not reliably start failing.** FCM answers `201` on one, so the send path sees success, the `404`/`410` prune never fires, and nothing re-registers them. The handler re-subscribes and posts the new endpoint with the old one alongside, so the stale row is deleted outright rather than waiting for a rejection that may never arrive.
+
+**The enable button re-registers on every mount**, because "this device has a subscription" and "the server can reach this device" are different claims and only the first was ever checked. If the `POST` in `enable()` failed — dropped connection, expired session — the browser kept its subscription anyway, so the button read *on* while the server had no row at all. Nobody re-taps a button that already says it is on, so that state was permanent. The upsert is keyed on endpoint, so re-posting is idempotent and costs one request per app open.
 
 **Dead subscriptions delete themselves.** A push service answers `404` or `410` once a subscription is gone for good — app uninstalled, permission revoked, browser data cleared. The send path deletes those rows then, and nothing else prunes the table; any other error (network, 5xx, rate limit) is transient and the row is kept. Sends run through `Promise.allSettled`, so one dead device cannot stop the rest of the team being told.
+
+**Accepted is not delivered, and the difference is where the complaints come from.** A push service answering `201` means it has taken the message, nothing more. It is free to hold it until the device next wakes on its own, and on an Android under Doze or battery restriction that is hours. Reported as "notifications aren't reaching", it was really "reaching that evening" — from the phone the two are identical, and the server logs looked perfect throughout because they were.
+
+So every send goes with **`urgency: 'high'`**, the RFC 8030 header asking the service to wake the device now rather than batch it, and **`TTL: 3600`** against a default of four weeks. If it could not be delivered within the hour the moment has passed, and a service flushing a fortnight of *New Store Added* at once is worse than silence. The header only asks — a phone's own battery settings can still overrule it, so `TEAM-GUIDE.md` carries the Android step.
+
+**Every send is logged, success included** — push service host, user id, status code, then a batch summary. Not diagnostics-in-waiting: without it the question *"was anything sent when store 107 was created?"* has no answer at all after the fact, which is exactly the position an afternoon of live testing on staff phones started from. The host is logged and never the full endpoint, since the path is the secret that addresses someone's device.
 
 **A notification failing never fails the action.** `POST /stores` responds without waiting on the push services, and errors are logged rather than thrown. The store was created; that is the part that had to be durable.
 
@@ -200,7 +210,9 @@ A shop nobody knows about is a shop nobody delivers to. When someone adds a stor
 
 **iOS needs the app on the Home Screen.** Safari only exposes `PushManager` to an installed PWA (16.4+), so on an iPhone browsing the site normally, notifications are genuinely unavailable — the button says how to install rather than offering something that cannot work. The same applies to any plain-`http` origin, including a LAN address during development: no secure context, no service worker, no push.
 
-The service worker (`frontend/public/sw.js`) gained `push` and `notificationclick` handlers and **still caches nothing** — a notification is a message, not a stored copy of a page, so the network-only rule that file exists to protect is intact.
+The service worker (`frontend/public/sw.js`) gained `push`, `notificationclick` and `pushsubscriptionchange` handlers and **still caches nothing** — a notification is a message, not a stored copy of a page, so the network-only rule that file exists to protect is intact.
+
+`backend/test/push.js` covers the send path with web-push and Prisma faked in the require cache: that both headers go out, that `410` prunes and `500` does not, that the actor is skipped, and that a send is logged without its endpoint path. Every failure it guards against is invisible in production until someone mentions they never heard about a shop.
 
 ## The daily grilling line (staff dashboard only)
 

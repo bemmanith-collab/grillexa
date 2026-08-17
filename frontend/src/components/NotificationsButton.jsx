@@ -23,13 +23,29 @@ export default function NotificationsButton({ className = 'btn-secondary' }) {
 
   // Reflect what this browser already has, so the button is honest after a
   // reload or on a device that subscribed weeks ago.
+  //
+  // And re-register it, because "this device has a subscription" and "the
+  // server can reach this device" are different claims and only the first was
+  // ever checked. If the POST in enable() failed — a dropped connection, an
+  // expired session — the browser kept its subscription regardless, so the
+  // button read "on" forever while the server had no row at all. Nobody
+  // re-taps a button that already says it is on, so that state was permanent.
+  //
+  // ponytail: re-POSTs on every mount rather than asking the server what it
+  // holds. The upsert is keyed on endpoint so this is idempotent, and it costs
+  // one request per app open; add a GET /push/subscribe status route if that
+  // ever shows up in the numbers.
   useEffect(() => {
     if (!support.ok) return;
     let cancelled = false;
     navigator.serviceWorker.ready
       .then((reg) => reg.pushManager.getSubscription())
-      .then((sub) => {
-        if (!cancelled) setEnabled(Boolean(sub) && permissionState() === 'granted');
+      .then(async (sub) => {
+        const on = Boolean(sub) && permissionState() === 'granted';
+        if (!cancelled) setEnabled(on);
+        if (!on) return;
+        const body = sub.toJSON();
+        await client.post('/push/subscribe', { endpoint: body.endpoint, keys: body.keys });
       })
       .catch(() => {});
     return () => {
