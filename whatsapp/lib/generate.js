@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { generatePost } from './claude.js';
+import { businessHour, businessMonth, businessWeekday } from './clock.js';
 import {
   AUDIENCES,
   CONTRAST_RULES,
@@ -26,26 +27,19 @@ const products = JSON.parse(fs.readFileSync(path.join(here, 'products.json'), 'u
 
 const readPrompt = (file) => fs.readFileSync(path.join(promptsDir, file), 'utf8').trim();
 
-export const WEEKDAYS = [
-  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
-];
-
-export function weekdayFor(date = new Date()) {
-  return WEEKDAYS[date.getDay()];
-}
-
 // Andhra Pradesh / Telangana seasons, roughly.
-export function seasonFor(date = new Date()) {
-  const month = date.getMonth() + 1;
+export function seasonFor(now) {
+  const month = businessMonth(now);
   if (month >= 3 && month <= 5) return 'summer — hot and dry';
   if (month >= 6 && month <= 9) return 'the monsoon — wet and humid';
   if (month >= 10 && month <= 11) return 'the festival season — mild, and a lot of cooking';
   return 'winter — cool mornings and evenings';
 }
 
-// Which meal a --batch run writes about when nobody said.
-export function slotForNow(date = new Date()) {
-  const hour = date.getHours();
+// Which meal a post is about when nobody said. Indian hours: someone running this at
+// 8am in Vijayawada wants breakfast, whatever the laptop's timezone says.
+export function slotForNow(now) {
+  const hour = businessHour(now);
   if (hour < 11) return 'breakfast';
   if (hour < 15) return 'lunch';
   if (hour < 19) return 'snack';
@@ -142,7 +136,7 @@ export function buildRequest(options) {
 
   const resolved = {
     ...options,
-    day: options.day ?? weekdayFor(),
+    day: options.day ?? businessWeekday(),
     season: options.season ?? seasonFor(),
     slot: spec.slotted ? (options.slot ?? slotForNow()) : undefined,
     product: spec.needsProduct ? pickProduct(options.product) : undefined,

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import chalk from 'chalk';
 
+import { businessDateStr } from './clock.js';
 import { AUDIENCES, LANGUAGES, SLOTS, TONES, TYPES } from './options.js';
 
 const RULE = '─'.repeat(56);
@@ -100,7 +101,9 @@ export function printList() {
 export function resolveOutFile(outPath, options) {
   if (outPath.toLowerCase().endsWith('.txt')) return outPath;
 
-  const date = new Date().toISOString().slice(0, 10);
+  // The Indian date, so a post written at 2am IST files under today rather than
+  // yesterday, which is what UTC would call it.
+  const date = businessDateStr();
   const parts = [options.type];
   if (options.slot) parts.push(options.slot);
   parts.push(options.audience, date);

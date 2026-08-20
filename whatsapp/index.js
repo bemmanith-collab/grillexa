@@ -12,7 +12,8 @@ import { GenerationError, modelName } from './lib/claude.js';
 import {
   AUDIENCES, DEFAULTS, LANGUAGES, QUOTE_LANGUAGES, SLOTS, TONES, TYPES,
 } from './lib/options.js';
-import { WEEKDAYS, buildRequest, findProduct, generate, productList } from './lib/generate.js';
+import { WEEKDAYS } from './lib/clock.js';
+import { buildRequest, findProduct, generate, productList } from './lib/generate.js';
 import {
   printError, printList, printPost, printRequest, printSaved, resolveOutFile, writePost,
 } from './lib/render.js';

@@ -63,8 +63,8 @@ and it is what passes your flags through to the script.
 | `--quote-language` | Language of the `GRILLO SAYS` line only. Default `auto`. |
 | `--slot` | `breakfast`, `lunch`, `snack`, `dinner`. Only with `--type=meal`. |
 | `--product` | Which product, with `--type=product`. Random if omitted. |
-| `--day` | Weekday in the headline. Defaults to today. |
-| `--season` | Season, with `--type=seasonal`. Defaults to the current one. |
+| `--day` | Weekday in the headline. Defaults to today in India. |
+| `--season` | Season, with `--type=seasonal`. Defaults to the current one in India. |
 | `--batch` | One post of every type, generated one after another. |
 | `--out` | Also write to a file. A path ending `.txt` is a file; anything else is a folder. |
 | `--dry-run` | Print the prompt instead of sending it. Costs nothing. |
@@ -109,6 +109,25 @@ Two separate settings, because the channel is mostly English but Grillo is not a
 
 When `--language` is not English, `--quote-language` is ignored — the body setting
 already governs the whole post, and a second instruction would only contradict it.
+
+## Everything time-based runs on Indian time
+
+Three things are decided by the clock: the weekday in the headline, which meal
+`--type=meal` writes about when you don't pass `--slot`, and which season
+`--type=seasonal` assumes. All three are facts about Andhra Pradesh, so all three are
+computed in IST regardless of what the machine running the tool is set to
+(`lib/clock.js`).
+
+Without that, a laptop on UTC prints `THURSDAY` on a Friday post after 6:30pm IST, and
+a batch run at 8am in Vijayawada writes about dinner. Output filenames use the Indian
+date for the same reason.
+
+It is a fixed +5:30 offset rather than a timezone lookup — India has never observed DST,
+so the offset is exact, and the arithmetic doesn't depend on timezone data being present
+on the machine. Same approach as `frontend/src/utils/date.js`, deliberately.
+
+Override either with `--day=friday` or `--season="summer — hot and dry"` when you are
+writing posts ahead of time.
 
 ## The post format
 

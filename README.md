@@ -496,7 +496,8 @@ grillexa/
 │   ├── index.js      CLI (commander)
 │   ├── lib/          claude.js (the only file that talks to the API),
 │   │                 generate.js (prompt assembly), options.js (the type /
-│   │                 audience / tone / language registry), render.js,
+│   │                 audience / tone / language registry), clock.js (IST,
+│   │                 same +5:30 offset as the app), render.js,
 │   │                 products.json
 │   └── prompts/      brand.md, example-post.md, one file per content type
 ├── package.json      root launcher only — `npm run whatsapp`. Nothing is
@@ -527,6 +528,8 @@ npm run whatsapp -- --type=morning --audience=elders     # from the repo root
 Two things in it are load-bearing and should survive future edits:
 
 **The voice lives in one file.** `prompts/brand.md` carries the tone, the format and the forbidden vocabulary, and is sent with every request; the per-type files only say what sections that type has. Changing how the channel sounds is one edit, not eight. `--dry-run` prints the assembled prompt without spending anything, which is how you check a prompt edit before it goes near the API.
+
+**The clock is the business's, not the machine's.** The weekday in the headline, the meal a batch writes about, the season a seasonal post assumes and the date in output filenames are all computed in IST (`lib/clock.js`), using the same fixed +5:30 offset and the same reasoning as `frontend/src/utils/date.js` — India has never observed DST, so the offset is exact and needs no timezone data on the machine. A laptop on UTC otherwise prints `THURSDAY` on a Friday post every evening after 6:30, and a batch run at 8am in Vijayawada writes about dinner.
 
 **Some of the prompt is there for honesty, not style.** Product posts may state only the facts listed for that product in `lib/products.json`. The `diabetics` audience is told never to imply a food treats or controls diabetes and never to touch the subject of medication. `--type=customer` writes from a real detail supplied in `--topic`; with no topic it produces an unattributed post rather than inventing a name and an outcome, because a made-up testimonial published as genuine costs the channel more than any post gains it. Those three are not decoration.
 
