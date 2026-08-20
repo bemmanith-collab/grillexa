@@ -500,7 +500,9 @@ grillexa/
 │   │                 same +5:30 offset as the app), render.js,
 │   │                 products.json, pantry.json (everyday ingredients,
 │   │                 one per post, so the channel stops repeating itself)
-│   └── prompts/      brand.md, example-post.md, one file per content type
+│   ├── prompts/      brand.md, example-post.md, one file per content type
+│   └── examples/     hand-written reference posts. Documentation only —
+│                     never sent to the model, unlike prompts/
 ├── package.json      root launcher only — `npm run whatsapp`. Nothing is
 │                     installed at this level.
 ├── Dockerfile        production image for Fly (backend + frontend + Nginx)

@@ -196,6 +196,12 @@ JavaScript to change how the posts read.
 
 After editing, `--dry-run` shows exactly what Claude will receive.
 
+`examples/` holds hand-written reference posts showing what the current prompts are
+aiming at, with a note on each explaining which instructions it demonstrates. **Nothing
+in `examples/` is sent to the model** — only `prompts/` is loaded, and only by filename.
+It is there for whoever edits a prompt file next and wants to see the target before
+changing it.
+
 `lib/products.json` is the product catalogue for `--type=product`. It is a plain list —
 add a product with its `facts`, and those facts are the **only** things the post is
 allowed to state about it.
