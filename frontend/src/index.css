@@ -2860,3 +2860,92 @@ a.btn-danger {
   margin-top: 2px;
   font-size: 0.78rem;
 }
+
+/* ---------- WhatsApp content generator (dashboard panel) ---------- */
+
+.wa-card {
+  margin-top: 16px;
+}
+
+.wa-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-strong, #1f2933);
+}
+
+.wa-header .card-title {
+  margin: 0;
+}
+
+.wa-today {
+  margin: 6px 0 12px;
+}
+
+.wa-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.wa-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wa-controls select,
+.wa-controls input {
+  /* 16px keeps iOS from zooming the page when the field takes focus, the same
+     reason SearchSelect sets it. */
+  font-size: 16px;
+  width: 100%;
+}
+
+.wa-topic {
+  grid-column: 1 / -1;
+}
+
+.wa-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wa-output {
+  margin-top: 16px;
+  border-top: 1px solid var(--border, #e4e7eb);
+  padding-top: 12px;
+}
+
+.wa-output-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+/* The post is shown exactly as it will be pasted: emoji, blank lines and the
+   em-dash dividers are the format, so nothing here may reflow or restyle it.
+   A readable sans-serif rather than a monospace font, because that is closer to
+   how it will look in WhatsApp. */
+.wa-post {
+  margin: 0;
+  padding: 14px;
+  max-height: 460px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.55;
+  background: var(--surface-muted, #f7f8fa);
+  border-radius: 8px;
+  user-select: text;
+}

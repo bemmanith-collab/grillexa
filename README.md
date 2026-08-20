@@ -516,17 +516,32 @@ grillexa/
 
 Fly builds **only** the root `Dockerfile`, `nginx.conf` and `entrypoint.sh`. There are no other Dockerfiles or nginx configs; earlier duplicates under `backend/` and `frontend/` were removed because editing the wrong one silently did nothing.
 
-`whatsapp/` is not in the image and is not deployed. It is a desk tool, run by hand.
+`whatsapp/` **is** in the image, as its own directory beside the backend rather than inside it — the dashboard panel imports it at runtime. See below.
 
 ## The WhatsApp content generator
 
 `whatsapp/` writes posts for the Grillo WhatsApp channel — myth-vs-fact, morning tips, a meal of the day, the Sunday cheat meal, habit challenges, product highlights, seasonal food, evening wind-downs and customer stories — formatted for a phone screen and copied straight into WhatsApp. **[whatsapp/README.md](whatsapp/README.md)** is the how-to.
 
-**It is deliberately not integrated.** It imports nothing from `backend/` or `frontend/`, never opens the database, has its own `package.json` and `node_modules`, and needs no part of the app to be running. It talks to the Claude API and to nothing else. That isolation is the point: content generation has no business holding a connection to a billing system, and a broken prompt file must never be able to stop a shop from raising a bill.
+**The dependency runs one way only.** The backend imports the subproject; the subproject imports nothing back. It still never opens the database, still has its own `package.json` and `node_modules`, and still runs standalone from a terminal with the app switched off. What changed is that it now also ships in the image, as `/app/whatsapp` beside `/app/backend`, because `POST /api/whatsapp/generate` loads it at runtime — CommonJS reaching ESM through `import()`, over a relative path that resolves the same in the repo and in the image.
+
+Keeping it a separate directory rather than folding it into `backend/src` is what lets the dashboard and the CLI share **one copy of the prompt files**. Two copies would drift, and the channel would start saying different things depending on who wrote the post.
 
 ```bash
-npm run whatsapp -- --type=morning --audience=elders     # from the repo root
+npm run whatsapp -- --today                              # the post today is due
+npm run whatsapp -- --type=morning --audience=elders     # or pick one
 ```
+
+**The week has a fixed shape** (`whatsapp/lib/rota.js`), and `--today` follows it: Monday a morning tip, Tuesday a myth, Wednesday dinner, Thursday a habit challenge, Friday an evening wind-down, Saturday seasonal, Sunday the cheat meal. A repeating rhythm gets anticipated — people start waiting for the Sunday one — where a random type each day is just noise arriving at breakfast. Product highlights and customer stories are deliberately **off** the rota and posted by hand, because a channel that sells every week stops being read.
+
+## The dashboard panel
+
+Admin and Manager see a **WhatsApp Content Generator** card under the day's numbers on the dashboard: pick a type and an audience, optionally type a topic, generate, copy. It opens with today's rota post already selected, so daily posting is one click rather than three decisions.
+
+**Role is not the whole gate.** Writing for the customer channel is a job two named people do, not something every Admin should be able to do because they can also reset passwords. `WHATSAPP_AUTHORS` is a comma-separated allowlist of email addresses checked on top of the role, and it **fails closed**: unset means nobody, and the panel simply does not render. An unset variable meaning "everybody" would hand the channel to every Admin the first time someone forgot to set a secret, and nothing would look wrong. Both checks live on the server — the panel hiding itself is a courtesy, not access control.
+
+The endpoint is rate limited to 60 posts an hour. Unlike the rest of the API, every call to it costs real money at Anthropic, and a stuck retry loop should hit a wall rather than a bill.
+
+The dropdowns are built from `GET /api/whatsapp/options`, which reads the subproject's own registry — so a content type added there appears in the dashboard with no frontend change, and the panel can never offer something the generator does not have.
 
 Two things in it are load-bearing and should survive future edits:
 
@@ -629,6 +644,8 @@ The service worker caches nothing, deliberately — this app writes bills, and a
 | `VAPID_PUBLIC_KEY` | Public half of the web-push keypair, handed to browsers so they can address a subscription to this server. Public by design. Generate both with `npx web-push generate-vapid-keys` |
 | `VAPID_PRIVATE_KEY` | Signs each push. A Fly secret, never committed. **Rotating the pair invalidates every existing subscription**, so it is not routine |
 | `VAPID_SUBJECT` | Contact address a push service uses to reach an operator about a misbehaving sender. Must be a `mailto:` or `https:` URL. Defaults to the maintainer's address |
+| `ANTHROPIC_API_KEY` | Powers the WhatsApp Content Generator panel. A Fly secret, never committed. Without it the panel's Generate button returns a 503 naming the missing key; nothing else in the app is affected |
+| `WHATSAPP_AUTHORS` | Comma-separated **email addresses** allowed to write channel posts, checked on top of the Admin/Manager role. **Fails closed** — unset means nobody, and the panel does not appear for anyone. Emails rather than names because they are unique in the database and stable |
 | `ZENQUOTES_KEY` | **Optional, and currently pointless.** It configured the Wisdom Planner's suggestion button, and that page has been removed — `GET /api/quotes/suggestions` still honours the key but nothing calls it. Safe to leave unset |
 
 Read from the environment or `.env`. One exception worth knowing: the business's own name, address and FSSAI licence number are hardcoded in `frontend/src/lib/businessInfo.js` because they are printed on every invoice. Not secret, but they are per-business and would need changing for anyone else.

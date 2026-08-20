@@ -24,6 +24,7 @@ const importRoutes = require('./routes/import');
 const dashboardRoutes = require('./routes/dashboard');
 const wastageRoutes = require('./routes/wastage');
 const pushRoutes = require('./routes/push');
+const whatsappRoutes = require('./routes/whatsapp');
 
 const app = express();
 
@@ -104,6 +105,7 @@ app.use('/api/import', importRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/wastage', wastageRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

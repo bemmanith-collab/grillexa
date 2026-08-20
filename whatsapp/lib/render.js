@@ -5,6 +5,7 @@ import path from 'node:path';
 import chalk from 'chalk';
 
 import { businessDateStr } from './clock.js';
+import { ROTA } from './rota.js';
 import { AUDIENCES, LANGUAGES, SLOTS, TONES, TYPES } from './options.js';
 
 const RULE = '─'.repeat(56);
@@ -88,6 +89,13 @@ export function printList() {
     const name = key[0].toUpperCase() + key.slice(1);
     row(key, key === 'english' ? 'Plain English.' : `Romanised ${name}, Latin alphabet.`);
   }
+
+  section('The weekly rota  (--today)');
+  for (const [day, due] of Object.entries(ROTA)) {
+    const label = TYPES[due.type].label + (due.slot ? ` · ${SLOTS[due.slot].label}` : '');
+    console.log(`  ${chalk.green(day.padEnd(15))}${label}`);
+  }
+  console.log(chalk.dim('  Product Highlight and Customer Story are off the rota — post them by hand.'));
 
   section('Quote language  (--quote-language)');
   row('auto', 'English or Telugu, picked per post. The default.');

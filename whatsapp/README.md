@@ -29,6 +29,9 @@ npm run generate -- --list
 ## Using it
 
 ```bash
+# The post today is due, per the weekly rota
+node index.js generate --today
+
 # See every type, audience, tone and language
 node index.js generate --list
 
@@ -111,6 +114,45 @@ Two separate settings, because the channel is mostly English but Grillo is not a
 
 When `--language` is not English, `--quote-language` is ignored — the body setting
 already governs the whole post, and a second instruction would only contradict it.
+
+## The weekly rota
+
+`--today` writes the post this weekday is due, so posting daily is not a decision anybody
+has to make at 6am:
+
+| Day | Post | Why there |
+|---|---|---|
+| Monday | Morning tip | The week's idea, while people are deciding what the week looks like |
+| Tuesday | Myth vs Fact | Clears the belief standing in the way of Monday's idea |
+| Wednesday | Dinner | Midweek is where good intentions collapse, and they collapse at dinner |
+| Thursday | Habit challenge | Three days in — turn the idea into something with a checkbox |
+| Friday | Evening wind-down | The week is done. Nothing to instruct |
+| Saturday | Seasonal food | Market day, while people are buying |
+| Sunday | Cheat meal | The most-read post of the week |
+
+A repeating rhythm gets anticipated — people start waiting for the Sunday one — where a
+random type each day is just noise arriving at breakfast.
+
+**Product highlights and customer stories are deliberately off the rota.** Both are worth
+posting occasionally and neither belongs on a weekly rhythm: a channel that sells every
+week stops being read. Post them by hand, in place of a day's post, no more than about
+once a fortnight. A test in `backend/test/whatsapp.js` fails if either one ends up
+scheduled.
+
+Anything passed alongside `--today` still wins, so `--today --audience=elders` is today's
+type written for a different reader. The rota lives in `lib/rota.js` and is the same one
+the dashboard panel uses.
+
+## Used from the dashboard too
+
+Admin and Manager (and only the emails in `WHATSAPP_AUTHORS`) get this same generator as a
+panel on the Grillexa dashboard — `POST /api/whatsapp/generate` imports the library in
+this folder rather than copying it, so both surfaces share one set of prompt files and
+cannot drift apart.
+
+Practically, that means **an edit to `prompts/` changes the dashboard too**, and reaches
+it on the next deploy rather than immediately. `--dry-run` is still the cheap way to check
+a prompt edit before it goes anywhere.
 
 ## The everyday ingredient
 

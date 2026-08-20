@@ -17,6 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
 import Chart, { lineData, TEAL } from '../components/Chart';
 import DailyWisdom from '../components/DailyWisdom';
+import WhatsAppGenerator from '../components/WhatsAppGenerator';
 import ShiftWastageModal from '../components/ShiftWastageModal';
 import Toast from '../components/Toast';
 import { formatCurrency } from '../lib/format';
@@ -353,6 +354,12 @@ export default function Dashboard() {
               </div>
             </>
           )}
+
+          {/* Below the day's numbers, because the dashboard's first job is still
+              the business. The panel hides itself for anyone who is not one of
+              the channel's writers, so the role check here is only to save
+              everyone else a request that would be refused anyway. */}
+          {staff && <WhatsAppGenerator />}
 
         </>
       )}

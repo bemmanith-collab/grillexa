@@ -13,6 +13,7 @@ import {
   AUDIENCES, DEFAULTS, LANGUAGES, QUOTE_LANGUAGES, SLOTS, TONES, TYPES,
 } from './lib/options.js';
 import { WEEKDAYS } from './lib/clock.js';
+import { ROTA, postForToday } from './lib/rota.js';
 import {
   buildRequest, findPantryItem, findProduct, generate, pantryList, productList,
 } from './lib/generate.js';
@@ -107,6 +108,20 @@ async function run(opts) {
     return;
   }
 
+  // --today is the everyday path: no decision to make at 6am, just the post this
+  // day of the week gets. Anything passed alongside it still wins, so
+  // `--today --audience=elders` is today's type written for a different reader.
+  if (opts.today) {
+    if (opts.batch) {
+      throw new GenerationError('Use either --today or --batch, not both.', {
+        hint: '--today generates the one post due today; --batch generates every type.',
+      });
+    }
+    const due = postForToday();
+    opts.type ??= due.type;
+    opts.slot ??= due.slot;
+  }
+
   if (opts.batch && opts.type) {
     throw new GenerationError('Use either --type or --batch, not both.', {
       hint: '--batch generates every type; --type generates one.',
@@ -171,6 +186,7 @@ program
   .option('--ingredient <name>', 'everyday ingredient to build the food around; random if omitted')
   .option('--day <weekday>', 'weekday in the headline; defaults to today')
   .option('--season <season>', 'season, with --type=seasonal; defaults to the current one')
+  .option('--today', "generate the post today's weekday is due (see the rota)")
   .option('--batch', 'generate one post of every type')
   .option('--out <path>', 'also write to a .txt file, or to a folder')
   .option('--dry-run', 'print the prompt that would be sent, without calling the API')
