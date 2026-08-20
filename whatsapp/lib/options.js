@@ -76,13 +76,22 @@ export const SLOTS = {
 export const AUDIENCES = {
   general: {
     label: 'General audience',
+    // Describes a reader, not a layout. An earlier version told this audience to split
+    // the post into a section per reader, which fought the type prompt for control of
+    // the section list — and the model settled it by doing both, stacking six or seven
+    // sections that said the same thing twice. Sections belong to the type file alone.
     description: [
-      'A whole household reading the same post — a grandmother, her son and her',
-      'grandchildren. Write the split treatment: a shared opening everyone reads,',
-      'then separate sections for the different readers, along the lines of',
-      '`👵 FOR ELDERS`, `👶 FOR YOUNG ONES` and `🌿 FOR THE FAMILY`, so each one',
-      'finds their own line in it. This is the only audience that gets the split —',
-      'the others are written for one reader.',
+      'A whole household reads this channel — a grandmother, her son and her',
+      'grandchildren — so the post has to work for all of them at once. Write one post,',
+      'with the same sections it would have for any other audience. Do not split it into',
+      'a block per reader: no `FOR ELDERS`, `FOR YOUNG ONES` or `FOR THE FAMILY`',
+      'sections.',
+      'Carry the range inside the ordinary lines instead. Choose food and habits that',
+      'suit everyone at the table, and where a detail genuinely differs by age, say it in',
+      'the same breath as the rest — "softer for the elders", "let the children help",',
+      '"take a smaller second helping" — rather than giving it a heading of its own.',
+      'Someone should read straight through and find themselves in it, not scroll to',
+      'their section.',
     ].join(' '),
   },
   elders: {

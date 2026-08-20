@@ -4,10 +4,15 @@ The post below is the house style. Read it for **structure, rhythm and register*
 how sections are separated, how lists are set, where the closing furniture goes, how
 warm the voice is.
 
-Do not read it for length, and do not reuse its sections. This is a breakfast post for
-a mixed audience, which is one of the longest formats on the channel. Most posts are
-considerably shorter. Copying its eight sections onto a myth post or a product post
-produces padding.
+Do not read it for length, and do not reuse its sections. Two things in it are specific
+to this one post and are **not** the house pattern:
+
+- **Its per-reader sections.** `👵 FOR ELDERS` and `👶 FOR YOUNG ONES` are particular to
+  this post. Posts are not split into a block per reader. A post for a mixed household
+  serves everyone inside its ordinary sections, in the same lines the rest of the post is
+  written in.
+- **Its length.** Eight sections is at the very top of the channel's range. Most posts
+  are three or four, and the sections a post gets come from its own type file.
 
 Do not reuse its wording either. `Simple. Light. Nutritious.` is that post's own
 three-word line; yours is written fresh for the post you are writing.
