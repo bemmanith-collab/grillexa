@@ -8,3 +8,6 @@ backend/prisma/migrations/**/migration.sql.bak
 
 # Brainstorming mockups (local only)
 .superpowers/
+
+# Generated WhatsApp posts (local only)
+whatsapp/posts/

@@ -1,0 +1,173 @@
+#!/usr/bin/env node
+
+// CLI entry point. Parses and validates arguments, then hands off to lib/. Nothing in
+// here talks to the API or builds a prompt.
+
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { config as loadEnv } from 'dotenv';
+import { Command } from 'commander';
+
+import { GenerationError, modelName } from './lib/claude.js';
+import {
+  AUDIENCES, DEFAULTS, LANGUAGES, QUOTE_LANGUAGES, SLOTS, TONES, TYPES,
+} from './lib/options.js';
+import { WEEKDAYS, buildRequest, findProduct, generate, productList } from './lib/generate.js';
+import {
+  printError, printList, printPost, printRequest, printSaved, resolveOutFile, writePost,
+} from './lib/render.js';
+
+// Read .env from beside this file rather than from the working directory, so the tool
+// works the same whether it is run from here or from the repo root.
+const here = path.dirname(fileURLToPath(import.meta.url));
+loadEnv({ path: path.join(here, '.env'), quiet: true });
+
+function must(value, registry, flag) {
+  if (Object.hasOwn(registry, value)) return value;
+  throw new GenerationError(`Unknown ${flag} "${value}".`, {
+    hint: `Valid values: ${Object.keys(registry).join(', ')}`,
+  });
+}
+
+function validate(opts) {
+  const type = opts.type ? must(opts.type, TYPES, '--type') : undefined;
+
+  const resolved = {
+    type,
+    audience: must(opts.audience ?? DEFAULTS.audience, AUDIENCES, '--audience'),
+    tone: must(opts.tone ?? DEFAULTS.tone, TONES, '--tone'),
+    language: must(opts.language ?? DEFAULTS.language, LANGUAGES, '--language'),
+    quoteLanguage: opts.quoteLanguage === 'auto' || opts.quoteLanguage === undefined
+      ? 'auto'
+      : must(opts.quoteLanguage, QUOTE_LANGUAGES, '--quote-language'),
+    topic: opts.topic,
+  };
+
+  if (opts.slot) {
+    resolved.slot = must(opts.slot, SLOTS, '--slot');
+    if (type && !TYPES[type].slotted) {
+      throw new GenerationError(`--slot does not apply to --type=${type}.`, {
+        hint: 'Only --type=meal takes a slot.',
+      });
+    }
+  }
+
+  if (opts.product) {
+    if (!findProduct(opts.product)) {
+      throw new GenerationError(`Unknown product "${opts.product}".`, {
+        hint: `Known products: ${productList().map((p) => p.slug).join(', ')}`,
+      });
+    }
+    resolved.product = opts.product;
+  }
+
+  if (opts.day) {
+    const day = WEEKDAYS.find((d) => d.toLowerCase() === opts.day.toLowerCase());
+    if (!day) {
+      throw new GenerationError(`Unknown day "${opts.day}".`, {
+        hint: `Valid values: ${WEEKDAYS.join(', ')}`,
+      });
+    }
+    resolved.day = day;
+  }
+
+  if (opts.season) resolved.season = opts.season;
+
+  return resolved;
+}
+
+async function runOne(options, { out: outPath, dryRun }) {
+  if (dryRun) {
+    printRequest(buildRequest(options));
+    return;
+  }
+
+  const result = await generate(options);
+  printPost(result);
+  if (outPath) {
+    printSaved(writePost(resolveOutFile(outPath, result.options), result.text));
+  }
+}
+
+async function run(opts) {
+  if (opts.list) {
+    printList();
+    return;
+  }
+
+  if (opts.batch && opts.type) {
+    throw new GenerationError('Use either --type or --batch, not both.', {
+      hint: '--batch generates every type; --type generates one.',
+    });
+  }
+  if (!opts.batch && !opts.type) {
+    throw new GenerationError('Nothing to generate.', {
+      hint: 'Pass --type=<type>, or --batch for all of them. --list shows what is available.',
+    });
+  }
+  if (opts.batch && opts.out?.toLowerCase().endsWith('.txt')) {
+    throw new GenerationError('--batch writes one file per type, so --out must be a folder.', {
+      hint: 'Try --out=posts/ instead of a .txt path.',
+    });
+  }
+
+  const options = validate(opts);
+
+  if (!opts.batch) {
+    await runOne(options, opts);
+    return;
+  }
+
+  // Sequential on purpose: eight parallel calls is the fastest way to get rate limited,
+  // and the posts arrive in a readable order this way.
+  const types = Object.keys(TYPES);
+  for (const [index, type] of types.entries()) {
+    console.log(`\n  [${index + 1}/${types.length}]  ${TYPES[type].label}…`);
+    await runOne({ ...options, type }, opts);
+  }
+}
+
+const program = new Command();
+
+program
+  .name('grillo-whatsapp')
+  .description('Generates ready-to-post content for the Grillo WhatsApp channel.')
+  .version('1.0.0');
+
+program
+  .command('generate', { isDefault: true })
+  .description('Generate one post, or one of every type with --batch')
+  .option('-t, --type <type>', 'content type to generate')
+  .option('-a, --audience <audience>', 'who it is written for', DEFAULTS.audience)
+  .option('--topic <topic>', 'what the post is about; omitted means Claude picks one')
+  .option('--tone <tone>', 'voice to write it in', DEFAULTS.tone)
+  .option('--language <language>', 'language of the post body', DEFAULTS.language)
+  .option('--quote-language <language>', 'language of the GRILLO SAYS quote', DEFAULTS.quoteLanguage)
+  .option('--slot <slot>', 'which meal, with --type=meal')
+  .option('--product <slug>', 'which product, with --type=product')
+  .option('--day <weekday>', 'weekday in the headline; defaults to today')
+  .option('--season <season>', 'season, with --type=seasonal; defaults to the current one')
+  .option('--batch', 'generate one post of every type')
+  .option('--out <path>', 'also write to a .txt file, or to a folder')
+  .option('--dry-run', 'print the prompt that would be sent, without calling the API')
+  .option('--list', 'list every type, audience, tone and language, then exit')
+  .action(async (opts) => {
+    try {
+      await run(opts);
+    } catch (error) {
+      printError(error);
+      process.exitCode = 1;
+    }
+  });
+
+program.addHelpText('after', `
+Examples:
+  $ node index.js generate --list
+  $ node index.js generate --type=myth --audience=general --topic="eating after 8 PM"
+  $ node index.js generate --type=meal --slot=dinner --audience=elders
+  $ node index.js generate --batch --audience=general --out=posts/
+
+Model: ${modelName()}  (override with CLAUDE_MODEL in .env)
+`);
+
+await program.parseAsync();

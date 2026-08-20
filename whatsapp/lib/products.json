@@ -1,0 +1,52 @@
+[
+  {
+    "slug": "green-sprouts",
+    "name": "Green sprouts",
+    "description": "Whole green moong, soaked overnight and sprouted fresh.",
+    "facts": [
+      "High in protein and fibre",
+      "Eaten raw with lemon and salt, or lightly steamed",
+      "Keeps about two days in the fridge"
+    ]
+  },
+  {
+    "slug": "mixed-sprouts",
+    "name": "Mixed sprouts",
+    "description": "Moong and chana sprouted together.",
+    "facts": [
+      "High in protein and fibre",
+      "Chana gives it more bite than plain moong",
+      "Goes into salads, chaat, chapati fillings and cooked vegetables"
+    ]
+  },
+  {
+    "slug": "chana-sprouts",
+    "name": "Chana sprouts",
+    "description": "Brown chana, soaked and sprouted.",
+    "facts": [
+      "The most filling of the sprouts",
+      "Better lightly steamed than raw",
+      "Works as an evening snack on its own"
+    ]
+  },
+  {
+    "slug": "mixed-fruit-bowl",
+    "name": "Mixed fruit bowl",
+    "description": "Seasonal fruit, cut fresh the same morning.",
+    "facts": [
+      "Cut and ready, so nobody has to find time to prepare it",
+      "Whatever is in season that week",
+      "Best eaten the day it is bought"
+    ]
+  },
+  {
+    "slug": "bananas",
+    "name": "Bananas",
+    "description": "Fresh bananas, sold by the dozen.",
+    "facts": [
+      "Needs no cutting, no cooking and no plate",
+      "Easy to carry and easy to digest",
+      "Good before or after physical work"
+    ]
+  }
+]

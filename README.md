@@ -491,6 +491,16 @@ grillexa/
 │   ├── test/            invoice.js, greeting.js, searchSelect.js,
 │   │                    storeLinks.js, reorder.js   (npm test)
 │   └── vite.config.js   dev proxy, build target down to iOS 14
+├── whatsapp/         standalone content generator for the Grillo WhatsApp
+│   │                 channel — see below. Not part of the app.
+│   ├── index.js      CLI (commander)
+│   ├── lib/          claude.js (the only file that talks to the API),
+│   │                 generate.js (prompt assembly), options.js (the type /
+│   │                 audience / tone / language registry), render.js,
+│   │                 products.json
+│   └── prompts/      brand.md, example-post.md, one file per content type
+├── package.json      root launcher only — `npm run whatsapp`. Nothing is
+│                     installed at this level.
 ├── Dockerfile        production image for Fly (backend + frontend + Nginx)
 ├── entrypoint.sh     runs `prisma migrate deploy`, then Node + Nginx
 ├── nginx.conf        production Nginx — serves the SPA, proxies /api and
@@ -501,6 +511,24 @@ grillexa/
 ```
 
 Fly builds **only** the root `Dockerfile`, `nginx.conf` and `entrypoint.sh`. There are no other Dockerfiles or nginx configs; earlier duplicates under `backend/` and `frontend/` were removed because editing the wrong one silently did nothing.
+
+`whatsapp/` is not in the image and is not deployed. It is a desk tool, run by hand.
+
+## The WhatsApp content generator
+
+`whatsapp/` writes posts for the Grillo WhatsApp channel — myth-vs-fact, morning tips, a meal of the day, habit challenges, product highlights, seasonal food, evening wind-downs and customer stories — formatted for a phone screen and copied straight into WhatsApp. **[whatsapp/README.md](whatsapp/README.md)** is the how-to.
+
+**It is deliberately not integrated.** It imports nothing from `backend/` or `frontend/`, never opens the database, has its own `package.json` and `node_modules`, and needs no part of the app to be running. It talks to the Claude API and to nothing else. That isolation is the point: content generation has no business holding a connection to a billing system, and a broken prompt file must never be able to stop a shop from raising a bill.
+
+```bash
+npm run whatsapp -- --type=morning --audience=elders     # from the repo root
+```
+
+Two things in it are load-bearing and should survive future edits:
+
+**The voice lives in one file.** `prompts/brand.md` carries the tone, the format and the forbidden vocabulary, and is sent with every request; the per-type files only say what sections that type has. Changing how the channel sounds is one edit, not eight. `--dry-run` prints the assembled prompt without spending anything, which is how you check a prompt edit before it goes near the API.
+
+**Some of the prompt is there for honesty, not style.** Product posts may state only the facts listed for that product in `lib/products.json`. The `diabetics` audience is told never to imply a food treats or controls diabetes and never to touch the subject of medication. `--type=customer` writes from a real detail supplied in `--topic`; with no topic it produces an unattributed post rather than inventing a name and an outcome, because a made-up testimonial published as genuine costs the channel more than any post gains it. Those three are not decoration.
 
 ## Local development
 

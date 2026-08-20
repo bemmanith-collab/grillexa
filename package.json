@@ -1,0 +1,9 @@
+{
+  "name": "grillexa",
+  "private": true,
+  "description": "Launcher for the subprojects. Backend, frontend and whatsapp each own their own package.json and dependencies; nothing is installed at this level.",
+  "scripts": {
+    "whatsapp": "npm --prefix whatsapp run generate --",
+    "whatsapp:install": "npm --prefix whatsapp install"
+  }
+}
