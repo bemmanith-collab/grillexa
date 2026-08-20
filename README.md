@@ -498,7 +498,8 @@ grillexa/
 │   │                 generate.js (prompt assembly), options.js (the type /
 │   │                 audience / tone / language registry), clock.js (IST,
 │   │                 same +5:30 offset as the app), render.js,
-│   │                 products.json
+│   │                 products.json, pantry.json (everyday ingredients,
+│   │                 one per post, so the channel stops repeating itself)
 │   └── prompts/      brand.md, example-post.md, one file per content type
 ├── package.json      root launcher only — `npm run whatsapp`. Nothing is
 │                     installed at this level.
@@ -528,6 +529,8 @@ npm run whatsapp -- --type=morning --audience=elders     # from the repo root
 Two things in it are load-bearing and should survive future edits:
 
 **The voice lives in one file.** `prompts/brand.md` carries the tone, the format and the forbidden vocabulary, and is sent with every request; the per-type files only say what sections that type has. Changing how the channel sounds is one edit, not eight. `--dry-run` prints the assembled prompt without spending anything, which is how you check a prompt edit before it goes near the API.
+
+**Variety is injected, not requested.** Every post left to itself reaches for banana, curd and sprouts, and the channel goes stale in a fortnight — and telling the prompt to vary the food does not help, because each post is a separate API call with no memory of the last one. So each post is handed one item from `lib/pantry.json`, the things already in the kitchen that nobody thinks of: curry leaves, ridge gourd skin, banana stem, coriander stems, last night's rice. A batch draws without replacement. Growing that list is the cheapest way to keep the channel fresh.
 
 **The clock is the business's, not the machine's.** The weekday in the headline, the meal a batch writes about, the season a seasonal post assumes and the date in output filenames are all computed in IST (`lib/clock.js`), using the same fixed +5:30 offset and the same reasoning as `frontend/src/utils/date.js` — India has never observed DST, so the offset is exact and needs no timezone data on the machine. A laptop on UTC otherwise prints `THURSDAY` on a Friday post every evening after 6:30, and a batch run at 8am in Vijayawada writes about dinner.
 

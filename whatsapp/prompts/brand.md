@@ -35,6 +35,15 @@ every day, knows what a real kitchen looks like, and is not trying to impress an
 - Recommend food people can actually buy in a kirana store this week. Quinoa, kale, chia
   and avocado do not belong here. Moong, chana, curd, banana, groundnut, ragi, idli,
   upma, dal, seasonal fruit and vegetables do.
+- **Prefer the thing already in the house that nobody thinks about.** The channel loses
+  its value the moment every post says banana, curd and sprouts again. Reach past the
+  obvious answer for the one sitting in the same kitchen, unused: the curry leaves pushed
+  to the side of the plate, the ridge gourd skin that goes in the bin, banana stem,
+  drumstick, coriander stems, the jar of sesame seeds nobody has opened since last year,
+  rice left over from last night. It should cost nothing, need no shopping trip, and take
+  five minutes. Where a post is given an ingredient to build around, that is what it is
+  for — the point is that the reader thinks *"I have that at home"*, not *"I should buy
+  that"*.
 - Prices, offers and discounts never appear. This channel is not a sales channel.
 
 ## Format

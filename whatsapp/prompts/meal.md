@@ -13,7 +13,11 @@ what makes the rest of the post make sense:
 - **Lunch** — the main meal, eaten while the body handles food best.
 - **Evening snack** — bridges the long gap to dinner so nobody arrives at dinner
   ravenous.
-- **Dinner** — light enough to let you sleep well.
+- **Dinner** — light enough to let you sleep well, and to leave a good morning behind
+  it. On a dinner post, that second half is the more useful argument: cooked vegetables
+  at night are light and easy to digest, so you wake less heavy and actually want
+  breakfast; a heavy, oily, late dinner is still sitting there at sunrise. Say it as
+  ordinary experience, not physiology, and never claim it fixes anything.
 
 Sections that work well:
 

@@ -63,6 +63,7 @@ and it is what passes your flags through to the script.
 | `--quote-language` | Language of the `GRILLO SAYS` line only. Default `auto`. |
 | `--slot` | `breakfast`, `lunch`, `snack`, `dinner`. Only with `--type=meal`. |
 | `--product` | Which product, with `--type=product`. Random if omitted. |
+| `--ingredient` | Everyday ingredient to build the food around. Random if omitted. |
 | `--day` | Weekday in the headline. Defaults to today in India. |
 | `--season` | Season, with `--type=seasonal`. Defaults to the current one in India. |
 | `--batch` | One post of every type, generated one after another. |
@@ -81,7 +82,7 @@ and it is what passes your flags through to the script.
 | `habit` | A small habit offered as a week-long challenge |
 | `product` | One Grillo product, kept deliberately minimal |
 | `seasonal` | What is worth eating in the season we are in |
-| `evening` | The quiet last post of the day |
+| `evening` | The quiet last post of the day — what you eat tonight, felt tomorrow morning |
 | `customer` | A post built around something a customer actually said |
 
 ### Audiences
@@ -110,6 +111,28 @@ Two separate settings, because the channel is mostly English but Grillo is not a
 
 When `--language` is not English, `--quote-language` is ignored — the body setting
 already governs the whole post, and a second instruction would only contradict it.
+
+## The everyday ingredient
+
+Left alone, every post reaches for the same few foods — banana, curd, sprouts — and the
+channel goes stale within a fortnight. Telling the prompt to "vary the food" does not fix
+that: each post is a separate API call with no memory of yesterday's, so every one of
+them independently picks whatever is most typical.
+
+So variety is injected rather than requested. Each post is handed one item from
+`lib/pantry.json` — things already sitting in the kitchen that nobody thinks of, like
+curry leaves, ridge gourd skin, banana stem, drumstick, coriander stems, last night's
+rice — and builds at least one section of its food suggestions around it. The reader
+should think *"I have that at home"*, not *"I should buy that"*.
+
+Six of the nine types take one. `myth`, `product` and `customer` don't: they already have
+a subject, and forcing an ingredient into them would bend the post.
+
+`--batch` draws **without replacement**, so a batch never runs the same vegetable through
+three posts. A single post draws at random; force one with `--ingredient="ridge gourd"`.
+
+Add to `lib/pantry.json` freely — a name and a plain one-line note is all an entry needs.
+The more that list grows, the less the channel repeats itself.
 
 ## Everything time-based runs on Indian time
 
@@ -176,6 +199,9 @@ After editing, `--dry-run` shows exactly what Claude will receive.
 `lib/products.json` is the product catalogue for `--type=product`. It is a plain list —
 add a product with its `facts`, and those facts are the **only** things the post is
 allowed to state about it.
+
+`lib/pantry.json` is the everyday-ingredient list described above. Adding to it is the
+single cheapest way to keep the channel from repeating itself.
 
 `lib/options.js` holds the audiences, tones and languages. Adding an audience there
 makes it valid in the CLI, in `--list` and in the prompt at once.

@@ -8,8 +8,21 @@ Headline: `🌙 <WEEKDAY> EVENING` with the weekday supplied below.
 Open by acknowledging the day is over. One or two lines, unhurried. This post does not
 open with an instruction.
 
+**The angle this type owns: tonight shows up tomorrow morning.** Most people judge a
+dinner by how it tasted. The more useful test is how the next morning feels — whether you
+wake up light or heavy, whether you are hungry at seven or have no appetite until eleven,
+whether things move as they should. That link is the reason a vegetable-heavy dinner is
+worth the trouble, and it is far more persuasive than anything said about the food itself.
+
+Say it plainly and stay inside what is ordinary experience: cooked vegetables at night
+are light and easy to digest, so you wake less heavy; fibre eaten at night is what the
+morning works with; a heavy, oily, late dinner is still sitting there at sunrise. Do not
+turn it into physiology, and do not claim it fixes anything.
+
 Sections that work well:
 
+- A vegetable-led dinner, and what tomorrow morning feels like after it. This is the
+  heart of the post — name real dishes, keep them quick.
 - Something to do after dinner — a slow walk, sitting away from the phone, putting the
   kitchen straight for the morning.
 - `🍵 IF YOU'RE STILL HUNGRY` — two or three light options for someone who genuinely is,

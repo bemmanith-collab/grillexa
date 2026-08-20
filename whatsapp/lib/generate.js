@@ -24,6 +24,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const promptsDir = path.join(here, '..', 'prompts');
 
 const products = JSON.parse(fs.readFileSync(path.join(here, 'products.json'), 'utf8'));
+const pantry = JSON.parse(fs.readFileSync(path.join(here, 'pantry.json'), 'utf8'));
 
 const readPrompt = (file) => fs.readFileSync(path.join(promptsDir, file), 'utf8').trim();
 
@@ -54,6 +55,27 @@ export function findProduct(slug) {
   return products.find((p) => p.slug === slug);
 }
 
+export function pantryList() {
+  return pantry;
+}
+
+export function findPantryItem(name) {
+  const wanted = name.trim().toLowerCase();
+  return pantry.find((item) => item.name.toLowerCase() === wanted)
+    ?? pantry.find((item) => item.name.toLowerCase().startsWith(wanted));
+}
+
+// Variety cannot come from the prompt. Each call is independent and knows nothing about
+// yesterday's post, so "vary the food" reliably produces the same handful of obvious
+// ingredients every time. Handing each post a different everyday thing to build around
+// is what actually rotates the channel.
+function pickPantryItem(name) {
+  if (!name) return pantry[Math.floor(Math.random() * pantry.length)];
+  const found = findPantryItem(name);
+  if (!found) throw new Error(`Unknown ingredient "${name}".`);
+  return found;
+}
+
 function pickProduct(slug) {
   if (!slug) return products[Math.floor(Math.random() * products.length)];
   const found = findProduct(slug);
@@ -74,6 +96,7 @@ export function resolveQuoteLanguage(choice) {
 function describeContext(options) {
   const {
     type, audience, tone, language, quoteLanguage, topic, slot, product, day, season,
+    ingredient,
   } = options;
 
   const spec = TYPES[type];
@@ -111,6 +134,14 @@ function describeContext(options) {
   if (spec.seasonal) {
     lines.push(`- Season: it is currently ${season}.`);
   }
+  if (ingredient) {
+    lines.push(
+      `- Everyday ingredient for this post: ${ingredient.name}. ${ingredient.note}`,
+      '  Build at least one section of the food suggestions around it, and mention it by',
+      '  name. It is a starting point, not the whole post — if it genuinely does not fit',
+      '  this topic, use it in a single line and move on rather than bending the post to it.',
+    );
+  }
   if (spec.needsProduct) {
     lines.push(
       `- Product: ${product.name}. ${product.description}`,
@@ -147,6 +178,7 @@ export function buildRequest(options) {
     season: options.season ?? seasonFor(),
     slot: spec.slotted ? (options.slot ?? slotForNow()) : undefined,
     product: spec.needsProduct ? pickProduct(options.product) : undefined,
+    ingredient: spec.everyday ? pickPantryItem(options.ingredient) : undefined,
     quoteLanguage: resolveQuoteLanguage(options.quoteLanguage),
   };
 

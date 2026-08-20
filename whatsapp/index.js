@@ -13,7 +13,9 @@ import {
   AUDIENCES, DEFAULTS, LANGUAGES, QUOTE_LANGUAGES, SLOTS, TONES, TYPES,
 } from './lib/options.js';
 import { WEEKDAYS } from './lib/clock.js';
-import { buildRequest, findProduct, generate, productList } from './lib/generate.js';
+import {
+  buildRequest, findPantryItem, findProduct, generate, pantryList, productList,
+} from './lib/generate.js';
 import {
   printError, printList, printPost, printRequest, printSaved, resolveOutFile, writePost,
 } from './lib/render.js';
@@ -60,6 +62,15 @@ function validate(opts) {
       });
     }
     resolved.product = opts.product;
+  }
+
+  if (opts.ingredient) {
+    if (!findPantryItem(opts.ingredient)) {
+      throw new GenerationError(`Unknown ingredient "${opts.ingredient}".`, {
+        hint: `Known: ${pantryList().map((i) => i.name).join(', ')}`,
+      });
+    }
+    resolved.ingredient = opts.ingredient;
   }
 
   if (opts.day) {
@@ -119,12 +130,23 @@ async function run(opts) {
     return;
   }
 
-  // Sequential on purpose: eight parallel calls is the fastest way to get rate limited,
+  // Sequential on purpose: nine parallel calls is the fastest way to get rate limited,
   // and the posts arrive in a readable order this way.
   const types = Object.keys(TYPES);
+
+  // Draw the everyday ingredients without replacement, so a batch never runs the same
+  // vegetable through three posts. Per-post random is fine on its own but repeats
+  // roughly a third of the time over nine draws, which is exactly what a batch shows.
+  const shuffled = pantryList()
+    .map((item) => item.name)
+    .sort(() => Math.random() - 0.5);
+
   for (const [index, type] of types.entries()) {
     console.log(`\n  [${index + 1}/${types.length}]  ${TYPES[type].label}…`);
-    await runOne({ ...options, type }, opts);
+    await runOne(
+      { ...options, type, ingredient: options.ingredient ?? shuffled[index % shuffled.length] },
+      opts,
+    );
   }
 }
 
@@ -146,6 +168,7 @@ program
   .option('--quote-language <language>', 'language of the GRILLO SAYS quote', DEFAULTS.quoteLanguage)
   .option('--slot <slot>', 'which meal, with --type=meal')
   .option('--product <slug>', 'which product, with --type=product')
+  .option('--ingredient <name>', 'everyday ingredient to build the food around; random if omitted')
   .option('--day <weekday>', 'weekday in the headline; defaults to today')
   .option('--season <season>', 'season, with --type=seasonal; defaults to the current one')
   .option('--batch', 'generate one post of every type')

@@ -3,6 +3,9 @@
 // the --list output and the prompt all read from the same place: a type added here is
 // immediately valid everywhere, and can never be listed but unusable.
 
+// `everyday: true` means the post is handed one overlooked kitchen ingredient to build
+// its food suggestions around. myth, product and customer are left out: they already
+// have a subject, and forcing an ingredient into them would bend the post.
 export const TYPES = {
   myth: {
     label: 'Myth vs Fact',
@@ -15,6 +18,7 @@ export const TYPES = {
     file: 'morning.md',
     contrast: 'always',
     dated: true,
+    everyday: true,
   },
   meal: {
     label: 'Meal of the Day',
@@ -22,12 +26,14 @@ export const TYPES = {
     contrast: 'always',
     dated: true,
     slotted: true,
+    everyday: true,
   },
   cheat: {
     label: 'Sunday Cheat Meal',
     file: 'cheat.md',
     contrast: 'always',
     dated: true,
+    everyday: true,
     // Always written for Sunday, whatever day it is generated on — these get drafted
     // midweek. --day still overrides.
     pinnedDay: 'Sunday',
@@ -37,6 +43,7 @@ export const TYPES = {
     file: 'habit.md',
     contrast: 'always',
     dated: false,
+    everyday: true,
   },
   product: {
     label: 'Product Highlight',
@@ -51,12 +58,14 @@ export const TYPES = {
     contrast: 'optional',
     dated: false,
     seasonal: true,
+    everyday: true,
   },
   evening: {
     label: 'Evening Wind-Down',
     file: 'evening.md',
     contrast: 'always',
     dated: true,
+    everyday: true,
   },
   customer: {
     label: 'Customer Story',
