@@ -77,6 +77,7 @@ and it is what passes your flags through to the script.
 | `myth` | Myth vs Fact — a food belief people repeat, set straight |
 | `morning` | A day-to-day tip for the start of the day |
 | `meal` | One meal: breakfast, lunch, evening snack or dinner (`--slot`) |
+| `cheat` | The Sunday cheat meal, made better rather than smaller |
 | `habit` | A small habit offered as a week-long challenge |
 | `product` | One Grillo product, kept deliberately minimal |
 | `seasonal` | What is worth eating in the season we are in |
@@ -127,7 +128,12 @@ so the offset is exact, and the arithmetic doesn't depend on timezone data being
 on the machine. Same approach as `frontend/src/utils/date.js`, deliberately.
 
 Override either with `--day=friday` or `--season="summer — hot and dry"` when you are
-writing posts ahead of time.
+writing posts ahead of time. When the day is not today — either because you passed
+`--day`, or because the type pins one — the prompt says so, so the post never calls a
+Sunday "today" in something drafted on Wednesday.
+
+`--type=cheat` is the one type with a pinned day: it is always written for Sunday
+whatever day you generate it on, since these get drafted midweek.
 
 ## The post format
 
@@ -189,6 +195,12 @@ you edit it out.
   channel more than any post gains it.
 - **No selling.** Product posts never mention price, offers, stock or urgency.
 - **No shaming.** No guilt language about food, ever.
+- **No food debt.** `--type=cheat` is the one place the channel says *cheat meal*, because
+  that is what readers call it themselves. It is used as their word, not as a verdict:
+  the post makes Sunday's meal better rather than smaller, and nothing is ever earned,
+  burnt off, worked off, made up for on Monday or counted. A good week has a Sunday in
+  it — that idea is the whole difference between this type and a diet post, and it is
+  what keeps the word from doing damage.
 
 ## Cost and model
 

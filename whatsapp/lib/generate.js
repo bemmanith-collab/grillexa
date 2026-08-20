@@ -93,7 +93,14 @@ function describeContext(options) {
   lines.push(`- Contrast block: ${CONTRAST_RULES[spec.contrast]}`);
 
   if (spec.dated) {
-    lines.push(`- Today is ${day}. Use that weekday in the headline.`);
+    // Don't claim it is Sunday on a Thursday. A pinned type is written ahead of the day
+    // it runs on, and telling the model otherwise invites it to write "today" into a
+    // post that will be read four days later.
+    lines.push(
+      spec.pinnedDay || options.day !== businessWeekday()
+        ? `- This post is for ${day}. Use that weekday in the headline. It is being written in advance, so do not refer to it as today.`
+        : `- Today is ${day}. Use that weekday in the headline.`,
+    );
   }
   if (spec.slotted) {
     const meal = SLOTS[slot];
@@ -136,7 +143,7 @@ export function buildRequest(options) {
 
   const resolved = {
     ...options,
-    day: options.day ?? businessWeekday(),
+    day: options.day ?? spec.pinnedDay ?? businessWeekday(),
     season: options.season ?? seasonFor(),
     slot: spec.slotted ? (options.slot ?? slotForNow()) : undefined,
     product: spec.needsProduct ? pickProduct(options.product) : undefined,

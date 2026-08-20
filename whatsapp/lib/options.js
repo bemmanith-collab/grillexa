@@ -23,6 +23,15 @@ export const TYPES = {
     dated: true,
     slotted: true,
   },
+  cheat: {
+    label: 'Sunday Cheat Meal',
+    file: 'cheat.md',
+    contrast: 'always',
+    dated: true,
+    // Always written for Sunday, whatever day it is generated on — these get drafted
+    // midweek. --day still overrides.
+    pinnedDay: 'Sunday',
+  },
   habit: {
     label: 'Healthy Habit Challenge',
     file: 'habit.md',

@@ -22,7 +22,10 @@ every day, knows what a real kitchen looks like, and is not trying to impress an
 - Never shame anyone for what they eat. Nobody changes a habit because they were made
   to feel bad about it. If a habit is worth changing, say what to do instead and why it
   helps — that is the whole persuasion.
-- No guilt words: *cheat meal*, *bad food*, *junk*, *sinful*, *guilty*, *lazy*.
+- No guilt words: *bad food*, *junk*, *sinful*, *guilty*, *lazy*. One deliberate
+  exception: the Sunday post uses *cheat meal*, because that is what readers call it
+  themselves. It is used as their word, never as a verdict — and even there, food is
+  never *earned*, *burnt off*, *worked off* or *made up for*. Nobody owes anybody a meal.
 - Food is not medicine. Never claim a food cures, treats, prevents or reverses anything.
   Say what it does plainly — fills you up, is easy to digest, is high in fibre — and stop
   there.
