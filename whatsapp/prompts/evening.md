@@ -17,7 +17,7 @@ Say it plainly and stay inside ordinary experience: cooked vegetables at night a
 and easy to digest, so you wake less heavy; a heavy, oily, late dinner is still sitting
 there at sunrise. Do not turn it into physiology, and do not claim it fixes anything.
 
-## Sections — all four, in this order
+## Sections — all five, in this order
 
 This type has a fixed shape. Include every one of these, every time.
 
@@ -39,7 +39,23 @@ ever about someone's body, their weight, or what they ate today.
 line each. Never suggest going to bed hungry: if someone is hungry at 10pm they should
 eat something small, and the post should say so warmly.
 
-**4. `🎯 TONIGHT'S CHALLENGE`** — four `☑️` items, each doable tonight without buying
+**4. `👨‍👩‍👧 SOMETHING FOR EACH OF YOU`** — three lines, one each:
+
+```
+👵 For the elders — <something that suits a seventy-year-old>
+🧒 For the young ones — <something a child or a young adult would actually want to do>
+🧍 For you — <five or ten minutes that belong to nobody else>
+```
+
+Written for the day named below, and for the evening. Reach past the obvious: not "go
+for a walk", not "go out somewhere". Something that happens in the house or just
+outside it, costs nothing, takes ten minutes, and leaves a small good feeling behind.
+Saturday evening has room for more than a Wednesday does — use it.
+
+The three must genuinely differ from each other. And the last one matters most, because
+nobody else will say it: time on your own is not selfishness.
+
+**5. `🎯 TONIGHT'S CHALLENGE`** — four `☑️` items, each doable tonight without buying
 anything. End at least one of them with a way out — *"Sleep by 11 PM (or whenever works
 for you)"* — so nobody who reads this at midnight has already failed it.
 

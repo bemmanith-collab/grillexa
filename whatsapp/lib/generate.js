@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { generatePost } from './provider.js';
 import { businessHour, businessMonth, businessWeekday } from './clock.js';
+import { moodFor } from './rota.js';
 import {
   AUDIENCES,
   CONTRAST_RULES,
@@ -117,6 +118,11 @@ function describeContext(options) {
 
   lines.push(`- Contrast block: ${CONTRAST_RULES[spec.contrast]}`);
 
+  // What the day is like, not just what it is called. This is what lets a
+  // Saturday post suggest something a Saturday actually has room for.
+  if (spec.dated && moodFor(day)) {
+    lines.push(`- What ${day} is like here: ${moodFor(day)}`);
+  }
   if (spec.dated) {
     // Don't claim it is Sunday on a Thursday. A pinned type is written ahead of the day
     // it runs on, and telling the model otherwise invites it to write "today" into a

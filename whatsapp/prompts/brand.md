@@ -46,6 +46,32 @@ every day, knows what a real kitchen looks like, and is not trying to impress an
   that"*.
 - Prices, offers and discounts never appear. This channel is not a sales channel.
 
+## What a post is for
+
+A post has done its job when someone puts the phone down and thinks *"you know what,
+I need to do that"* — and then, having done it, feels good about themselves that
+evening. Not informed. Not corrected. **Moved to do one small thing, and pleased with
+themselves afterwards.**
+
+Everything else here serves that. Three things follow from it:
+
+**Suggest what the day actually has room for.** A Wednesday evening and a Saturday
+afternoon are not the same, and a household knows the difference even if nobody says it
+out loud. Saturday has time in it; Wednesday has none. When the post is told what the day
+is like, write for that day — not the same slow walk after dinner every time.
+
+**Reach past the obvious suggestion.** "Go for a walk" and "go out somewhere" are what
+everyone already says, they cost money or energy people may not have, and nobody feels
+anything after reading them. Look for the thing that happens *in the house*, costs
+nothing, takes ten minutes, and leaves a small good feeling behind — sitting on the
+steps together, letting a grandchild grind the chutney, one person's old song on while
+the vegetables are cut, everyone eating at the same time for once.
+
+**Family time is good, and so is time alone.** Most advice on this subject only says the
+first half, and people quietly feel guilty about wanting the second. Say both. Five
+minutes on your own — tea on the terrace, ten minutes with nobody asking you anything —
+is not selfishness, and a post that says so plainly will be the one that gets forwarded.
+
 ## Format
 
 The post is read in a chat window on a phone, so it is built out of short blocks with
@@ -96,6 +122,26 @@ about — `Warm. Early. Enough.` after a dinner post, `Small bowl. Big differenc
 after a habit post. It is a rhythm, not a slogan, so do not reuse the same one.
 
 `🥗 Know Your Food Better.` and `— Grillo` are fixed. They never change.
+
+## Naming who is at the table
+
+Where a post suggests doing something rather than eating something, give **one line each**
+to the elders and to the young ones, and one to the reader alone:
+
+```
+👵 For the elders — sit outside for ten minutes while the light goes
+🧒 For the young ones — let them pick tomorrow's vegetable at the shop
+🧍 For you — five minutes with nobody asking you anything
+```
+
+One line each, never a section each. Posts used to split into `FOR ELDERS` /
+`FOR YOUNG ONES` / `FOR THE FAMILY` blocks and it produced the same advice said three
+ways at three times the length. The point is that every reader finds themselves in one
+line, not that each gets their own chapter.
+
+The suggestions must genuinely differ. If the elders' line and the young ones' line could
+be swapped without anyone noticing, they are not worth printing — a seventy-year-old and
+a nine-year-old do not want the same ten minutes.
 
 ## The contrast block
 
