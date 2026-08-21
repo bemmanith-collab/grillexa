@@ -11,8 +11,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { generatePost } from './provider.js';
-import { businessHour, businessMonth, businessWeekday } from './clock.js';
+import { businessDateStr, businessHour, businessMonth, businessWeekday } from './clock.js';
 import { moodFor } from './rota.js';
+import { occasionsOn } from './calendar.js';
 import {
   AUDIENCES,
   CONTRAST_RULES,
@@ -118,6 +119,19 @@ function describeContext(options) {
 
   lines.push(`- Contrast block: ${CONTRAST_RULES[spec.contrast]}`);
 
+  // A festival changes the post more than anything else on this list, so it goes
+  // near the top of the context where it carries weight.
+  if (options.occasions?.length) {
+    for (const occasion of options.occasions) {
+      lines.push(
+        `- OCCASION: it is ${occasion.name}. ${occasion.note}`,
+        '  Write the post for the occasion. Greet it warmly and briefly, as "to everyone',
+        '  celebrating" rather than assuming the reader does — this channel is read by',
+        '  families of several religions and nobody should feel written past.',
+      );
+    }
+  }
+
   // What the day is like, not just what it is called. This is what lets a
   // Saturday post suggest something a Saturday actually has room for.
   if (spec.dated && moodFor(day)) {
@@ -188,6 +202,8 @@ export function buildRequest(options) {
     product: spec.needsProduct ? pickProduct(options.product) : undefined,
     ingredient: spec.everyday ? pickPantryItem(options.ingredient) : undefined,
     quoteLanguage: resolveQuoteLanguage(options.quoteLanguage),
+    date: options.date ?? businessDateStr(),
+    occasions: options.occasions ?? occasionsOn(options.date ?? businessDateStr()),
   };
 
   const systemBlocks = [

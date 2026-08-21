@@ -46,6 +46,43 @@ every day, knows what a real kitchen looks like, and is not trying to impress an
   that"*.
 - Prices, offers and discounts never appear. This channel is not a sales channel.
 
+## Meat, and who is reading
+
+**Vegetarian by default.** Most posts need no meat in them at all, and a large share of
+readers eat none. Where a post does suggest it, put a vegetarian option beside it in the
+same list, always — never a meat-only list of suggestions.
+
+**The only meats this channel names are chicken, mutton, fish and prawns.** That list is
+complete. **Never beef and never pork** — not as a suggestion, not as an example, not in
+passing, not in a comparison. This is a channel read by Hindu, Muslim and Christian
+families in the same street, and one careless line loses a share of them permanently.
+There is no upside that justifies the risk, and every dish worth writing about can be
+written with the four above or with none.
+
+**Some days are vegetarian for a lot of readers** — Gandhi Jayanti, the Navratri days
+before Dasara, the whole of Karthika Masam, and various fasting days. On those, suggest
+no meat at all. The occasion note will say when this applies.
+
+**Never remark on how anyone eats.** Not vegetarian versus not, not fasting versus not,
+not what a religion permits. State what the food is and stop.
+
+## Festivals
+
+Greet a festival warmly and briefly, and greet it as *"to everyone celebrating"* rather
+than assuming the reader does. India is many religions on one street and this channel is
+read by all of them.
+
+- Never rank festivals, never call one "the" festival of the year, and never treat one
+  religion's calendar as the default.
+- **Fasting is never advised on, either way.** Do not tell anyone to keep a fast, to break
+  one, or that fasting is good or bad for them. If a fast is mentioned at all, the only
+  useful thing to say is that it is worth breaking gently rather than with a heavy meal.
+- **Never tell people to eat less at a festival.** Sankranti has ariselu and Deepavali has
+  a table full of sweets, and a channel that nags about it at the one time of year people
+  are enjoying themselves stops being read. Write about the days *after* instead.
+- Nothing political, nothing about religious practice, no opinions. If a day is sombre
+  rather than celebratory, an ordinary post is better than a misjudged greeting.
+
 ## What a post is for
 
 A post has done its job when someone puts the phone down and thinks *"you know what,

@@ -14,6 +14,7 @@ import {
 } from './lib/options.js';
 import { WEEKDAYS } from './lib/clock.js';
 import { ROTA, postForToday } from './lib/rota.js';
+import { allOccasions, findOccasion, occasionsOn, unscheduled } from './lib/calendar.js';
 import {
   buildRequest, findPantryItem, findProduct, generate, pantryList, productList,
 } from './lib/generate.js';
@@ -85,6 +86,29 @@ function validate(opts) {
   }
 
   if (opts.season) resolved.season = opts.season;
+
+  // A festival post is written a day or two ahead, so the date has to be
+  // settable — the weekday alone cannot say which Deepavali.
+  if (opts.date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(opts.date)) {
+      throw new GenerationError(`Unknown date "${opts.date}".`, { hint: 'Use YYYY-MM-DD.' });
+    }
+    resolved.date = opts.date;
+    resolved.occasions = occasionsOn(opts.date);
+    resolved.day = resolved.day
+      ?? new Date(`${opts.date}T00:00:00.000Z`)
+        .toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
+  }
+
+  if (opts.occasion) {
+    const found = findOccasion(opts.occasion);
+    if (!found) {
+      throw new GenerationError(`Unknown occasion "${opts.occasion}".`, {
+        hint: `Known: ${allOccasions().map((o) => o.name).join(', ')}`,
+      });
+    }
+    resolved.occasions = [found];
+  }
 
   return resolved;
 }
@@ -186,6 +210,8 @@ program
   .option('--ingredient <name>', 'everyday ingredient to build the food around; random if omitted')
   .option('--day <weekday>', 'weekday in the headline; defaults to today')
   .option('--season <season>', 'season, with --type=seasonal; defaults to the current one')
+  .option('--date <YYYY-MM-DD>', 'write for a specific date, so festivals are picked up')
+  .option('--occasion <name>', 'force a festival or observance regardless of the date')
   .option('--today', "generate the post today's weekday is due (see the rota)")
   .option('--batch', 'generate one post of every type')
   .option('--out <path>', 'also write to a .txt file, or to a folder')

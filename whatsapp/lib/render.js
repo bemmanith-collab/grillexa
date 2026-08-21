@@ -7,6 +7,7 @@ import chalk from 'chalk';
 import { businessDateStr } from './clock.js';
 import { describeProvider } from './provider.js';
 import { ROTA } from './rota.js';
+import { occasionToday, unscheduled } from './calendar.js';
 import { AUDIENCES, LANGUAGES, SLOTS, TONES, TYPES } from './options.js';
 
 const RULE = '─'.repeat(56);
@@ -102,6 +103,23 @@ export function printList() {
   row('auto', 'English or Telugu, picked per post. The default.');
   row('english', 'Always English.');
   row('telugu', 'Always romanised Telugu.');
+
+  const today = occasionToday();
+  if (today.length) {
+    section('Today');
+    for (const o of today) console.log(`  ${chalk.green(o.name)}`);
+  }
+
+  // Silent by nature: a movable festival with no date for this year simply does
+  // not happen, and nobody finds out until a customer asks why there was no
+  // Deepavali post. So it is said out loud, once, where it will be seen.
+  const missing = unscheduled();
+  if (missing.length) {
+    section('Festivals with no date set for this year');
+    console.log(chalk.yellow(`  ${missing.join(', ')}`));
+    console.log(chalk.dim('  These are lunar and move every year. Add them to lib/calendar.json as'));
+    console.log(chalk.dim('  "dates": { "2026": "2026-11-08" } — they are skipped until you do.'));
+  }
 
   const provider = describeProvider();
   console.log('');
