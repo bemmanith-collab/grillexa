@@ -130,6 +130,19 @@ model WhatsAppPost {
   @@index([type, createdAt])
 }
 
+// One row per day a reminder went out.
+//
+// The unique constraint is the lock. Fly runs more than one machine and both
+// can be awake at once, so every machine checks the clock and they all try to
+// insert — the first wins, the rest get a constraint violation and stay quiet.
+// A flag in memory would send the reminder twice on a busy morning.
+model WhatsAppReminder {
+  id         Int      @id @default(autoincrement())
+  sentFor    String   @unique // the Indian date the reminder was about, YYYY-MM-DD
+  sentAt     DateTime @default(now())
+  recipients Int      @default(0)
+}
+
 model Store {
   id        Int      @id @default(autoincrement())
   name      String   @unique

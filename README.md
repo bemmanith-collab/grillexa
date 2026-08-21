@@ -559,6 +559,10 @@ Two things in it are load-bearing and should survive future edits:
 
 **The channel names four meats and no others.** Chicken, mutton, fish, prawns. Never beef and never pork — not as a suggestion, an example, or an aside. Hindu, Muslim and Christian families read this on the same street, and one careless line loses a share of them for good. Vegetarian by default; where meat appears a vegetarian option sits beside it. Fasting is never advised on in either direction, and nobody is ever told to eat less at a festival.
 
+**It reminds you.** A daily habit fails on the mornings nobody remembers, not the mornings nobody has anything to say — so from 7am IST the app pushes *"Friday is usually an Evening Wind-Down post, and today's is not written yet"* to whoever is in `WHATSAPP_AUTHORS`, using the web-push that was already set up for store notifications and the sentence the suggestion engine already computes. It goes quiet the moment the post exists, since a reminder that fires anyway teaches people the notification means nothing.
+
+It is a timer in the app rather than a cron service, which `min_machines_running = 1` makes viable — but **more than one machine can be awake**, so the day's row in `WhatsAppReminder` is claimed under a unique constraint before anything is sent. First machine wins, the rest fail the insert and stay quiet. A flag in memory would send it twice on a busy morning. The check runs every five minutes rather than once on the hour, so a machine restarting at 07:03 does not skip the day.
+
 **It suggests what to write next.** Nine content types and a daily habit means the easy ones get reached for and the rest quietly stop appearing. `backend/src/lib/whatsappSuggestions.js` reads the post history and says what has gone stale, most overdue first — and it counts what was *marked as posted*, not what was generated, because a draft nobody sent is not something the readers saw.
 
 **The clock is the business's, not the machine's.** The weekday in the headline, the meal a batch writes about, the season a seasonal post assumes and the date in output filenames are all computed in IST (`lib/clock.js`), using the same fixed +5:30 offset and the same reasoning as `frontend/src/utils/date.js` — India has never observed DST, so the offset is exact and needs no timezone data on the machine. A laptop on UTC otherwise prints `THURSDAY` on a Friday post every evening after 6:30, and a batch run at 8am in Vijayawada writes about dinner.
@@ -660,6 +664,8 @@ The service worker caches nothing, deliberately — this app writes bills, and a
 | `ANTHROPIC_API_KEY` | Optional alternative provider — better writing, roughly ₹5 a post. Used only if `GEMINI_API_KEY` is unset. A Fly secret, never committed |
 | `AI_PROVIDER` | Optional. Forces `gemini`, `claude` or `pollinations` instead of picking the first configured one. Errors rather than falling back if the named one is not set up |
 | `POLLINATIONS_ENABLED` | Optional, default on. The keyless free fallback used when nothing else is configured. `false` turns it off so a missing key fails loudly instead of quietly writing a worse post |
+| `WHATSAPP_REMINDER` | Optional, default on. `off` silences the daily "today's post isn't written" push notification |
+| `WHATSAPP_REMINDER_HOUR` | Optional, default `7`. The IST hour the reminder may go out from. An empty value falls back to 7 rather than to midnight |
 | `WHATSAPP_AUTHORS` | Comma-separated **email addresses** allowed to write channel posts, checked on top of the Admin/Manager role. **Fails closed** — unset means nobody, and the panel does not appear for anyone. Emails rather than names because they are unique in the database and stable |
 | `ZENQUOTES_KEY` | **Optional, and currently pointless.** It configured the Wisdom Planner's suggestion button, and that page has been removed — `GET /api/quotes/suggestions` still honours the key but nothing calls it. Safe to leave unset |
 

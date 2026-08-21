@@ -1,5 +1,6 @@
 require('dotenv').config();
 const app = require('./app');
+const { startReminderSchedule } = require('./lib/whatsappReminder');
 
 // Fails at boot rather than at the first login, where jwt.sign would throw.
 if (!process.env.JWT_SECRET) {
@@ -14,4 +15,6 @@ const port = process.env.PORT || 4000;
 
 app.listen(port, () => {
   console.log(`API listening on port ${port}`);
+  // After the server is up: a notification is never worth delaying the API for.
+  startReminderSchedule();
 });
