@@ -1,49 +1,36 @@
-// Thin wrapper over the Anthropic SDK. The only thing in here that knows about HTTP.
+// Anthropic's Claude — the best writing of the three and the only one that
+// costs money, so it is never selected unless a key is present.
+//
+// It is also the only provider that caches the prompt prefix. The brand voice
+// and the format exemplar are identical on every request and get a cache
+// breakpoint, which is what makes a --batch run cheap.
 
 import Anthropic from '@anthropic-ai/sdk';
+import { GenerationError } from '../errors.js';
 
 const DEFAULT_MODEL = 'claude-opus-5';
 
-// Carries a message written for a person at a terminal rather than a stack trace.
-export class GenerationError extends Error {
-  constructor(message, { hint } = {}) {
-    super(message);
-    this.name = 'GenerationError';
-    this.hint = hint;
-  }
-}
+export const name = 'claude';
+export const label = 'Anthropic Claude';
 
-let client;
-
-function getClient() {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new GenerationError('No Anthropic API key found.', {
-      hint: 'Copy .env.example to .env and put your key in it (ANTHROPIC_API_KEY=sk-ant-...).',
-    });
-  }
-  client ??= new Anthropic();
-  return client;
+export function isConfigured() {
+  return Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
 export function modelName() {
   return process.env.CLAUDE_MODEL || DEFAULT_MODEL;
 }
 
-/**
- * One post, one API call.
- *
- * `system` is the brand voice and the format exemplar — identical on every call, so it
- * carries a cache breakpoint and a batch of eight pays for it once. Everything that
- * varies per post goes in the user message, after the breakpoint.
- */
-export async function generatePost({ systemBlocks, prompt }) {
-  const anthropic = getClient();
+let client;
+
+export async function generate({ systemBlocks, prompt, maxTokens }) {
+  client ??= new Anthropic();
 
   let response;
   try {
-    response = await anthropic.messages.create({
+    response = await client.messages.create({
       model: modelName(),
-      max_tokens: 4000,
+      max_tokens: maxTokens,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'medium' },
       system: systemBlocks,
@@ -74,26 +61,26 @@ export async function generatePost({ systemBlocks, prompt }) {
   return { text, usage: response.usage };
 }
 
-// Turn an SDK exception into something worth reading at 6am before the day's posts go out.
 function translate(error) {
   if (error instanceof Anthropic.AuthenticationError) {
     return new GenerationError('The Anthropic API key was rejected.', {
-      hint: 'Check ANTHROPIC_API_KEY in .env — it may be mistyped, revoked or from another account.',
+      hint: 'Check ANTHROPIC_API_KEY — it may be mistyped, revoked or from another account.',
+      code: 'not-configured',
     });
   }
   if (error instanceof Anthropic.PermissionDeniedError) {
     return new GenerationError(`This API key cannot use ${modelName()}.`, {
-      hint: 'Check the key\'s permissions in the Anthropic console, or set CLAUDE_MODEL in .env to a model it can use.',
+      hint: "Check the key's permissions, or set CLAUDE_MODEL to a model it can use.",
     });
   }
   if (error instanceof Anthropic.NotFoundError) {
     return new GenerationError(`No such model: ${modelName()}.`, {
-      hint: 'Fix CLAUDE_MODEL in .env, or remove it to fall back to the default.',
+      hint: 'Fix CLAUDE_MODEL, or remove it to fall back to the default.',
     });
   }
   if (error instanceof Anthropic.RateLimitError) {
     return new GenerationError('Rate limited by the Anthropic API.', {
-      hint: 'Wait a minute and run it again. A --batch run makes eight calls back to back.',
+      hint: 'Wait a minute and try again. A --batch run makes nine calls back to back.',
     });
   }
   if (error instanceof Anthropic.APIConnectionError) {

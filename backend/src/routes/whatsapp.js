@@ -28,8 +28,9 @@ async function generator() {
     importGenerator('generate.js'),
     importGenerator('options.js'),
     importGenerator('rota.js'),
+    importGenerator('provider.js'),
   ])
-    .then(([generate, options, rota]) => ({ generate, options, rota }))
+    .then(([generate, options, rota, provider]) => ({ generate, options, rota, provider }))
     .catch((err) => {
       modules = undefined; // let a later request try again after a bad deploy
       throw err;
@@ -76,10 +77,11 @@ router.use((req, res, next) => {
   next();
 });
 
-// Unlike the rest of the API, a request here costs real money at Anthropic. A
-// generous ceiling that still stops a stuck retry loop, a leaning keyboard or a
-// bored account from running up a bill: nobody writing posts by hand needs more
-// than this in an hour, and hitting it is a signal something is wrong.
+// Unlike the rest of the API, every request here goes out to a third party — and
+// on Claude it is billed per post, while the free providers have quotas of their
+// own that a loop would burn through. A generous ceiling that still stops a stuck
+// retry or a leaning keyboard: nobody writing posts by hand needs more than this
+// in an hour, and hitting it means something is wrong.
 const generateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: 60,
@@ -92,7 +94,7 @@ const generateLimiter = rateLimit({
 // generator does not have — adding one to the subproject's registry puts it in
 // the dashboard with no frontend change.
 router.get('/options', async (req, res) => {
-  const { options, rota } = await generator();
+  const { options, rota, provider } = await generator();
   const list = (registry) => Object.entries(registry)
     .map(([value, entry]) => ({ value, label: entry.label ?? value }));
 
@@ -104,6 +106,10 @@ router.get('/options', async (req, res) => {
     // click rather than three decisions. Computed in IST, like everything else
     // date-shaped here — the person posting is in India whatever the server thinks.
     today: rota.postForToday(),
+    // Which service is writing. Shown in the panel because the three differ a
+    // lot in quality, and "why does this read badly today" should be answerable
+    // without opening a terminal.
+    provider: provider.describeProvider(),
     // Which types take a meal slot, so the panel knows when to show that field.
     slottedTypes: Object.entries(options.TYPES)
       .filter(([, spec]) => spec.slotted)
@@ -168,8 +174,17 @@ router.post('/generate', generateLimiter, async (req, res) => {
     // else is a bug and belongs in the generic error handler.
     if (err?.name !== 'GenerationError') throw err;
 
-    const missingKey = err.message.includes('API key');
-    res.status(missingKey ? 503 : 502).json({ error: err.message, hint: err.hint });
+    // code 'not-configured' means an operator has to fix something — no
+    // provider set up, or a key that was refused. Nothing the person at the
+    // dashboard can do, so 503 and a hint aimed at them rather than at whoever
+    // edits .env files.
+    const operatorProblem = err.code === 'not-configured';
+    res.status(operatorProblem ? 503 : 502).json({
+      error: err.message,
+      hint: operatorProblem
+        ? 'Ask an administrator to set GEMINI_API_KEY on the server.'
+        : err.hint,
+    });
   }
 });
 

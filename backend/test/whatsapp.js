@@ -113,6 +113,70 @@ const tests = {
     assert.ok(options.TYPES[today.type], `today is due "${today.type}", which is not a content type`);
   },
 
+  'the provider chain prefers free over paid, and paid over the free-for-all': async () => {
+    const provider = await import(pathToFileURL(path.join(GENERATOR_DIR, 'provider.js')).href);
+    const saved = {
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+      POLLINATIONS_ENABLED: process.env.POLLINATIONS_ENABLED,
+      AI_PROVIDER: process.env.AI_PROVIDER,
+    };
+    const set = (env) => {
+      for (const key of Object.keys(saved)) delete process.env[key];
+      Object.assign(process.env, env);
+    };
+
+    try {
+      set({ GEMINI_API_KEY: 'x', ANTHROPIC_API_KEY: 'x' });
+      assert.strictEqual(provider.describeProvider().name, 'gemini', 'Gemini is free and should win');
+
+      set({ ANTHROPIC_API_KEY: 'x' });
+      assert.strictEqual(provider.describeProvider().name, 'claude');
+
+      // Nothing configured still writes something, which is the point of the
+      // keyless fallback existing at all.
+      set({});
+      assert.strictEqual(provider.describeProvider().name, 'pollinations');
+
+      // ...unless it has been turned off, which must fail loudly rather than
+      // silently producing a worse post.
+      set({ POLLINATIONS_ENABLED: 'false' });
+      assert.strictEqual(provider.describeProvider().name, null);
+
+      // An explicit choice is never silently overridden.
+      set({ AI_PROVIDER: 'claude', GEMINI_API_KEY: 'x', ANTHROPIC_API_KEY: 'x' });
+      assert.strictEqual(provider.describeProvider().name, 'claude');
+    } finally {
+      for (const key of Object.keys(saved)) {
+        if (saved[key] === undefined) delete process.env[key];
+        else process.env[key] = saved[key];
+      }
+    }
+  },
+
+  'a missing provider is reported as an operator problem, not a user one': async () => {
+    const provider = await import(pathToFileURL(path.join(GENERATOR_DIR, 'provider.js')).href);
+    const saved = process.env.POLLINATIONS_ENABLED;
+    process.env.POLLINATIONS_ENABLED = 'false';
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    try {
+      await assert.rejects(
+        () => provider.generatePost({ systemBlocks: [{ text: 'a' }], prompt: 'b' }),
+        (err) => {
+          // The route turns this code into a 503 with a hint aimed at an
+          // administrator. Without it, a missing key reads as a user error.
+          assert.strictEqual(err.name, 'GenerationError');
+          assert.strictEqual(err.code, 'not-configured');
+          return true;
+        }
+      );
+    } finally {
+      if (saved === undefined) delete process.env.POLLINATIONS_ENABLED;
+      else process.env.POLLINATIONS_ENABLED = saved;
+    }
+  },
+
   'the topic is optional': async () => {
     const generate = await import(pathToFileURL(path.join(GENERATOR_DIR, 'generate.js')).href);
     const built = generate.buildRequest({

@@ -1,14 +1,16 @@
-// Assembles the prompt for one post and hands it to Claude.
+// Assembles the prompt for one post and hands it to whichever provider is configured
+// (see provider.js). Nothing in this file knows which one that is.
 //
 // The split matters: brand.md and example-post.md are byte-identical on every call and
-// go in the system prompt behind a cache breakpoint; everything that varies — type,
-// audience, tone, language, topic, today's date — goes in the user message after it.
+// go in the system prompt; everything that varies — type, audience, tone, language,
+// topic, today's date — goes in the user message after it. On Claude the split also
+// carries a cache breakpoint; the other providers just get the two joined together.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { generatePost } from './claude.js';
+import { generatePost } from './provider.js';
 import { businessHour, businessMonth, businessWeekday } from './clock.js';
 import {
   AUDIENCES,

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { Command } from 'commander';
 
-import { GenerationError, modelName } from './lib/claude.js';
+import { GenerationError, describeProvider } from './lib/provider.js';
 import {
   AUDIENCES, DEFAULTS, LANGUAGES, QUOTE_LANGUAGES, SLOTS, TONES, TYPES,
 } from './lib/options.js';
@@ -177,7 +177,7 @@ program
   .description('Generate one post, or one of every type with --batch')
   .option('-t, --type <type>', 'content type to generate')
   .option('-a, --audience <audience>', 'who it is written for', DEFAULTS.audience)
-  .option('--topic <topic>', 'what the post is about; omitted means Claude picks one')
+  .option('--topic <topic>', 'what the post is about; omitted means one gets chosen for you')
   .option('--tone <tone>', 'voice to write it in', DEFAULTS.tone)
   .option('--language <language>', 'language of the post body', DEFAULTS.language)
   .option('--quote-language <language>', 'language of the GRILLO SAYS quote', DEFAULTS.quoteLanguage)
@@ -189,7 +189,7 @@ program
   .option('--today', "generate the post today's weekday is due (see the rota)")
   .option('--batch', 'generate one post of every type')
   .option('--out <path>', 'also write to a .txt file, or to a folder')
-  .option('--dry-run', 'print the prompt that would be sent, without calling the API')
+  .option('--dry-run', 'print the prompt that would be sent, without calling any provider')
   .option('--list', 'list every type, audience, tone and language, then exit')
   .action(async (opts) => {
     try {
@@ -207,7 +207,7 @@ Examples:
   $ node index.js generate --type=meal --slot=dinner --audience=elders
   $ node index.js generate --batch --audience=general --out=posts/
 
-Model: ${modelName()}  (override with CLAUDE_MODEL in .env)
+Writing with: ${describeProvider().label}${describeProvider().model ? ` (${describeProvider().model})` : ''}
 `);
 
 await program.parseAsync();

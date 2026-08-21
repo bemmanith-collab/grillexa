@@ -5,6 +5,7 @@ import path from 'node:path';
 import chalk from 'chalk';
 
 import { businessDateStr } from './clock.js';
+import { describeProvider } from './provider.js';
 import { ROTA } from './rota.js';
 import { AUDIENCES, LANGUAGES, SLOTS, TONES, TYPES } from './options.js';
 
@@ -101,6 +102,14 @@ export function printList() {
   row('auto', 'English or Telugu, picked per post. The default.');
   row('english', 'Always English.');
   row('telugu', 'Always romanised Telugu.');
+
+  const provider = describeProvider();
+  console.log('');
+  console.log(chalk.cyan.bold('Writing with'));
+  console.log(`  ${chalk.green(provider.label)}${provider.model ? chalk.dim(`  (${provider.model})`) : ''}`);
+  if (!provider.name) {
+    console.log(chalk.yellow('  Set GEMINI_API_KEY in .env — free, from https://aistudio.google.com/apikey'));
+  }
 
   console.log('');
 }

@@ -4,21 +4,48 @@ Writes ready-to-post content for the Grillo WhatsApp channel. Type a topic and a
 audience, get back a post formatted for a phone screen that you copy straight into
 WhatsApp.
 
-**This is a standalone tool.** It does not import from `backend/` or `frontend/`, does
-not touch the database, and does not need the Grillexa app to be running. It talks to
-the Claude API and to nothing else.
+**It runs standalone.** It imports nothing from `backend/` or `frontend/`, never touches
+the database, and does not need the Grillexa app to be running. It talks to one content
+provider and to nothing else.
+
+The Grillexa dashboard imports *this* — see *Used from the dashboard too* below. The
+dependency runs one way only.
 
 ## Setup
 
 ```bash
 cd whatsapp
 npm install
-cp .env.example .env      # then put your key in .env
+cp .env.example .env
 ```
 
-You need an Anthropic API key from <https://console.anthropic.com/settings/keys>. Put
-it in `.env` as `ANTHROPIC_API_KEY=sk-ant-...`. `.env` is gitignored — the key never
-goes near the repo.
+Then pick who writes the posts. **`.env` is gitignored — no key ever goes near the repo.**
+
+| Provider | Cost | Key | Quality |
+|---|---|---|---|
+| **Google Gemini** | Free tier | `GEMINI_API_KEY` from <https://aistudio.google.com/apikey> — no card | Good. Holds the brand format. **Start here.** |
+| **Anthropic Claude** | ~₹5 a post | `ANTHROPIC_API_KEY` from <https://console.anthropic.com/settings/keys> | Best writing of the three |
+| **Pollinations** | Free | none | Unreliable. See the warning below |
+
+The first one configured wins, in that order — so setting `GEMINI_API_KEY` is the whole
+setup. With no keys at all it falls through to Pollinations and still writes something.
+
+Force one with `AI_PROVIDER=gemini|claude|pollinations`. Naming a provider that is not
+configured is an error rather than a silent fallback: a post written by an unexpected
+provider is worse than no post, because nobody looks twice at it.
+
+`npm run generate -- --list` ends by printing which provider is active.
+
+### About Pollinations
+
+It is an anonymous relay in front of somebody else's models. No account, no quota you
+control, no uptime guarantee, and no say in which model answers. Against a long brand
+prompt it will sometimes drop the section format or the closing lines.
+
+It exists so the tool still does something on a machine with no keys. **Read what it
+writes before posting it**, and treat a good result as luck rather than as the
+arrangement working. `POLLINATIONS_ENABLED=false` turns it off, so a missing key fails
+loudly instead of quietly producing a worse post.
 
 Check it works:
 
@@ -60,7 +87,7 @@ and it is what passes your flags through to the script.
 |---|---|
 | `--type` | Which kind of post. Required, unless `--batch`. |
 | `--audience` | Who it is written for. Default `general`. |
-| `--topic` | What it is about. Leave it out and Claude picks something suitable. |
+| `--topic` | What it is about. Leave it out and one gets chosen to suit the type. |
 | `--tone` | `friendly` (default), `professional`, `playful`, `authoritative`. |
 | `--language` | `english` (default), `telugu`, `hindi`. |
 | `--quote-language` | Language of the `GRILLO SAYS` line only. Default `auto`. |
@@ -92,10 +119,12 @@ and it is what passes your flags through to the script.
 
 `general`, `elders`, `diabetics`, `young`.
 
-**`general` is the only one that splits the post.** It writes the shared opening and
-then separate `👵 FOR ELDERS`, `👶 FOR YOUNG ONES` and `🌿 FOR THE FAMILY` sections,
-because "everyone" means showing everyone. Naming a specific audience produces one
-focused post with no split.
+**`general` writes one post for the whole household, not a section per reader.** It used
+to split into `👵 FOR ELDERS` / `👶 FOR YOUNG ONES` / `🌿 FOR THE FAMILY` blocks and that
+produced six- and seven-section posts repeating the same advice three ways — so the
+audience now describes a reader and leaves the sections to the type. Where a detail
+differs by age it is carried inside an ordinary line ("softer for the elders", "let the
+children help") rather than under a heading of its own.
 
 `diabetics` adds a short plain note that food is not treatment and their doctor stays in
 charge. That note is not optional — see *What it will not write* below.
@@ -278,14 +307,16 @@ you edit it out.
 
 ## Cost and model
 
-One post is one API call on `claude-opus-5` — roughly a few thousand tokens in and under
-a thousand out. `--batch` is eight of those, run one after another rather than in
-parallel, which is both easier to read and less likely to hit a rate limit.
+One post is one API call — roughly a few thousand tokens in and under a thousand out.
+`--batch` is nine of those, run one after another rather than in parallel: easier to read,
+and less likely to trip a rate limit.
 
-The brand voice and the exemplar are sent as a cached prefix, so a batch pays for that
-part once rather than eight times.
+On **Gemini** and **Pollinations** that is free, within the free tier's per-minute and
+per-day limits. On **Claude** it is roughly ₹5 a post, and only there does the cached
+prefix help — the brand voice and the exemplar carry a cache breakpoint, so a batch pays
+for them once instead of nine times.
 
-Override the model with `CLAUDE_MODEL` in `.env` if you need to.
+Override the model with `GEMINI_MODEL` or `CLAUDE_MODEL` in `.env`.
 
 ## When something goes wrong
 
@@ -294,8 +325,9 @@ non-zero so it can be scripted.
 
 | Message | Fix |
 |---|---|
-| `No Anthropic API key found` | Create `.env` from `.env.example` and put your key in it. |
-| `The Anthropic API key was rejected` | Key is mistyped, revoked, or from another account. |
-| `Rate limited by the Anthropic API` | Wait a minute. A `--batch` makes eight calls in a row. |
-| `Claude declined to write this post` | Rephrase the topic. Medical framing is the usual cause. |
+| `No content provider is set up` | Set `GEMINI_API_KEY` in `.env`, or remove `POLLINATIONS_ENABLED=false`. |
+| `The Gemini API key was rejected` | Mistyped or revoked. Keys: <https://aistudio.google.com/apikey> |
+| `Gemini free-tier rate limit reached` | Wait a minute. A `--batch` makes nine calls in a row. |
+| `Pollinations did not answer in time` | Free service, no uptime promise. Retry, or set `GEMINI_API_KEY`. |
+| `Gemini declined the request` | Rephrase the topic. Medical framing is the usual cause. |
 | `Unknown --type "..."` | Run `--list`. |

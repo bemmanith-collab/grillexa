@@ -89,6 +89,10 @@ export default function WhatsAppGenerator({ options }) {
         <p className="form-hint wa-today">
           {options.today.day} — usually a{' '}
           <strong>{options.types.find((t) => t.value === options.today.type)?.label}</strong> post.
+          {/* Which service is writing. The three differ enough in quality that
+              "why does this read badly today" should be answerable here rather
+              than by opening a terminal. */}
+          {options.provider?.label && ` Written by ${options.provider.label}.`}
         </p>
       )}
 
