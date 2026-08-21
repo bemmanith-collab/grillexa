@@ -11,6 +11,7 @@ import client from '../api/client';
 // content type added to the subproject appears here with no frontend change,
 // and this can never offer something the generator does not have.
 export default function WhatsAppGenerator({ options }) {
+  const [day, setDay] = useState(options.today?.day || '');
   const [type, setType] = useState(options.today?.type || options.types[0]?.value || '');
   const [slot, setSlot] = useState(options.today?.slot || '');
   const [audience, setAudience] = useState('general');
@@ -26,8 +27,18 @@ export default function WhatsAppGenerator({ options }) {
 
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
 
-  // The type and meal open on whatever the rota says today is due, so posting
-  // daily is one click. Both stay editable — the rota is a suggestion.
+  // The panel opens on today, and picking a different day moves the content type
+  // with it — Monday is a morning tip, Friday an evening wind-down. That is the
+  // whole interaction for daily posting: choose the day, press Generate. The
+  // type dropdown stays live underneath for anything off the rota.
+  const chooseDay = useCallback((next) => {
+    setDay(next);
+    const due = options.rota?.[next];
+    if (!due) return;
+    setType(due.type);
+    setSlot(due.slot || '');
+  }, [options.rota]);
+
   const slotted = options.slottedTypes?.includes(type);
 
   const generate = useCallback(async () => {
@@ -40,6 +51,7 @@ export default function WhatsAppGenerator({ options }) {
         audience,
         topic: topic.trim() || undefined,
         slot: slotted ? slot || undefined : undefined,
+        day: day || undefined,
       });
       setPost(res.data);
       // A generated post is long; drop the reader at the top of it rather than
@@ -50,7 +62,7 @@ export default function WhatsAppGenerator({ options }) {
     } finally {
       setBusy(false);
     }
-  }, [type, audience, topic, slot, slotted]);
+  }, [type, audience, topic, slot, slotted, day]);
 
   // navigator.clipboard needs a secure context, and this app gets opened over a
   // plain-http LAN address during testing — where it is undefined and the copy
@@ -97,6 +109,18 @@ export default function WhatsAppGenerator({ options }) {
       )}
 
       <div className="wa-controls">
+        <label>
+          Day
+          <select value={day} onChange={(e) => chooseDay(e.target.value)} disabled={busy}>
+            {(options.weekdays || []).map((d) => (
+              <option key={d} value={d}>
+                {d}
+                {options.today?.day === d ? ' (today)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <label>
           Content type
           <select value={type} onChange={(e) => setType(e.target.value)} disabled={busy}>

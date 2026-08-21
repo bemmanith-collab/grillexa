@@ -106,6 +106,10 @@ router.get('/options', async (req, res) => {
     // click rather than three decisions. Computed in IST, like everything else
     // date-shaped here — the person posting is in India whatever the server thinks.
     today: rota.postForToday(),
+    // The whole weekly rota, so choosing a day in the panel can set the content
+    // type to whatever that day is due without a round trip.
+    rota: rota.ROTA,
+    weekdays: Object.keys(rota.ROTA),
     // Which service is writing. Shown in the panel because the three differ a
     // lot in quality, and "why does this read badly today" should be answerable
     // without opening a terminal.
@@ -119,7 +123,7 @@ router.get('/options', async (req, res) => {
 
 router.post('/generate', generateLimiter, async (req, res) => {
   const { options, generate } = await generator();
-  const { type, audience, topic, slot } = req.body ?? {};
+  const { type, audience, topic, slot, day } = req.body ?? {};
 
   if (!options.TYPES[type]) {
     return res.status(400).json({
@@ -140,6 +144,17 @@ router.post('/generate', generateLimiter, async (req, res) => {
     });
   }
 
+  // Weekdays are the rota's own keys, so a day the rota does not know cannot be
+  // asked for. Capitalisation is normalised rather than rejected.
+  const rotaModule = (await generator()).rota;
+  const weekdays = Object.keys(rotaModule.ROTA);
+  const cleanDay = day
+    ? weekdays.find((d) => d.toLowerCase() === String(day).toLowerCase())
+    : undefined;
+  if (day && !cleanDay) {
+    return res.status(400).json({ error: `Unknown day "${day}".`, valid: weekdays });
+  }
+
   // A topic is free text that goes into the prompt. Cap it: the field is meant
   // for a phrase like "eating after 8 PM", and an essay pasted in would be paid
   // for by the token on every request.
@@ -154,6 +169,7 @@ router.post('/generate', generateLimiter, async (req, res) => {
       quoteLanguage: options.DEFAULTS.quoteLanguage,
       topic: cleanTopic || undefined,
       slot: slot || undefined,
+      day: cleanDay,
     });
 
     res.json({

@@ -112,7 +112,7 @@ and it is what passes your flags through to the script.
 | `habit` | A small habit offered as a week-long challenge |
 | `product` | One Grillo product, kept deliberately minimal |
 | `seasonal` | What is worth eating in the season we are in |
-| `evening` | The quiet last post of the day — what you eat tonight, felt tomorrow morning |
+| `evening` | The bedtime wind-down: three things to do, what to avoid, what to eat if hungry, tonight's challenge |
 | `customer` | A post built around something a customer actually said |
 
 ### Audiences
@@ -251,8 +251,14 @@ echoes whatever that post was about, so the sign-off has a rhythm without readin
 template.
 
 Most types also carry the `🔄 INSTEAD OF THIS… TRY THIS` block, which names a habit and
-its replacement in the same breath. `product` and `customer` never do; `myth` and
-`seasonal` include it only when there are real swaps worth making.
+its replacement in the same breath. `product`, `customer` and `evening` never do — the
+evening post carries a `💤 WHAT TO AVOID` list instead, and both together would make a
+bedtime read twice as long as it should be. `myth` and `seasonal` include the block only
+when there are real swaps worth making.
+
+**`evening` has a fixed shape**, unlike every other type: `🧘 3 THINGS TO DO BEFORE BED`
+(numbered, one of them about food), `💤 WHAT TO AVOID`, `🌿 WHAT TO EAT IF YOU'RE HUNGRY`
+and `🎯 TONIGHT'S CHALLENGE`, in that order, every time.
 
 ## Changing the voice
 

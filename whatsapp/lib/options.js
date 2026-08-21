@@ -63,7 +63,9 @@ export const TYPES = {
   evening: {
     label: 'Evening Wind-Down',
     file: 'evening.md',
-    contrast: 'always',
+    // WHAT TO AVOID does the contrast block's job on this type, and carrying
+    // both makes the post twice as long as a bedtime read should be.
+    contrast: 'never',
     dated: true,
     everyday: true,
   },

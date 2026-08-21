@@ -8,7 +8,11 @@
 
 import { GenerationError } from '../errors.js';
 
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+// Pinned deliberately rather than using a -latest alias, so a model swap is a
+// visible change here and not a silent shift in how the channel sounds. Google
+// retires models to new keys without warning — when this one goes, the 404
+// below carries Google's own message, which names the replacement.
+const DEFAULT_MODEL = 'gemini-3.6-flash';
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 export const name = 'gemini';
@@ -119,8 +123,13 @@ function translate(status, detail, model) {
     });
   }
   if (status === 404) {
-    return new GenerationError(`Gemini has no model called "${model}".`, {
-      hint: 'Set GEMINI_MODEL to a model your key can use, or remove it for the default.',
+    // Google's own 404 text names the model to move to ("no longer available to
+    // new users, please use models/X"). That sentence is the entire fix, so it
+    // is passed through rather than replaced with a generic message — and a
+    // model can be listed by the models endpoint while still refusing to
+    // generate, so "check what your key can use" is actively misleading advice.
+    return new GenerationError(`Gemini will not use "${model}".`, {
+      hint: detail || 'Set GEMINI_MODEL to a different model.',
     });
   }
   if (status === 429) {
