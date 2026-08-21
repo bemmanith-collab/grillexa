@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Copy, Check, RefreshCw } from 'lucide-react';
+import { Copy, Check, RefreshCw, Lightbulb, Send } from 'lucide-react';
 import client from '../api/client';
 
 // Writes a post for the Grillo WhatsApp channel and hands it over ready to
@@ -16,6 +16,9 @@ export default function WhatsAppGenerator({ options }) {
   const [slot, setSlot] = useState(options.today?.slot || '');
   const [audience, setAudience] = useState('general');
   const [topic, setTopic] = useState('');
+  const [language, setLanguage] = useState('english');
+  const [suggestions, setSuggestions] = useState(null);
+  const [marking, setMarking] = useState(false);
 
   const [post, setPost] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -26,6 +29,16 @@ export default function WhatsAppGenerator({ options }) {
   const copiedTimer = useRef(null);
 
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
+
+  const loadSuggestions = useCallback(() => {
+    client.get('/whatsapp/suggestions')
+      .then((res) => setSuggestions(res.data))
+      // Suggestions are a prompt, not a feature anyone is blocked on — a failure
+      // here must never stop someone writing today's post.
+      .catch(() => setSuggestions(null));
+  }, []);
+
+  useEffect(loadSuggestions, [loadSuggestions]);
 
   // The panel opens on today, and picking a different day moves the content type
   // with it — Monday is a morning tip, Friday an evening wind-down. That is the
@@ -52,6 +65,7 @@ export default function WhatsAppGenerator({ options }) {
         topic: topic.trim() || undefined,
         slot: slotted ? slot || undefined : undefined,
         day: day || undefined,
+        language,
       });
       setPost(res.data);
       // A generated post is long; drop the reader at the top of it rather than
@@ -62,7 +76,7 @@ export default function WhatsAppGenerator({ options }) {
     } finally {
       setBusy(false);
     }
-  }, [type, audience, topic, slot, slotted, day]);
+  }, [type, audience, topic, slot, slotted, day, language]);
 
   // navigator.clipboard needs a secure context, and this app gets opened over a
   // plain-http LAN address during testing — where it is undefined and the copy
@@ -95,6 +109,28 @@ export default function WhatsAppGenerator({ options }) {
     }
   }, [post]);
 
+  // Generated is not published. Without this the history says the channel posted
+  // nine times this week when it actually sent two, and every suggestion built on
+  // top of that is wrong.
+  const markUsed = useCallback(async () => {
+    if (!post?.id) return;
+    setMarking(true);
+    try {
+      await client.post(`/whatsapp/history/${post.id}`, { used: true });
+      setPost((current) => ({ ...current, used: true }));
+      loadSuggestions();
+    } catch {
+      setError({ error: 'Could not mark it as posted.' });
+    } finally {
+      setMarking(false);
+    }
+  }, [post, loadSuggestions]);
+
+  const applySuggestion = useCallback((suggestion) => {
+    setType(suggestion.type);
+    setSlot(suggestion.slot || '');
+  }, []);
+
   return (
     <div className="card wa-card">
       {options.today && (
@@ -106,6 +142,32 @@ export default function WhatsAppGenerator({ options }) {
               than by opening a terminal. */}
           {options.provider?.label && ` Written by ${options.provider.label}.`}
         </p>
+      )}
+
+      {suggestions?.suggestions?.length > 0 && (
+        <div className="wa-suggestions">
+          <div className="wa-suggestions-title">
+            <Lightbulb size={15} strokeWidth={1.9} />
+            What to write next
+          </div>
+          {suggestions.suggestions.map((s) => (
+            <button
+              key={`${s.priority}-${s.type}`}
+              type="button"
+              className={`wa-suggestion${s.priority === 'today' ? ' wa-suggestion-today' : ''}`}
+              onClick={() => applySuggestion(s)}
+              disabled={busy}
+            >
+              {s.reason}
+            </button>
+          ))}
+          {suggestions.summary && (
+            <p className="form-hint">
+              {suggestions.summary.usedThisWeek} posted in the last week
+              {suggestions.summary.lastPostedOn && `, most recently ${suggestions.summary.lastPostedOn}`}.
+            </p>
+          )}
+        </div>
       )}
 
       <div className="wa-controls">
@@ -135,6 +197,15 @@ export default function WhatsAppGenerator({ options }) {
           <select value={audience} onChange={(e) => setAudience(e.target.value)} disabled={busy}>
             {options.audiences.map((a) => (
               <option key={a.value} value={a.value}>{a.label}</option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Language
+          <select value={language} onChange={(e) => setLanguage(e.target.value)} disabled={busy}>
+            {(options.languages || []).map((l) => (
+              <option key={l.value} value={l.value}>{l.label}</option>
             ))}
           </select>
         </label>
@@ -184,13 +255,28 @@ export default function WhatsAppGenerator({ options }) {
           <div className="wa-output-bar">
             <span className="form-hint">
               {post.meta.day}
+              {post.meta.occasion && ` · ${post.meta.occasion}`}
               {post.meta.ingredient && ` · built around ${post.meta.ingredient}`}
               {post.meta.quoteLanguage === 'telugu' && ' · Telugu sign-off'}
             </span>
-            <button type="button" className="btn-secondary btn-sm" onClick={copy}>
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? 'Copied' : 'Copy'}
-            </button>
+            <span className="wa-output-actions">
+              <button type="button" className="btn-secondary btn-sm" onClick={copy}>
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+              {post.id && (
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  onClick={markUsed}
+                  disabled={marking || post.used}
+                  title="Tell the channel history this one actually went out"
+                >
+                  {post.used ? <Check size={14} /> : <Send size={14} />}
+                  {post.used ? 'Posted' : 'Mark as posted'}
+                </button>
+              )}
+            </span>
           </div>
           {/* Rendered as-is in a pre: emoji, blank lines and the — dividers are
               the format, so anything that reflows the text changes the post. */}

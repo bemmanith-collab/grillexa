@@ -35,6 +35,7 @@ model User {
   consignments     Consignment[]
   settlements      Settlement[]
   wastages         Wastage[]
+  whatsappPosts    WhatsAppPost[]
   // Distinct from `stores`, which is the many-to-many "who covers this shop".
   // This is authorship: who walked up to it and put it in the system. Named
   // because two relations now join User and Store and Prisma cannot guess.
@@ -93,6 +94,40 @@ model WisdomMessage {
   updatedAt DateTime  @updatedAt
 
   @@index([audience, active])
+}
+
+// Every post the WhatsApp generator has written, kept so the channel can be
+// looked at as a whole rather than one post at a time: what has been posted this
+// week, which types are going stale, and which of them anybody actually used.
+//
+// `text` is stored because a post that was sent to customers should be
+// recoverable — the generator is not deterministic, so regenerating it produces
+// a different post, not the same one.
+model WhatsAppPost {
+  id         Int      @id @default(autoincrement())
+  type       String
+  audience   String
+  language   String   @default("english")
+  slot       String?
+  day        String
+  postDate   String   // the Indian calendar date it was written for, YYYY-MM-DD
+  occasion   String?
+  ingredient String?
+  topic      String?
+  provider   String?
+  text       String
+  // Generated is not the same as published. Only the ones marked used should
+  // count when working out what the channel has actually shown people.
+  used       Boolean  @default(false)
+  // -1, 0 or 1. Deliberately blunt: a five-point scale nobody fills in is worth
+  // less than a thumb that gets pressed.
+  rating     Int      @default(0)
+  createdAt  DateTime @default(now())
+  authorId   Int
+  author     User     @relation(fields: [authorId], references: [id])
+
+  @@index([createdAt])
+  @@index([type, createdAt])
 }
 
 model Store {

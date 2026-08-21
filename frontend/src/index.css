@@ -2949,3 +2949,57 @@ a.btn-danger {
   border-radius: 8px;
   user-select: text;
 }
+
+/* Suggestions strip, above the controls in the WhatsApp panel. */
+.wa-suggestions {
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--surface-muted, #f7f8fa);
+}
+
+.wa-suggestions-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+/* Each suggestion is a button, not a line of text: reading "you have not posted
+   a Myth vs Fact in nine days" and then having to find that in a dropdown is the
+   kind of small friction that stops a tool getting used. */
+.wa-suggestion {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  border: 1px solid var(--border, #e4e7eb);
+  border-radius: 6px;
+  background: var(--surface, #fff);
+  cursor: pointer;
+}
+
+.wa-suggestion:hover:not(:disabled) {
+  border-color: var(--accent, #e2703a);
+}
+
+.wa-suggestion:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.wa-suggestion-today {
+  border-left: 3px solid var(--accent, #e2703a);
+  font-weight: 600;
+}
+
+.wa-output-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

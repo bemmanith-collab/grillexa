@@ -4,6 +4,8 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
+const prisma = require('../db');
+const { buildSuggestions, summarise } = require('../lib/whatsappSuggestions');
 
 const router = express.Router();
 
@@ -29,8 +31,9 @@ async function generator() {
     importGenerator('options.js'),
     importGenerator('rota.js'),
     importGenerator('provider.js'),
+    importGenerator('clock.js'),
   ])
-    .then(([generate, options, rota, provider]) => ({ generate, options, rota, provider }))
+    .then(([generate, options, rota, provider, clock]) => ({ generate, options, rota, provider, clock }))
     .catch((err) => {
       modules = undefined; // let a later request try again after a bad deploy
       throw err;
@@ -102,6 +105,13 @@ router.get('/options', async (req, res) => {
     types: list(options.TYPES),
     audiences: list(options.AUDIENCES),
     slots: list(options.SLOTS),
+    // Language is a dropdown now rather than a CLI flag only. The quote follows
+    // the body automatically when it is not English, so there is nothing extra
+    // for the person posting to remember.
+    languages: Object.keys(options.LANGUAGES).map((value) => ({
+      value,
+      label: value === 'english' ? 'English' : `${value[0].toUpperCase()}${value.slice(1)} (Latin script)`,
+    })),
     // The panel opens on today's post already selected, so posting daily is one
     // click rather than three decisions. Computed in IST, like everything else
     // date-shaped here — the person posting is in India whatever the server thinks.
@@ -123,7 +133,7 @@ router.get('/options', async (req, res) => {
 
 router.post('/generate', generateLimiter, async (req, res) => {
   const { options, generate } = await generator();
-  const { type, audience, topic, slot, day } = req.body ?? {};
+  const { type, audience, topic, slot, day, language } = req.body ?? {};
 
   if (!options.TYPES[type]) {
     return res.status(400).json({
@@ -135,6 +145,12 @@ router.post('/generate', generateLimiter, async (req, res) => {
     return res.status(400).json({
       error: `Unknown audience "${audience}".`,
       valid: Object.keys(options.AUDIENCES),
+    });
+  }
+  if (language && !options.LANGUAGES[language]) {
+    return res.status(400).json({
+      error: `Unknown language "${language}".`,
+      valid: Object.keys(options.LANGUAGES),
     });
   }
   if (slot && !options.SLOTS[slot]) {
@@ -165,14 +181,40 @@ router.post('/generate', generateLimiter, async (req, res) => {
       type,
       audience: audience || options.DEFAULTS.audience,
       tone: options.DEFAULTS.tone,
-      language: options.DEFAULTS.language,
+      language: language || options.DEFAULTS.language,
       quoteLanguage: options.DEFAULTS.quoteLanguage,
       topic: cleanTopic || undefined,
       slot: slot || undefined,
       day: cleanDay,
     });
 
+    // Kept so the channel can be looked at as a whole — what is going stale,
+    // what was actually sent. A failure to record must never lose the post the
+    // person is waiting for, so it is caught and the response goes out anyway.
+    let saved = null;
+    try {
+      saved = await prisma.whatsAppPost.create({
+        data: {
+          type: result.options.type,
+          audience: result.options.audience,
+          language: result.options.language,
+          slot: result.options.slot ?? null,
+          day: result.options.day,
+          postDate: result.options.date,
+          occasion: result.options.occasions?.map((o) => o.name).join(', ') || null,
+          ingredient: result.options.ingredient?.name ?? null,
+          topic: cleanTopic || null,
+          provider: (await generator()).provider.describeProvider().name,
+          text: result.text,
+          authorId: req.user.id,
+        },
+      });
+    } catch (saveError) {
+      console.error('whatsapp: could not record post history', saveError);
+    }
+
     res.json({
+      id: saved?.id ?? null,
       text: result.text,
       meta: {
         type: result.options.type,
@@ -183,6 +225,8 @@ router.post('/generate', generateLimiter, async (req, res) => {
         // rather than having to notice it across a week of posts.
         ingredient: result.options.ingredient?.name ?? null,
         quoteLanguage: result.options.quoteLanguage,
+        language: result.options.language,
+        occasion: result.options.occasions?.map((o) => o.name).join(', ') || null,
       },
     });
   } catch (err) {
@@ -201,6 +245,79 @@ router.post('/generate', generateLimiter, async (req, res) => {
         ? 'Ask an administrator to set GEMINI_API_KEY on the server.'
         : err.hint,
     });
+  }
+});
+
+// What to write next, and how the week has gone. Read by the panel on load.
+router.get('/suggestions', async (req, res) => {
+  const { options, rota, clock } = await generator();
+  // The Indian date, same as everything else here — "this week" has to mean the
+  // same thing to the suggestions as it does to the person reading them.
+  const today = clock.businessDateStr();
+
+  const posts = await prisma.whatsAppPost.findMany({
+    orderBy: { postDate: 'desc' },
+    take: 200,
+    select: { type: true, postDate: true, used: true },
+  });
+
+  res.json({
+    suggestions: buildSuggestions({
+      posts,
+      types: options.TYPES,
+      dueToday: rota.postForToday(),
+      today,
+    }).slice(0, 4),
+    summary: summarise(posts, today),
+  });
+});
+
+// The last posts written, newest first. Small page: this is a "what did we send
+// on Tuesday" list, not an archive to browse.
+router.get('/history', async (req, res) => {
+  const posts = await prisma.whatsAppPost.findMany({
+    orderBy: { id: 'desc' },
+    take: Math.min(Number(req.query.limit) || 20, 50),
+    include: { author: { select: { name: true } } },
+  });
+
+  res.json({
+    posts: posts.map((post) => ({
+      id: post.id,
+      type: post.type,
+      audience: post.audience,
+      language: post.language,
+      day: post.day,
+      postDate: post.postDate,
+      occasion: post.occasion,
+      ingredient: post.ingredient,
+      used: post.used,
+      rating: post.rating,
+      author: post.author?.name ?? null,
+      createdAt: post.createdAt,
+      text: post.text,
+    })),
+  });
+});
+
+// Marking a post used is what makes the suggestions mean anything: without it
+// every draft counts as published and the channel looks busier than it is.
+router.post('/history/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad post id.' });
+
+  const data = {};
+  if (typeof req.body?.used === 'boolean') data.used = req.body.used;
+  if ([-1, 0, 1].includes(req.body?.rating)) data.rating = req.body.rating;
+  if (!Object.keys(data).length) {
+    return res.status(400).json({ error: 'Nothing to update.', valid: ['used', 'rating'] });
+  }
+
+  try {
+    const post = await prisma.whatsAppPost.update({ where: { id }, data });
+    res.json({ id: post.id, used: post.used, rating: post.rating });
+  } catch {
+    res.status(404).json({ error: 'No such post.' });
   }
 });
 
