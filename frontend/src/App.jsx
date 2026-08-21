@@ -21,6 +21,7 @@ const StockHistory = lazy(() => import('./pages/StockHistory'));
 const Users = lazy(() => import('./pages/Users'));
 const Stores = lazy(() => import('./pages/Stores'));
 const Reports = lazy(() => import('./pages/Reports'));
+const WhatsAppPage = lazy(() => import('./pages/WhatsApp'));
 
 // Copies each column heading onto its cells as data-label, which the phone
 // card layout prints beside the value (see .data-table in index.css). Done in
@@ -187,6 +188,17 @@ export default function App() {
               element={
                 <ProtectedRoute roles={['ADMIN']}>
                   <Users />
+                </ProtectedRoute>
+              }
+            />
+            {/* Admin/Manager gets past the router; WHATSAPP_AUTHORS decides
+                the rest, and the page sends anyone else back to the dashboard.
+                The server refuses regardless of what the router allows. */}
+            <Route
+              path="/whatsapp"
+              element={
+                <ProtectedRoute roles={['ADMIN', 'MANAGER']}>
+                  <WhatsAppPage />
                 </ProtectedRoute>
               }
             />

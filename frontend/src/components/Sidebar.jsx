@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useChannelAccess } from '../lib/channelAccess';
 import {
   LayoutDashboard,
   BarChart3,
@@ -14,6 +15,7 @@ import {
   TrendingUp,
   Store,
   Users,
+  MessageCircle,
   LogOut,
   KeyRound,
   MoreHorizontal,
@@ -55,6 +57,12 @@ const NAV = [
   { to: '/users', icon: Users, label: 'Users', roles: 'ADMIN' },
 ];
 
+// Not in NAV: role is not what decides this one. Only the addresses in
+// WHATSAPP_AUTHORS may write for the customer channel, and the browser cannot
+// see that list — so the entry is appended only once the server has confirmed
+// this account is on it. Four of the five Admins never see it.
+const CHANNEL_LINK = { to: '/whatsapp', icon: MessageCircle, label: 'WhatsApp', short: 'Posts' };
+
 // Five, not four: the dashboard took a tab and pushing Direct Sale into the
 // More sheet would put a till behind two taps. The bar is sized for six
 // columns (five plus More) in index.css.
@@ -79,7 +87,11 @@ export default function Sidebar() {
 
   if (!user) return null;
 
-  const items = NAV.filter((item) => item.roles.includes(user.role));
+  // Sales can never be on the allowlist, so do not spend a refused request
+  // on every page load for most of the staff.
+  const channel = useChannelAccess({ enabled: user.role !== 'SALES' });
+  const items = NAV.filter((item) => item.roles.includes(user.role))
+    .concat(channel.state === 'allowed' ? [CHANNEL_LINK] : []);
   const primary = items.slice(0, PRIMARY_COUNT);
   const rest = items.slice(PRIMARY_COUNT);
   const onMoreRoute = rest.some((item) => location.pathname === item.to);

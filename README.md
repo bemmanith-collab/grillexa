@@ -535,7 +535,11 @@ npm run whatsapp -- --type=morning --audience=elders     # or pick one
 
 ## The dashboard panel
 
-Admin and Manager see a **WhatsApp Content Generator** card under the day's numbers on the dashboard: pick a type and an audience, optionally type a topic, generate, copy. It opens with today's rota post already selected, so daily posting is one click rather than three decisions.
+**WhatsApp** is its own page, reached from the nav beside Users and Stores: pick a type and an audience, optionally type a topic, generate, copy. It opens with today's rota post already selected, so daily posting is one click rather than three decisions.
+
+It began as a card at the bottom of the dashboard and was moved. On a phone the dashboard is a long scroll — metrics, ranking, chart, top products, alerts, leaderboard — and burying a tool used every single day underneath all of it is how it stops getting used. Writing a post is a task, not a metric.
+
+**The nav entry is not role-based either.** Only the server knows `WHATSAPP_AUTHORS`, so the sidebar asks `GET /api/whatsapp/options` and adds the link only if the answer is 200. Four of the five Admin accounts never see it. Sales accounts skip the request entirely — they can never be on the list, and it would otherwise be a refused call on every page load for most of the staff.
 
 **Role is not the whole gate.** Writing for the customer channel is a job two named people do, not something every Admin should be able to do because they can also reset passwords. `WHATSAPP_AUTHORS` is a comma-separated allowlist of email addresses checked on top of the role, and it **fails closed**: unset means nobody, and the panel simply does not render. An unset variable meaning "everybody" would hand the channel to every Admin the first time someone forgot to set a secret, and nothing would look wrong. Both checks live on the server — the panel hiding itself is a courtesy, not access control.
 

@@ -1,20 +1,19 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { MessageCircle, Copy, Check, RefreshCw } from 'lucide-react';
+import { Copy, Check, RefreshCw } from 'lucide-react';
 import client from '../api/client';
 
 // Writes a post for the Grillo WhatsApp channel and hands it over ready to
-// paste. Admin and Manager only — the backend enforces that too, since hiding a
-// panel is not access control.
+// paste. Whoever is in WHATSAPP_AUTHORS, and only them — the backend enforces
+// that on every call, since a page that hides itself is not access control.
 //
-// The dropdowns are built from GET /whatsapp/options rather than a list kept
-// here, so a content type added to the generator appears in this panel with no
-// frontend change and can never be offered but unsupported.
-export default function WhatsAppGenerator() {
-  const [options, setOptions] = useState(null);
-  const [denied, setDenied] = useState(false);
-  const [type, setType] = useState('');
+// `options` comes from GET /whatsapp/options via the page, so the dropdowns are
+// built from the generator's own registry rather than a list kept here: a
+// content type added to the subproject appears here with no frontend change,
+// and this can never offer something the generator does not have.
+export default function WhatsAppGenerator({ options }) {
+  const [type, setType] = useState(options.today?.type || options.types[0]?.value || '');
+  const [slot, setSlot] = useState(options.today?.slot || '');
   const [audience, setAudience] = useState('general');
-  const [slot, setSlot] = useState('');
   const [topic, setTopic] = useState('');
 
   const [post, setPost] = useState(null);
@@ -27,36 +26,9 @@ export default function WhatsAppGenerator() {
 
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
 
-  // Opens on the post today is due, so daily posting is one click. Everything
-  // stays editable — the rota is a suggestion, not a schedule.
-  useEffect(() => {
-    let cancelled = false;
-    client
-      .get('/whatsapp/options')
-      .then((res) => {
-        if (cancelled) return;
-        setOptions(res.data);
-        setType(res.data.today?.type || res.data.types[0]?.value || '');
-        setSlot(res.data.today?.slot || '');
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        // 403 means this account is not one of the channel's writers, and 503
-        // that none are configured yet. Neither is an error for the person
-        // looking at the dashboard — the panel simply is not theirs, so it stays
-        // invisible rather than showing them a failure they cannot act on.
-        // Anything else is a real fault, and hiding that would leave whoever
-        // does write the posts staring at a dashboard with no panel and no clue.
-        const status = err.response?.status;
-        if (status === 403 || status === 503) setDenied(true);
-        else setError({ error: 'The content generator is not responding.' });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const slotted = options?.slottedTypes?.includes(type);
+  // The type and meal open on whatever the rota says today is due, so posting
+  // daily is one click. Both stay editable — the rota is a suggestion.
+  const slotted = options.slottedTypes?.includes(type);
 
   const generate = useCallback(async () => {
     setBusy(true);
@@ -111,30 +83,8 @@ export default function WhatsAppGenerator() {
     }
   }, [post]);
 
-  // Not one of the channel's writers: the panel does not exist for them.
-  if (denied) return null;
-
-  // Still loading, or loaded but broken — say so rather than vanishing, since
-  // this only reaches someone who is supposed to have the panel.
-  if (!options) {
-    return error ? (
-      <div className="card wa-card">
-        <div className="wa-header">
-          <MessageCircle size={18} strokeWidth={1.8} />
-          <h3 className="card-title">WhatsApp Content Generator</h3>
-        </div>
-        <div className="form-error">{error.error}</div>
-      </div>
-    ) : null;
-  }
-
   return (
     <div className="card wa-card">
-      <div className="wa-header">
-        <MessageCircle size={18} strokeWidth={1.8} />
-        <h3 className="card-title">WhatsApp Content Generator</h3>
-      </div>
-
       {options.today && (
         <p className="form-hint wa-today">
           {options.today.day} — usually a{' '}
