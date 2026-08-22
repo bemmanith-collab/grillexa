@@ -1,0 +1,35 @@
+{
+  "_readme": [
+    "Fruit worth naming in a post, by the months it is actually in the market in",
+    "Andhra Pradesh and Telangana — not when a supermarket can fly it in.",
+    "",
+    "`months` are inclusive and wrap around the year end (11-2 means November to",
+    "February). `note` is one line on what it is good for, in the channel's own",
+    "register: no health claims, nothing a doctor would have to correct.",
+    "",
+    "Seasons shift a few weeks either way with the year, so treat a month at the",
+    "edge of a range as 'probably around'. Edit freely — this is local knowledge",
+    "and whoever runs the shop knows it better than this file does."
+  ],
+
+  "fruits": [
+    { "name": "Mango", "months": [4, 6], "note": "Banganapalli, Suvarnarekha, Rasalu. The whole summer is built around it." },
+    { "name": "Watermelon", "months": [3, 6], "note": "Mostly water, which is the point in April. Cheap and everywhere." },
+    { "name": "Muskmelon", "months": [3, 6], "note": "Cooling and soft. Good for elders and small children." },
+    { "name": "Jamun", "months": [6, 8], "note": "Short season, sold by the roadside in cones with salt." },
+    { "name": "Guava", "months": [8, 2], "note": "Cheap for months, high in fibre, and eaten with chilli and salt." },
+    { "name": "Custard apple (sitaphal)", "months": [8, 11], "note": "Short season, very sweet, soft enough for anyone to eat." },
+    { "name": "Pomegranate", "months": [9, 2], "note": "Keeps well and travels well. Good in a lunchbox." },
+    { "name": "Sweet lime (mosambi)", "months": [10, 3], "note": "Juiced everywhere in winter. Better eaten than juiced — the fibre stays." },
+    { "name": "Orange", "months": [11, 2], "note": "Nagpur oranges arrive in winter and are cheapest then." },
+    { "name": "Grapes", "months": [1, 4], "note": "Anantapur grapes. Wash them properly." },
+    { "name": "Sapota (chikoo)", "months": [10, 3], "note": "Very sweet and soft. Small portions suit anyone watching sugar." },
+    { "name": "Papaya", "months": [1, 12], "note": "All year, ripens on the counter, and easy on the stomach." },
+    { "name": "Banana", "months": [1, 12], "note": "All year, needs no cutting, no plate and no cooking." },
+    { "name": "Ber (regi pandu)", "months": [12, 2], "note": "Winter roadside fruit, sold by the cup with salt and chilli." },
+    { "name": "Wood apple (velaga pandu)", "months": [1, 3], "note": "Local, seasonal, and mostly made into a chutney or a sherbet." },
+    { "name": "Tender coconut", "months": [1, 12], "note": "All year and best in the heat. Cheaper than any bottled drink." },
+    { "name": "Pineapple", "months": [5, 8], "note": "Sold cut, with salt and chilli, through the monsoon." },
+    { "name": "Sugarcane", "months": [11, 3], "note": "Juiced at the roadside through the cool months." }
+  ]
+}

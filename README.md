@@ -557,6 +557,8 @@ Two things in it are load-bearing and should survive future edits:
 
 **It knows what day it is in the Indian calendar.** `whatsapp/lib/calendar.json` carries 23 festivals and national days with a note each on what the day is, what people cook, and what not to say. The fixed dates are filled in; the lunar ones are listed with their dates **deliberately empty**, because a wrong Deepavali date on a customer channel is worse than no Deepavali post. An unfilled festival is skipped silently, so `--list` names every one still missing a date for the year — otherwise the day passes, an ordinary post goes out, and nobody notices until a customer asks.
 
+**It knows today's weather and this month's fruit.** Open-Meteo (free, no key) for Hyderabad, turned into what it should do to the food — rain means warm and off-the-stove and cut fruit spoiling faster, a hot day means buttermilk and water-heavy fruit. Fetched once per day per process, and a forecast failure only costs a line of context, never the post. Fruit comes from `whatsapp/lib/fruits.json`, by the months it is genuinely in the market here.
+
 Festival dates are filled by `npm run calendar:fill` from Google's public Indian-holidays feed (no key, no account) rather than typed in — they are lunisolar and move every year. It writes into the file rather than fetching at generation time, so the dates are reviewable in a diff and no post waits on a network call. Bathukamma, Bonalu and Karthika Pournami are Telangana observances absent from any national feed and stay manual.
 
 **The channel names four meats and no others.** Chicken, mutton, fish, prawns. Never beef and never pork — not as a suggestion, an example, or an aside. Hindu, Muslim and Christian families read this on the same street, and one careless line loses a share of them for good. Vegetarian by default; where meat appears a vegetarian option sits beside it. Fasting is never advised on in either direction, and nobody is ever told to eat less at a festival.
@@ -666,6 +668,7 @@ The service worker caches nothing, deliberately — this app writes bills, and a
 | `ANTHROPIC_API_KEY` | Optional alternative provider — better writing, roughly ₹5 a post. Used only if `GEMINI_API_KEY` is unset. A Fly secret, never committed |
 | `AI_PROVIDER` | Optional. Forces `gemini`, `claude` or `pollinations` instead of picking the first configured one. Errors rather than falling back if the named one is not set up |
 | `POLLINATIONS_ENABLED` | Optional, default on. The keyless free fallback used when nothing else is configured. `false` turns it off so a missing key fails loudly instead of quietly writing a worse post |
+| `WEATHER_LAT` / `WEATHER_LON` | Optional. Where to read the weather for; defaults to Amberpet, Hyderabad. No key — Open-Meteo is keyless |
 | `WHATSAPP_REMINDER` | Optional, default on. `off` silences the daily "today's post isn't written" push notification |
 | `WHATSAPP_REMINDER_HOUR` | Optional, default `7`. The IST hour the reminder may go out from. An empty value falls back to 7 rather than to midnight |
 | `WHATSAPP_AUTHORS` | Comma-separated **email addresses** allowed to write channel posts, checked on top of the Admin/Manager role. **Fails closed** — unset means nobody, and the panel does not appear for anyone. Emails rather than names because they are unique in the database and stable |

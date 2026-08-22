@@ -183,6 +183,30 @@ Practically, that means **an edit to `prompts/` changes the dashboard too**, and
 it on the next deploy rather than immediately. `--dry-run` is still the cheap way to check
 a prompt edit before it goes anywhere.
 
+## Weather and fruit
+
+Every post is told today's weather and what fruit is actually in the market.
+
+**Weather** comes from Open-Meteo — free, no key, no account — for Amberpet, Hyderabad
+(`WEATHER_LAT` / `WEATHER_LON` to move it). The prompt gets the temperature and sky plus
+what that should do to the food: rain means warm, cooked, off-the-stove and cut fruit
+spoiling faster; a hot day means buttermilk, curd rice, water-heavy fruit and not standing
+over a stove at midday; a cold morning means something warm to start.
+
+It is fetched once per day per process, so a `--batch` run makes one call. **A forecast
+failure is never fatal** — the line is simply left out and the post is a little more
+generic. A channel that goes quiet because a weather service was slow would be a bad
+trade.
+
+**Fruit** comes from `lib/fruits.json`, listed by the months it is really in the market
+here rather than when a supermarket can fly it in. Ranges wrap the year end, so guava
+(`[8, 2]`) shows in both August and December. A few are picked per post rather than all of
+them — a list of twelve fruits is a catalogue, and the year-round ones are dropped when
+something genuinely seasonal is available, since banana and papaya are always true and
+therefore never interesting.
+
+Edit that file freely. Whoever runs the shop knows the seasons better than it does.
+
 ## Festival dates
 
 Most Indian festivals are lunisolar — Vinayaka Chavithi is Bhadrapada Shukla Chaturthi,

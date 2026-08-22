@@ -14,6 +14,8 @@ import { generatePost } from './provider.js';
 import { businessDateStr, businessHour, businessMonth, businessWeekday } from './clock.js';
 import { moodFor } from './rota.js';
 import { occasionsOn } from './calendar.js';
+import { pickSeasonalFruits } from './fruits.js';
+import { weatherFor, weatherGuidance } from './weather.js';
 import {
   AUDIENCES,
   CONTRAST_RULES,
@@ -132,6 +134,22 @@ function describeContext(options) {
     }
   }
 
+  // Weather first among the day's context, because it changes what people
+  // actually want to eat more than anything else here does.
+  if (options.weather) {
+    lines.push(`- Weather where the readers are today: ${options.weather.summary} — ${options.weather.heat}.`);
+    const guidance = weatherGuidance(options.weather);
+    if (guidance) lines.push(`  ${guidance}`);
+  }
+
+  if (options.fruits?.length) {
+    lines.push(
+      `- Fruit in the market right now: ${options.fruits.map((f) => `${f.name} (${f.note})`).join('; ')}`,
+      '  Name one or two of these where fruit fits. In season means cheap and good',
+      '  this week, which is the reason worth giving — not "eat seasonal fruit".',
+    );
+  }
+
   // What the day is like, not just what it is called. This is what lets a
   // Saturday post suggest something a Saturday actually has room for.
   if (spec.dated && moodFor(day)) {
@@ -191,8 +209,14 @@ function describeContext(options) {
  * Separate from generate() so --dry-run can show the exact prompt: prompt files are
  * meant to be edited by hand, and being able to read the assembled result costs nothing.
  */
-export function buildRequest(options) {
+export async function buildRequest(options) {
   const spec = TYPES[options.type];
+  const date = options.date ?? businessDateStr();
+
+  // Never fatal, never slow: weatherFor swallows its own failures and caches per
+  // day, so a --batch run makes one call and a forecast outage costs a line of
+  // context rather than the post.
+  const weather = options.weather ?? await weatherFor(date);
 
   const resolved = {
     ...options,
@@ -202,8 +226,10 @@ export function buildRequest(options) {
     product: spec.needsProduct ? pickProduct(options.product) : undefined,
     ingredient: spec.everyday ? pickPantryItem(options.ingredient) : undefined,
     quoteLanguage: resolveQuoteLanguage(options.quoteLanguage),
-    date: options.date ?? businessDateStr(),
-    occasions: options.occasions ?? occasionsOn(options.date ?? businessDateStr()),
+    date,
+    occasions: options.occasions ?? occasionsOn(date),
+    weather,
+    fruits: options.fruits ?? pickSeasonalFruits(),
   };
 
   const systemBlocks = [
@@ -232,7 +258,7 @@ export function buildRequest(options) {
 
 /** Generate one post. Returns the text plus the resolved options that produced it. */
 export async function generate(options) {
-  const { systemBlocks, prompt, options: resolved } = buildRequest(options);
+  const { systemBlocks, prompt, options: resolved } = await buildRequest(options);
   const { text, usage } = await generatePost({ systemBlocks, prompt });
   return { text, usage, options: resolved };
 }

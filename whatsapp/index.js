@@ -115,7 +115,7 @@ function validate(opts) {
 
 async function runOne(options, { out: outPath, dryRun }) {
   if (dryRun) {
-    printRequest(buildRequest(options));
+    printRequest(await buildRequest(options));
     return;
   }
 

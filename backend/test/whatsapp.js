@@ -60,7 +60,7 @@ const tests = {
 
   'a request can be assembled without calling the API': async () => {
     const generate = await import(pathToFileURL(path.join(GENERATOR_DIR, 'generate.js')).href);
-    const built = generate.buildRequest({
+    const built = await generate.buildRequest({
       type: 'myth',
       audience: 'general',
       tone: 'friendly',
@@ -179,7 +179,7 @@ const tests = {
 
   'the topic is optional': async () => {
     const generate = await import(pathToFileURL(path.join(GENERATOR_DIR, 'generate.js')).href);
-    const built = generate.buildRequest({
+    const built = await generate.buildRequest({
       type: 'habit',
       audience: 'elders',
       tone: 'friendly',
