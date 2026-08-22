@@ -10,7 +10,8 @@
   },
   "scripts": {
     "generate": "node index.js generate",
-    "list": "node index.js generate --list"
+    "list": "node index.js generate --list",
+    "calendar:fill": "node scripts/fill-calendar.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",

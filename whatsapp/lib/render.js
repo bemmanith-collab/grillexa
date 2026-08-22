@@ -136,9 +136,10 @@ export function printList() {
 export function resolveOutFile(outPath, options) {
   if (outPath.toLowerCase().endsWith('.txt')) return outPath;
 
-  // The Indian date, so a post written at 2am IST files under today rather than
-  // yesterday, which is what UTC would call it.
-  const date = businessDateStr();
+  // The date the post is FOR, not the date it was written on. Festival posts are
+  // prepared days ahead, and a Deepavali post filed under the Tuesday somebody
+  // happened to write it is impossible to find again.
+  const date = options.date || businessDateStr();
   const parts = [options.type];
   if (options.slot) parts.push(options.slot);
   parts.push(options.audience, date);

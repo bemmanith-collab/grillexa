@@ -183,6 +183,31 @@ Practically, that means **an edit to `prompts/` changes the dashboard too**, and
 it on the next deploy rather than immediately. `--dry-run` is still the cheap way to check
 a prompt edit before it goes anywhere.
 
+## Festival dates
+
+Most Indian festivals are lunisolar — Vinayaka Chavithi is Bhadrapada Shukla Chaturthi,
+Deepavali the Amavasya of Kartika — so the dates are moon phases resolved against sunrise
+at a place, and they move every year. Nobody should be typing them in:
+
+```bash
+npm run calendar:fill              # fills this year into lib/calendar.json
+npm run calendar:fill -- --dry-run # show what it would change first
+npm run calendar:fill -- --year 2027
+```
+
+It reads Google's public Indian-holidays feed, which needs no key and no account, and
+writes the dates into the file. **Into the file, not fetched at generation time** — the
+dates stay reviewable in a diff, no post ever waits on a network call, and a feed outage
+cannot quietly change what the channel says. Run it once a year and read the diff before
+committing; these go to customers.
+
+Three are not in a national feed and stay manual: **Bathukamma**, **Bonalu** and
+**Karthika Pournami**. They are Telangana observances — a local panchangam has them.
+
+`--list` names anything still missing a date, because the failure is otherwise invisible:
+the day passes, an ordinary post goes out, and nobody notices until a customer asks why
+there was no Deepavali post.
+
 ## The everyday ingredient
 
 Left alone, every post reaches for the same few foods — banana, curd, sprouts — and the

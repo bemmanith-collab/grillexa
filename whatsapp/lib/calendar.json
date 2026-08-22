@@ -12,9 +12,10 @@
     "ordinary one.",
     "",
     "`note` is written for whoever generates the post. Say what the day is, what people",
-    "actually cook, and what to be careful about. It is read by the model, not by customers."
+    "actually cook, and what to be careful about. It is read by the model, not by customers.",
+    "",
+    "`aliases` are the names this festival goes by in Google's national holiday feed, which npm run calendar:fill reads. Regional festivals (Bathukamma, Bonalu) are not in that feed and stay manual."
   ],
-
   "occasions": [
     {
       "name": "New Year's Day",
@@ -64,96 +65,185 @@
       "recurring": "12-25",
       "note": "Greet it warmly and briefly. A minority of readers celebrate it and the rest have colleagues and neighbours who do, so write it as 'to those celebrating' rather than assuming. Cake and sweets are the food; treat them the way the Sunday post treats a cheat meal."
     },
-
     {
       "name": "Ugadi",
       "kind": "hindu",
-      "dates": {},
-      "note": "Telugu New Year, and the most local festival on this list after Sankranti. Ugadi pachadi is the whole idea — six tastes together, sweet and bitter and sour, standing for a year that will hold all of them. That is a genuinely good food post and needs no stretching. Raw mango, neem flower, jaggery, tamarind."
+      "dates": {
+        "2026": "2026-03-19"
+      },
+      "note": "Telugu New Year, and the most local festival on this list after Sankranti. Ugadi pachadi is the whole idea — six tastes together, sweet and bitter and sour, standing for a year that will hold all of them. That is a genuinely good food post and needs no stretching. Raw mango, neem flower, jaggery, tamarind.",
+      "aliases": [
+        "Ugadi",
+        "Gudi Padwa",
+        "Telugu New Year"
+      ]
     },
     {
       "name": "Maha Shivaratri",
       "kind": "hindu",
-      "dates": {},
-      "note": "Many readers fast all day and stay awake at night. Never tell anyone to break a fast, never call fasting unhealthy, and give no medical opinion on it. If food is mentioned at all, it is what people actually eat when they break it — fruit, milk, sabudana — and the useful advice is to break it gently rather than with a heavy meal."
+      "dates": {
+        "2026": "2026-02-15"
+      },
+      "note": "Many readers fast all day and stay awake at night. Never tell anyone to break a fast, never call fasting unhealthy, and give no medical opinion on it. If food is mentioned at all, it is what people actually eat when they break it — fruit, milk, sabudana — and the useful advice is to break it gently rather than with a heavy meal.",
+      "aliases": [
+        "Maha Shivaratri",
+        "Mahashivratri"
+      ]
     },
     {
       "name": "Holi",
       "kind": "hindu",
-      "dates": {},
-      "note": "Less central here than in the north but widely enjoyed. Colours, water, and being outside in the heat. Hydration is the honest angle. Food is gujiya, thandai, sweets."
+      "dates": {
+        "2026": "2026-03-03"
+      },
+      "note": "Less central here than in the north but widely enjoyed. Colours, water, and being outside in the heat. Hydration is the honest angle. Food is gujiya, thandai, sweets.",
+      "aliases": [
+        "Holi"
+      ]
     },
     {
       "name": "Sri Rama Navami",
       "kind": "hindu",
-      "dates": {},
-      "note": "Panakam and vada pappu are handed out at temples and homes — jaggery, cardamom, dry ginger, soaked moong dal. Both are seasonal cooling foods in peak summer, which makes the food angle write itself."
+      "dates": {
+        "2026": "2026-03-26"
+      },
+      "note": "Panakam and vada pappu are handed out at temples and homes — jaggery, cardamom, dry ginger, soaked moong dal. Both are seasonal cooling foods in peak summer, which makes the food angle write itself.",
+      "aliases": [
+        "Rama Navami",
+        "Sri Rama Navami"
+      ]
     },
     {
       "name": "Ramzan (Ramadan)",
       "kind": "muslim",
-      "dates": {},
-      "note": "A month, not a day, so fill both the first and last dates if you use it. Muslim readers fast from before dawn to sunset. Never tell anyone to break or keep a fast and give no medical opinion on fasting. If the post touches it at all, it is practical and respectful: what makes sehri last until evening, and breaking the fast gently — dates, fruit, water — rather than heavily. Do not schedule a post that centres on daytime eating as though everyone is eating."
+      "dates": {
+        "2026": "2026-02-19"
+      },
+      "note": "A month, not a day, so fill both the first and last dates if you use it. Muslim readers fast from before dawn to sunset. Never tell anyone to break or keep a fast and give no medical opinion on fasting. If the post touches it at all, it is practical and respectful: what makes sehri last until evening, and breaking the fast gently — dates, fruit, water — rather than heavily. Do not schedule a post that centres on daytime eating as though everyone is eating.",
+      "aliases": [
+        "Ramadan Start",
+        "Ramzan",
+        "Ramadan"
+      ]
     },
     {
       "name": "Eid al-Fitr (Ramzan Eid)",
       "kind": "muslim",
-      "dates": {},
-      "note": "A celebration at the end of the fasting month. Greet it warmly, as 'to those celebrating'. Sheer khurma, biryani, sweets. Treat the food the way the Sunday post treats a cheat meal — it is a feast day and nobody needs advice about eating less at it."
+      "dates": {
+        "2026": "2026-03-21"
+      },
+      "note": "A celebration at the end of the fasting month. Greet it warmly, as 'to those celebrating'. Sheer khurma, biryani, sweets. Treat the food the way the Sunday post treats a cheat meal — it is a feast day and nobody needs advice about eating less at it.",
+      "aliases": [
+        "Id-ul-Fitr",
+        "Eid al-Fitr",
+        "Ramzan Id",
+        "Eid-ul-Fitr"
+      ]
     },
     {
       "name": "Bakrid (Eid al-Adha)",
       "kind": "muslim",
-      "dates": {},
-      "note": "Greet warmly and briefly. Mutton is the food of the day. Keep any suggestion inside the channel's non-vegetarian list, and do not comment on the observance itself."
+      "dates": {
+        "2026": "2026-05-28"
+      },
+      "note": "Greet warmly and briefly. Mutton is the food of the day. Keep any suggestion inside the channel's non-vegetarian list, and do not comment on the observance itself.",
+      "aliases": [
+        "Bakrid",
+        "Eid al-Adha",
+        "Id-ul-Zuha",
+        "Eid ul-Adha"
+      ]
     },
     {
       "name": "Bonalu",
       "kind": "hindu",
       "dates": {},
-      "note": "Telangana, in the monsoon month of Ashada. Cooked rice with milk and jaggery carried to the temple. Local and worth marking for Telangana readers."
+      "note": "Telangana, in the monsoon month of Ashada. Cooked rice with milk and jaggery carried to the temple. Local and worth marking for Telangana readers.",
+      "aliases": [
+        "Bonalu"
+      ]
     },
     {
       "name": "Vinayaka Chavithi",
       "kind": "hindu",
-      "dates": {},
-      "note": "Big here, and lasts days. Undrallu, kudumulu, modak, laddu. Households are cooking steamed rice-flour sweets in quantity. Steamed rather than fried is the natural, non-preachy observation."
+      "dates": {
+        "2026": "2026-09-14"
+      },
+      "note": "Big here, and lasts days. Undrallu, kudumulu, modak, laddu. Households are cooking steamed rice-flour sweets in quantity. Steamed rather than fried is the natural, non-preachy observation.",
+      "aliases": [
+        "Ganesh Chaturthi",
+        "Vinayaka Chaturthi",
+        "Vinayaka Chavithi"
+      ]
     },
     {
       "name": "Bathukamma",
       "kind": "hindu",
       "dates": {},
-      "note": "Telangana, nine days, flowers and women's gatherings, ending with Saddula Bathukamma. The food is the five saddulu — curd rice, tamarind rice, lemon rice, coconut rice, sesame rice. A genuinely good food post."
+      "note": "Telangana, nine days, flowers and women's gatherings, ending with Saddula Bathukamma. The food is the five saddulu — curd rice, tamarind rice, lemon rice, coconut rice, sesame rice. A genuinely good food post.",
+      "aliases": [
+        "Bathukamma",
+        "Batukamma"
+      ]
     },
     {
       "name": "Dasara (Vijayadashami)",
       "kind": "hindu",
-      "dates": {},
-      "note": "Ten days of Navratri and then Dasara. Many readers eat only vegetarian food through Navratri, so do not suggest non-vegetarian food during it. Fasting is common — the fasting rules above apply."
+      "dates": {
+        "2026": "2026-10-20"
+      },
+      "note": "Ten days of Navratri and then Dasara. Many readers eat only vegetarian food through Navratri, so do not suggest non-vegetarian food during it. Fasting is common — the fasting rules above apply.",
+      "aliases": [
+        "Dussehra",
+        "Vijayadashami",
+        "Dasara"
+      ]
     },
     {
       "name": "Deepavali",
       "kind": "hindu",
-      "dates": {},
-      "note": "The biggest sweets-and-fried-snacks week of the year. Boxes of sweets arrive from everywhere and sit on the table for a fortnight. Do not tell anyone to eat fewer sweets at Deepavali — nobody will listen and it makes the channel a nag. The useful post is about the days after: what to eat when the house is full of sweets, and keeping one proper meal a day."
+      "dates": {
+        "2026": "2026-11-08"
+      },
+      "note": "The biggest sweets-and-fried-snacks week of the year. Boxes of sweets arrive from everywhere and sit on the table for a fortnight. Do not tell anyone to eat fewer sweets at Deepavali — nobody will listen and it makes the channel a nag. The useful post is about the days after: what to eat when the house is full of sweets, and keeping one proper meal a day.",
+      "aliases": [
+        "Diwali/Deepavali",
+        "Diwali",
+        "Deepavali"
+      ]
     },
     {
       "name": "Karthika Pournami",
       "kind": "hindu",
       "dates": {},
-      "note": "The month of Karthika Masam. Many readers eat only vegetarian food for the whole month and some fast on Mondays — so avoid non-vegetarian suggestions across it if you can, not only on the day."
+      "note": "The month of Karthika Masam. Many readers eat only vegetarian food for the whole month and some fast on Mondays — so avoid non-vegetarian suggestions across it if you can, not only on the day.",
+      "aliases": [
+        "Karthika Purnima",
+        "Kartik Purnima",
+        "Karthika Pournami"
+      ]
     },
     {
       "name": "Guru Nanak Jayanti",
       "kind": "sikh",
-      "dates": {},
-      "note": "A small number of readers, but greeting it costs nothing and excluding it is noticed. Short and warm."
+      "dates": {
+        "2026": "2026-11-24"
+      },
+      "note": "A small number of readers, but greeting it costs nothing and excluding it is noticed. Short and warm.",
+      "aliases": [
+        "Guru Nanak Jayanti"
+      ]
     },
     {
       "name": "Good Friday",
       "kind": "christian",
-      "dates": {},
-      "note": "A day of fasting and abstinence for observant Christians. Sombre rather than celebratory — do not greet it the way you would greet a festival. If in doubt, post an ordinary post that day."
+      "dates": {
+        "2026": "2026-04-03"
+      },
+      "note": "A day of fasting and abstinence for observant Christians. Sombre rather than celebratory — do not greet it the way you would greet a festival. If in doubt, post an ordinary post that day.",
+      "aliases": [
+        "Good Friday"
+      ]
     }
   ]
 }
