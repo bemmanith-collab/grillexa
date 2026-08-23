@@ -200,6 +200,21 @@ strawman, and each arrow line is something they can do tomorrow morning without 
 anything new. At least one swap should be about *how* they eat — sitting down, eating
 slowly, eating together — not only about what is on the plate.
 
+**The block must answer the post it is in.** This is where these go wrong: a post
+suggests raita beside the biryani and roasted sesame in the chutney, and then the swap
+block talks about skipping breakfast and watching television — advice that would fit any
+post on the channel, attached to this one. It reads as two posts stuck together, because
+that is what it is.
+
+Every swap has to come out of what this post is already about. If the post has a section
+of suggestions above, the swaps are *those suggestions, in swap form* — and in that case
+the suggestions section should be written as the swap block itself rather than the post
+carrying both. Saying each thing twice, once as advice and once as a swap, is worse than
+either alone.
+
+If you cannot write four swaps that belong to this particular post, write three. If you
+cannot write three, leave the block out.
+
 The post's own instructions say whether to include this block.
 
 ## Length

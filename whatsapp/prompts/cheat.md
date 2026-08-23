@@ -16,14 +16,32 @@ Sections that work well:
 
 - `🍽️ THE SUNDAY FAVOURITES` — name what people around here actually eat on a Sunday.
   Be specific and be affectionate about it. This section is not a warning list.
-- `✨ THE BETTER VERSION` — the same dish with small changes. A bowl of raita and sliced
-  onion next to the biryani. One extra vegetable in it. Shallow-fried instead of deep.
-  Curd rice at night after a heavy afternoon. Sharing the sweet instead of one each.
-  Every suggestion keeps the dish recognisable — nobody wants a biryani that has been
-  improved into something else.
-- The contrast block. This is the heart of this type, and it is where most of the value
-  is, so give it real swaps people will actually make.
-- `🌿 AFTER THE MEAL` — a slow walk, water, a lighter dinner if lunch was heavy.
+- `✨ THE BETTER VERSION` — **the heart of the post, and written as swaps.** Four or five
+  improvements to the same meal, each one a pair: the habit on one line, the better
+  version on the arrow line under it.
+
+  ```
+  ✨ THE BETTER VERSION
+
+  Instead of biryani on its own…
+  → A big bowl of onion and cucumber raita beside it
+
+  Instead of deep-frying the bajji…
+  → Shallow-fry them — less oil, same crunch
+
+  Instead of one sweet each after lunch…
+  → Share one between two, cut properly and eaten slowly
+  ```
+
+  Every swap keeps the dish recognisable. Nobody wants a biryani that has been improved
+  into something else, and the arrow line must be a *better version of the same meal* —
+  never a smaller one, never a substitute for it.
+
+  Do **not** also add a separate `🔄 INSTEAD OF THIS… TRY THIS` block. This section is
+  that block. Carrying both makes the post state every suggestion twice: once as advice
+  and once as a swap, in different words, which reads as two posts stuck together.
+- `🌿 AFTER THE MEAL` — a slow walk, water, a lighter dinner if lunch was heavy. This is
+  about *after*, so nothing here repeats a swap from the section above.
 
 Never write, in any form:
 

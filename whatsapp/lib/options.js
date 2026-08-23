@@ -31,7 +31,10 @@ export const TYPES = {
   cheat: {
     label: 'Sunday Cheat Meal',
     file: 'cheat.md',
-    contrast: 'always',
+    // THE BETTER VERSION is written as swaps and IS the contrast block on this
+    // type. A second one restated every suggestion in different words and read
+    // as two posts stuck together.
+    contrast: 'never',
     dated: true,
     everyday: true,
     // Always written for Sunday, whatever day it is generated on — these get drafted
