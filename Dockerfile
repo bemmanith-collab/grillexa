@@ -25,6 +25,10 @@ RUN npm ci --omit=dev
 COPY whatsapp/lib ./lib
 COPY whatsapp/prompts ./prompts
 COPY whatsapp/index.js ./index.js
+# The 30-day plan. Not used by the CLI, but backend/prisma/seedCalendar.js reads
+# it from here — the calendar is seeded by running that script against the
+# production database, so the file has to be in the image.
+COPY whatsapp/strategy ./strategy
 # examples/ is documentation and is deliberately left out.
 
 # ---------- Stage 2: frontend (React + Vite) ----------

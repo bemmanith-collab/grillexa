@@ -600,6 +600,12 @@ Themes run in weekly bands, so a week reads as a week rather than ninety unrelat
 cd backend && npm run seed:calendar
 ```
 
+The same script seeds production. It is **not** part of `npm start` — the calendar is a deliberate act, not something a restart should do — so it is run by hand after a deploy, and `whatsapp/strategy/` is copied into the image for exactly this:
+
+```bash
+flyctl ssh console -a grillexa -C "sh -c 'cd /app/backend && node prisma/seedCalendar.js'"
+```
+
 **The seed is safe to run repeatedly, and that is the point.** Rows are upserted on `(day, timeSlot)`, and `sent`, `sentAt` and `fullPost` are never written by it — a month of ticked-off posts and generated prose has to survive a typo fix in the strategy file, or nobody will dare run it again. The `update` clause lists the four planning fields by name rather than spreading the whole cell, which is what keeps that true if the schema grows a field later.
 
 **Nothing about the voice lives in the calendar.** *Generate Full Post* hands the cell's draft to the existing generator as its topic, so `prompts/brand.md`, the post format, the audience rules, the weather, the seasonal fruit and the everyday-ingredient rotation all apply exactly as they do to a hand-written post. The engagement question is appended to the topic as an instruction, because a post that ends on the quote leaves the reply prompt to be pasted on afterwards — which is how it gets forgotten.
