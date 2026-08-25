@@ -3003,3 +3003,189 @@ a.btn-danger {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* ---------------------------------------------------------------------------
+   The 30-day content calendar.
+
+   Ninety cells is a lot to put on a screen, so the grid is three across on a
+   desktop and one across on a phone — and on a phone it reads as a plain list
+   of ninety, in order, which is the right shape for scrolling through a month.
+   Nothing is truncated with an ellipsis: a theme that does not fit wraps, since
+   a half-shown theme is no use to whoever is deciding what to post.
+   --------------------------------------------------------------------------- */
+.wa-calendar {
+  margin-top: var(--space-2);
+}
+
+.wa-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.wa-cal-filters {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+/* The chosen filter has to be obvious at a glance — the grid can look identical
+   under two of them if the month is early. */
+.wa-cal-filters .btn-secondary.is-active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--deep);
+}
+
+.wa-cal-legend {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin: var(--space-2) 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.wa-cal-day {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-soft);
+}
+
+.wa-cal-daynum {
+  margin: 0 0 var(--space-1);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.wa-cal-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+}
+
+@media (min-width: 900px) {
+  .wa-cal-row {
+    grid-template-columns: repeat(var(--slots, 3), 1fr);
+  }
+}
+
+.wa-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+/* A posted cell recedes rather than disappearing. Whoever is running the month
+   still needs to read back what went out on day 9. */
+.wa-cell.is-sent {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+
+/* Holds the column when a filter hides one of the three, so the other two stay
+   under their own headings instead of sliding across. */
+.wa-cell-empty {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.wa-cell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.wa-cell-slot {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.wa-cell-sent {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  /* The tick is the one control pressed ninety times over a month, often on a
+     phone — give it a real target rather than a 13px checkbox. */
+  padding: 4px 6px;
+  margin: -4px -6px;
+}
+
+.wa-cell-sent input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.wa-cell-theme {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.wa-cell-q,
+.wa-cell-img {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.wa-cell-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.wa-cell-chev-open {
+  transform: rotate(180deg);
+}
+
+.wa-cell-body {
+  margin-top: 6px;
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--border-soft);
+}
+
+/* Shorter than the generator panel's, because here it opens inside a grid cell
+   and a 460px block would push the next day off the screen. */
+.wa-cell-body .wa-post {
+  max-height: 320px;
+  font-size: 14px;
+}
+
+/* Two jobs, two tabs. Plain buttons rather than a tab component: there are two
+   of them and there will not be a third. */
+.wa-tabs {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
+
+.wa-tabs .btn-secondary.is-active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--deep);
+}

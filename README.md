@@ -501,8 +501,10 @@ grillexa/
 │   │                 products.json, pantry.json (everyday ingredients,
 │   │                 one per post, so the channel stops repeating itself)
 │   ├── prompts/      brand.md, example-post.md, one file per content type
-│   └── examples/     hand-written reference posts. Documentation only —
-│                     never sent to the model, unlike prompts/
+│   ├── examples/     hand-written reference posts. Documentation only —
+│   │                 never sent to the model, unlike prompts/
+│   └── strategy/     30-day.json — the ninety planned calendar cells. Read by
+│                     backend/prisma/seedCalendar.js, not by the CLI
 ├── package.json      root launcher only — `npm run whatsapp`. Nothing is
 │                     installed at this level.
 ├── Dockerfile        production image for Fly (backend + frontend + Nginx)
@@ -572,6 +574,41 @@ It is a timer in the app rather than a cron service, which `min_machines_running
 **The clock is the business's, not the machine's.** The weekday in the headline, the meal a batch writes about, the season a seasonal post assumes and the date in output filenames are all computed in IST (`lib/clock.js`), using the same fixed +5:30 offset and the same reasoning as `frontend/src/utils/date.js` — India has never observed DST, so the offset is exact and needs no timezone data on the machine. A laptop on UTC otherwise prints `THURSDAY` on a Friday post every evening after 6:30, and a batch run at 8am in Vijayawada writes about dinner.
 
 **Some of the prompt is there for honesty, not style.** Product posts may state only the facts listed for that product in `lib/products.json`. The `diabetics` audience is told never to imply a food treats or controls diabetes and never to touch the subject of medication. `--type=customer` writes from a real detail supplied in `--topic`; with no topic it produces an unattributed post rather than inventing a name and an outcome, because a made-up testimonial published as genuine costs the channel more than any post gains it. The Sunday cheat-meal post is the one place the channel uses the words *cheat meal*, because that is what readers call it themselves; it makes the meal better rather than smaller, and nothing in it is ever earned, burnt off or made up for on Monday. Those are not decoration.
+
+## The 30-day content calendar
+
+The generator writes **one post, now**. The calendar is the other half: **ninety posts, planned** — thirty days at three fixed times, seeded from a file and ticked off as they go out.
+
+```
+Morning    7:30 AM   Habit & Energy
+Afternoon  1:00 PM   Food & Productivity
+Night      8:30 PM   Community & Mission
+```
+
+Themes run in weekly bands, so a week reads as a week rather than ninety unrelated posts:
+
+| | Morning | Afternoon | Night |
+|---|---|---|---|
+| **Week 1** (days 1–7) | Hydration & Morning Routine | Balanced Lunches | Local Store Awareness |
+| **Week 2** (days 8–14) | Breakfast & Energy | Snack Swaps | Community Building |
+| **Week 3** (days 15–21) | Fruits & Fibre | Productivity & Food | Healthier Living |
+| **Week 4** (days 22–30) | Consistency & Habits | Long-term Health | Growth & Mission |
+
+**`whatsapp/strategy/30-day.json` is the source of truth**, not the database. Each of the ninety cells carries a `theme`, a `draft` under a hundred words, an `engagementQuestion` and an `imageIdea`. Editing the file and re-running the seed updates that cell in place:
+
+```bash
+cd backend && npm run seed:calendar
+```
+
+**The seed is safe to run repeatedly, and that is the point.** Rows are upserted on `(day, timeSlot)`, and `sent`, `sentAt` and `fullPost` are never written by it — a month of ticked-off posts and generated prose has to survive a typo fix in the strategy file, or nobody will dare run it again. The `update` clause lists the four planning fields by name rather than spreading the whole cell, which is what keeps that true if the schema grows a field later.
+
+**Nothing about the voice lives in the calendar.** *Generate Full Post* hands the cell's draft to the existing generator as its topic, so `prompts/brand.md`, the post format, the audience rules, the weather, the seasonal fruit and the everyday-ingredient rotation all apply exactly as they do to a hand-written post. The engagement question is appended to the topic as an instruction, because a post that ends on the quote leaves the reply prompt to be pasted on afterwards — which is how it gets forgotten.
+
+The three times of day are the *channel's* vocabulary and the nine content types are the *generator's*; `SLOT_TO_TYPE` in `backend/src/routes/whatsapp.js` is the one place they meet. Morning becomes a Morning Tip, afternoon a Meal of the Day at lunch, night an Evening Wind-Down. A rename on either side breaks Generate Full Post for one time of day only and silently, so `test/whatsapp-calendar.js` checks the join against the generator's own registry.
+
+**A generated calendar post is also recorded in `WhatsAppPost`**, so it counts towards the suggestion engine's view of what the channel has actually shown people, alongside the hand-written ones.
+
+`WhatsAppContent` is deliberately **not** merged into `WhatsAppPost`. That table is history — what was written, when, by whom, with a rating against it. This one is a plan: it exists before anything is written and most of its rows sit empty of prose for weeks. Merging them would mean every history query had to filter out ninety rows of intent, and the plan would be rewritten every time somebody pressed Generate.
 
 ## Local development
 
@@ -714,6 +751,12 @@ Read from the environment or `.env`. One exception worth knowing: the business's
 | GET | `/api/quotes/today?audience=STAFF\|CUSTOMER` | Authenticated — the day's line. Only `STAFF` is still called, by the dashboard card; bills no longer ask for `CUSTOMER` |
 | GET/POST/PATCH/DELETE | `/api/quotes`, `/api/quotes/:id` | Admin — **orphaned.** The planner page that used these was removed; they work, nothing calls them |
 | GET | `/api/quotes/suggestions` | Admin — **orphaned**, same reason |
+| GET | `/api/whatsapp/options`, `/suggestions`, `/history` | Admin, Manager **and** on the `WHATSAPP_AUTHORS` allowlist |
+| POST | `/api/whatsapp/generate` | Same gate — rate-limited to 60/hour, every call bills a third party |
+| POST | `/api/whatsapp/history/:id` | Same gate — marks a post as actually posted, or rates it |
+| GET | `/api/whatsapp/calendar` | Same gate — all ninety planned cells in one response, generated posts included |
+| POST | `/api/whatsapp/calendar/:id/generate` | Same gate — polishes one cell's draft into a full post, same 60/hour limit |
+| PATCH | `/api/whatsapp/calendar/:id` | Same gate — `{ sent }` to tick a cell off, `{ fullPost }` to keep an edit |
 
 ## Tests
 
@@ -724,7 +767,7 @@ cd frontend && npm test
 
 No framework, no database, no browser — plain Node scripts that print `ok` lines.
 
-Backend, eleven files:
+Backend, seventeen files:
 
 - `test/crash-guards.js` — malformed request bodies return 400 rather than killing the process (an unhandled rejection in an async handler exits Node on Express 4), `todayStr` is ISO and round-trips, and public signup stays gone.
 - `test/stock-cascade.js` — the ledger cascade against an in-memory Prisma stub: back-dated writes re-chain later days, moving a document between dates leaves nothing behind, and reversing a bill restores stock exactly.
@@ -738,6 +781,8 @@ Backend, eleven files:
 - `test/offline-import.js` — the offline CSV import end to end without a database: the parser (quotes, CRLF, a UTF-8 BOM), every rule that stops a bad row reaching the ledger, and the write path against the same in-memory Prisma stub — a re-import creates no second bill and adds no second lot of wastage, a corrected file applies the difference, and wastage entered by hand is not swallowed.
 
 - `test/wastage.js` — the end-of-shift count's rules, which are mostly about what is *not* an error: the modal posts every product in the catalogue and most of them are blank, so a blank is skipped rather than written as a zero or rejected, an empty submission is caught as "nothing counted", a fractional count is refused before it can hit an Int column, the same product twice is refused rather than double-counted, and there is no upper bound because there is nothing to bound it against. The summary values at cost and keeps the reason split.
+
+- `test/whatsapp-calendar.js` — the 30-day calendar is ninety rows of copy in a JSON file plus one small map, and both rot quietly. The strategy file is checked for thirty contiguous days with all three times of day, nothing blank that the schema requires, no draft over a hundred words, and none of the words `prompts/brand.md` forbids outright — beef and pork among them, which lose readers permanently. Then the join: every time of day must still name a content type the generator actually has, and pass a meal only to a type that takes one.
 
 `test/fake-tx.js` is not a test: it is the in-memory Prisma stub `stock-cascade.js` and `offline-import.js` share, so there is one fake to keep honest rather than two that drift. It applies the schema's column defaults on insert the way Postgres does — a fake that returned a defaulted column as `undefined` turned the import's wastage delta into `NaN`, which looked exactly like a bug in the code.
 

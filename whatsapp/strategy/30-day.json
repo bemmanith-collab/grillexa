@@ -1,0 +1,763 @@
+{
+  "_readme": [
+    "The 30-day channel plan. Ninety cells: thirty days, three times of day each.",
+    "",
+    "This file is the source of truth for the calendar. `npm run seed:calendar` in backend/",
+    "reads it and upserts one WhatsAppContent row per cell, keyed on (day, timeSlot) — so",
+    "editing a theme here and running the seed again updates that cell in place. It never",
+    "touches `sent`, `sentAt` or `fullPost`: a month of ticked-off posts survives an edit.",
+    "",
+    "`draft` is the post itself, under 100 words, written by hand. It is also what the",
+    "generator is handed when somebody presses Generate Full Post — so it carries the idea",
+    "plainly. The brand voice lives in prompts/brand.md and is applied at generation time;",
+    "do not restate it here.",
+    "",
+    "`engagementQuestion` is the one line asking readers to reply. Keep it answerable in a",
+    "few words from a phone — 'which one is in your kitchen right now' beats 'what are your",
+    "thoughts on seasonal eating'.",
+    "",
+    "`imageIdea` is a note for whoever makes the picture, not a prompt for an image model.",
+    "",
+    "Both are optional in the schema and may be null. They are filled on every cell here.",
+    "",
+    "Day is a position in the plan, 1-30, not a date. The plan starts whenever it is started.",
+    "Days 29 and 30 continue the week 4 themes — a 30-day month is four weeks and two days,",
+    "and the two spare days close the month rather than opening a fifth theme."
+  ],
+
+  "slots": {
+    "morning": "7:30 AM — Habit & Energy. Read standing in the kitchen. One small thing to do today.",
+    "afternoon": "1:00 PM — Food & Productivity. Read in the gap after lunch. How food and the working day meet.",
+    "night": "8:30 PM — Community & Mission. Read after dinner. The street, the shop, the people. Never a new instruction this late."
+  },
+
+  "weeks": {
+    "1": { "days": "1-7", "morning": "Hydration & Morning Routine", "afternoon": "Balanced Lunches", "night": "Local Store Awareness" },
+    "2": { "days": "8-14", "morning": "Breakfast & Energy", "afternoon": "Snack Swaps", "night": "Community Building" },
+    "3": { "days": "15-21", "morning": "Fruits & Fibre", "afternoon": "Productivity & Food", "night": "Healthier Living" },
+    "4": { "days": "22-30", "morning": "Consistency & Habits", "afternoon": "Long-term Health", "night": "Growth & Mission" }
+  },
+
+  "days": [
+    {
+      "day": 1,
+      "week": 1,
+      "posts": {
+        "morning": {
+          "theme": "Water before tea",
+          "draft": "One glass of water before the first tea of the day.\n\nNothing else changes. No timing, no measuring, nothing to buy.\n\nMost of us wake up with eight hours of nothing behind us and reach straight for something hot and sweet. The water first just puts back what the night took.\n\nYou will notice it by the third morning.",
+          "engagementQuestion": "Tea first or water first in your house?",
+          "imageIdea": "A steel tumbler of water beside a glass of tea, early morning light."
+        },
+        "afternoon": {
+          "theme": "The plate that does not put you to sleep",
+          "draft": "Three o'clock heaviness usually starts at one o'clock.\n\nA plate that is mostly rice will do it every time. The fix is not less food — it is a little more of everything else. Dal, one vegetable, curd.\n\nSame quantity, differently divided. You will still be full at four, just awake.",
+          "engagementQuestion": "What does your lunch plate look like most days?",
+          "imageIdea": "A thali from above, rice noticeably smaller than the other bowls."
+        },
+        "night": {
+          "theme": "The shop that knows your name",
+          "draft": "The kirana at the end of your street has been there longer than most things in your life.\n\nThey know which brand of oil you buy. They keep the good bananas back. They give credit in a bad month and never mention it again.\n\nThat is not a shop. That is a neighbour who happens to sell things.",
+          "engagementQuestion": "How long has your kirana been on your street?",
+          "imageIdea": "A small neighbourhood shopfront at night, shutter half down, one light on."
+        }
+      }
+    },
+    {
+      "day": 2,
+      "week": 1,
+      "posts": {
+        "morning": {
+          "theme": "Water through the day, not all at once",
+          "draft": "Most people drink nothing until four, then a litre in one go.\n\nA glass with each meal is easier to remember than a target, and easier than carrying a bottle around.\n\nThree meals, three glasses. You are most of the way there without counting anything.",
+          "engagementQuestion": "When do you actually drink water?",
+          "imageIdea": "A filled tumbler set beside a lunch plate, as part of the place setting."
+        },
+        "afternoon": {
+          "theme": "Vegetable first, rice after",
+          "draft": "Same plate, same food, nothing taken away.\n\nStart with the vegetable and the dal, then the rice. You fill up on the part that fills you up, and the rice sorts itself out.\n\nNo measuring, no smaller plate, no decision to make halfway through the meal.",
+          "engagementQuestion": "What do you start with on your plate?",
+          "imageIdea": "A hand reaching past the rice towards the vegetable bowl."
+        },
+        "night": {
+          "theme": "Where your food actually comes from",
+          "draft": "The sprouts on your plate were soaked by somebody two streets away. The bananas came off a lorry at four in the morning.\n\nFood has a route, and most of it runs through people you could recognise.\n\nWorth knowing, on a full stomach, at the end of the day.",
+          "engagementQuestion": "Do you know who grows or sells what you ate today?",
+          "imageIdea": "Crates being unloaded from a lorry in the dark, early morning."
+        }
+      }
+    },
+    {
+      "day": 3,
+      "week": 1,
+      "posts": {
+        "morning": {
+          "theme": "The first ten minutes",
+          "draft": "Before the phone.\n\nTen minutes at the start of the day that belong to you — the water, the window open, the kitchen quiet before anyone else is up.\n\nIt is not a routine and it is not discipline. It is just ten minutes that nobody else has asked for yet.",
+          "engagementQuestion": "What is the first thing you do when you wake up?",
+          "imageIdea": "A window being pushed open from inside, early light coming in."
+        },
+        "afternoon": {
+          "theme": "Lunch you did not have to think about",
+          "draft": "The best lunch on a working day is the one that was decided last night.\n\nA little extra dal at dinner, and the box is packed before you sleep. Nobody makes a good decision at six in the morning.\n\nSame food, one less thing to work out while you are already late.",
+          "engagementQuestion": "Is your tiffin packed the night before or the same morning?",
+          "imageIdea": "A packed tiffin box on a counter beside house keys."
+        },
+        "night": {
+          "theme": "Buying small, buying often",
+          "draft": "The local shop lets you buy fifty rupees of something because that is what you need today.\n\nNo minimum, no bulk pack, nothing thrown away at the end of the week.\n\nThat is not a limitation. For most households it is exactly the right size.",
+          "engagementQuestion": "How often do you go to the shop — daily or weekly?",
+          "imageIdea": "A small cloth bag with a handful of vegetables in it."
+        }
+      }
+    },
+    {
+      "day": 4,
+      "week": 1,
+      "posts": {
+        "morning": {
+          "theme": "Buttermilk in the morning heat",
+          "draft": "Curd, water, salt, a curry leaf if there is one in the house.\n\nIt costs almost nothing, it is already in the fridge, and it does more through a hot morning than anything that comes in a bottle.\n\nMake a jug in the morning and it is gone by evening.",
+          "engagementQuestion": "Buttermilk or a bottle, on a hot day?",
+          "imageIdea": "A jug of buttermilk with a curry leaf floating on top."
+        },
+        "afternoon": {
+          "theme": "Eat away from your desk",
+          "draft": "Lunch eaten in front of a screen is finished in six minutes and forgotten by two.\n\nYou will be hungry again at four, and you will not know why.\n\nTwenty minutes somewhere else. That is the whole suggestion — not different food, a different chair.",
+          "engagementQuestion": "Where do you eat lunch on a working day?",
+          "imageIdea": "A lunch box open on a low wall outside, away from any desk."
+        },
+        "night": {
+          "theme": "The people behind the counter",
+          "draft": "Somebody opened that shop at six thirty this morning and will close it at ten tonight.\n\nSeven days most weeks.\n\nNext time you are there, ask how the day was. It costs nothing and it is the difference between a transaction and a street where people know each other.",
+          "engagementQuestion": "Do you know your shopkeeper's name?",
+          "imageIdea": "A shopkeeper mid-conversation with a customer, both smiling."
+        }
+      }
+    },
+    {
+      "day": 5,
+      "week": 1,
+      "posts": {
+        "morning": {
+          "theme": "Soak it tonight, drink it tomorrow",
+          "draft": "A spoon of methi or a few soaked almonds, put in water before you sleep.\n\nIn the morning it is already done. No cooking, no decision, no time taken from a morning that has none to give.\n\nThe easiest habit is the one you finished yesterday.",
+          "engagementQuestion": "What is soaking in your kitchen tonight?",
+          "imageIdea": "A small steel bowl of water with almonds in it, on a dark counter."
+        },
+        "afternoon": {
+          "theme": "The afternoon slump has a cause",
+          "draft": "It is usually one of three things: lunch was very heavy, lunch was mostly rice, or there was no lunch at all.\n\nAll three are fixable and none of them need a supplement.\n\nA balanced plate at one, and four o'clock stops being the hardest hour of the day.",
+          "engagementQuestion": "What time does your energy drop?",
+          "imageIdea": "An office clock at four, desk in soft focus behind it."
+        },
+        "night": {
+          "theme": "A street that feeds itself",
+          "draft": "The vegetable cart, the milk booth, the kirana, the fruit stall at the corner.\n\nFour or five people, and between them your whole week's food, within a two-minute walk.\n\nMost cities lost this. Ours still has it. Worth noticing before it goes.",
+          "engagementQuestion": "How many food shops are within walking distance of your house?",
+          "imageIdea": "A short street at dusk with two or three small stalls lit up."
+        }
+      }
+    },
+    {
+      "day": 6,
+      "week": 1,
+      "posts": {
+        "morning": {
+          "theme": "Saturday, and no alarm",
+          "draft": "The one morning nobody is rushing.\n\nSo the water, the ten minutes, the sitting down to eat — all the things that are hard on a Tuesday are easy today.\n\nDo them once properly. It shows you what you are aiming at the rest of the week.",
+          "engagementQuestion": "What is different about your Saturday morning?",
+          "imageIdea": "A breakfast table with the light well up the wall, nobody hurrying."
+        },
+        "afternoon": {
+          "theme": "Cook once, eat twice",
+          "draft": "Make a little extra at lunch on a Saturday.\n\nTonight it is already dinner. Tomorrow it is already a tiffin box.\n\nThe second meal takes no cooking at all, and the day it saves is the one where you had no time to cook anyway.",
+          "engagementQuestion": "Do you cook once a day or twice?",
+          "imageIdea": "A large vessel of dal next to a smaller serving bowl."
+        },
+        "night": {
+          "theme": "Market day",
+          "draft": "Buy what is piled highest and costs least this week.\n\nThat is what seasonal means, and it needs no chart and no app. The pile tells you. The price tells you.\n\nThe cheapest vegetable at the market this week is also the freshest one there.",
+          "engagementQuestion": "What was cheapest at your market today?",
+          "imageIdea": "A vegetable cart with one item heaped clearly higher than the rest."
+        }
+      }
+    },
+    {
+      "day": 7,
+      "week": 1,
+      "posts": {
+        "morning": {
+          "theme": "One week of water",
+          "draft": "Seven days.\n\nYou will not have done it every morning, and that was never the point. If it happened four times out of seven, it is now a thing you sometimes do — which is how every habit starts.\n\nSame again next week. Nothing added.",
+          "engagementQuestion": "How many mornings did you manage it?",
+          "imageIdea": "A wall calendar with a few days ticked, not all of them."
+        },
+        "afternoon": {
+          "theme": "Sunday lunch, and nothing to balance",
+          "draft": "The big meal of the week, and probably guests.\n\nEat it properly. Go back for more if you want to. Nothing needs working off afterwards and nobody owes anybody a meal.\n\nA balanced week has a Sunday in it. That is what makes it a week and not a diet.",
+          "engagementQuestion": "What is the Sunday meal at your house?",
+          "imageIdea": "A serving dish at the centre of a table, spoons in it, plates around."
+        },
+        "night": {
+          "theme": "Why we sell through your shop",
+          "draft": "We could have gone straight to your door. We did not.\n\nThe sprouts and the fruit bowls reach you through the same shop your family has used for twenty years, because that shop is what holds a street together.\n\nOne more reason to walk down and buy from them.",
+          "engagementQuestion": "Which shop do you buy from most?",
+          "imageIdea": "A shelf in a small kirana with fresh produce among the packets."
+        }
+      }
+    },
+    {
+      "day": 8,
+      "week": 2,
+      "posts": {
+        "morning": {
+          "theme": "Breakfast is not optional for everyone",
+          "draft": "Skipping it suits some people. If you are up at five and out of the house by seven, it does not suit you.\n\nYou are not saving anything — you are borrowing it from eleven o'clock, and paying it back with interest.\n\nSomething small beats nothing at all.",
+          "engagementQuestion": "Do you eat before you leave, or after you reach?",
+          "imageIdea": "A steel tiffin box, half open, balanced on a two-wheeler seat."
+        },
+        "afternoon": {
+          "theme": "Groundnuts in your pocket",
+          "draft": "A small fistful of roasted groundnuts, kept where you will find them at eleven.\n\nThat is the hour that undoes most days — the one where whatever is nearest wins.\n\nCheap, already in the house, and it does not need a fridge or a plate.",
+          "engagementQuestion": "What do you reach for at eleven o'clock?",
+          "imageIdea": "Roasted groundnuts in a twist of newspaper."
+        },
+        "night": {
+          "theme": "Cooking for one is the hardest cooking",
+          "draft": "Somebody on your street eats alone. A student, a widow, someone whose family is in another city.\n\nCooking for one person is more work per plate than cooking for six, so most of them stop trying.\n\nIf you made extra tonight, that is a bowl and a two-minute walk.",
+          "engagementQuestion": "Who lives alone on your street?",
+          "imageIdea": "A covered bowl being handed across a low compound wall."
+        }
+      }
+    },
+    {
+      "day": 9,
+      "week": 2,
+      "posts": {
+        "morning": {
+          "theme": "Breakfast that is already made",
+          "draft": "Soaked poha. Curd rice. Last night's chapati with a banana.\n\nNone of it needs cooking at six in the morning, and all of it is real food.\n\nThe best breakfast is not the healthiest one on paper. It is the one that actually happens on a Tuesday.",
+          "engagementQuestion": "What is your no-cooking breakfast?",
+          "imageIdea": "Three small plates side by side: poha, curd rice, chapati with banana."
+        },
+        "afternoon": {
+          "theme": "Instead of the biscuit packet",
+          "draft": "Four o'clock, and the packet is what is nearest.\n\nInstead of biscuits with tea → a handful of roasted chana\nInstead of a second tea → buttermilk\nInstead of the fried packet → a banana, or whatever fruit is on the counter\n\nNone of it costs more. All of it is already in most kitchens.",
+          "engagementQuestion": "What is your four o'clock snack?",
+          "imageIdea": "A bowl of roasted chana beside a glass of tea."
+        },
+        "night": {
+          "theme": "The WhatsApp group nobody uses",
+          "draft": "Every street has one, full of forwards.\n\nIt is also the fastest way to find out who has a spare cylinder, whose child needs a lift, or who is unwell and has not cooked in three days.\n\nSame group. Different use.",
+          "engagementQuestion": "Is your street group useful or just forwards?",
+          "imageIdea": "A phone screen showing a neighbourhood group, held in one hand."
+        }
+      }
+    },
+    {
+      "day": 10,
+      "week": 2,
+      "posts": {
+        "morning": {
+          "theme": "Sprouts without the ceremony",
+          "draft": "Sprouts do not need a bowl of their own and a serious expression.\n\nA handful stirred into the upma. Scattered on the poha. Beside the idli instead of a second one.\n\nSame plate, more in it, no extra cooking. That is the only way a new food survives past the first week.",
+          "engagementQuestion": "Where would a handful of sprouts fit on your plate?",
+          "imageIdea": "Poha with sprouts stirred through, not arranged on top."
+        },
+        "afternoon": {
+          "theme": "The fried thing at five",
+          "draft": "Nobody is giving up mirchi bajji, and nobody should have to.\n\nBut it goes better after something than instead of something. Eaten on an empty stomach at five, it is the whole evening meal by accident.\n\nHave it. Have it after a fruit.",
+          "engagementQuestion": "What is the evening snack near your office?",
+          "imageIdea": "A paper plate of hot bajjis at a roadside stall."
+        },
+        "night": {
+          "theme": "Teach one thing this week",
+          "draft": "Whoever cooks in your house knows things that were never written down.\n\nHow much salt is a handful. When the tempering is ready. Which vegetable to buy on a Thursday.\n\nAsk for one of them this week. It will not be there forever.",
+          "engagementQuestion": "What did you learn from whoever taught you to cook?",
+          "imageIdea": "Two pairs of hands over one cutting board, clearly different ages."
+        }
+      }
+    },
+    {
+      "day": 11,
+      "week": 2,
+      "posts": {
+        "morning": {
+          "theme": "Ragi, before anyone called it anything",
+          "draft": "Ragi java in the morning is what people here drank long before it appeared on any list.\n\nIt is in every kirana, it costs very little, and it keeps you going until lunch without sitting heavy.\n\nOld food. Still works.",
+          "engagementQuestion": "Did ragi feature in your grandmother's kitchen?",
+          "imageIdea": "A glass of ragi java, thick, spoon standing in it."
+        },
+        "afternoon": {
+          "theme": "Sesame by the stove",
+          "draft": "Dry-roast a cup of sesame once, keep it in a jar within reach of the stove.\n\nA spoon over rice. Into the chutney. On curd.\n\nIt lasts a month, needs no recipe, and turns an ordinary plate into something with a bit more in it. Most kitchens already have the jar.",
+          "engagementQuestion": "Is there sesame in your kitchen right now?",
+          "imageIdea": "Sesame seeds toasting in a flat pan, caught mid-toss."
+        },
+        "night": {
+          "theme": "Eating at the same time, once",
+          "draft": "Most households eat in shifts now — whoever gets home, whenever they get home.\n\nOnce this week, everybody at once. Whichever meal is easiest to arrange.\n\nThe food matters much less than the timing. It is twenty minutes and it is the part people remember.",
+          "engagementQuestion": "Does your family eat together or in shifts?",
+          "imageIdea": "A table set for four with all four places filled."
+        }
+      }
+    },
+    {
+      "day": 12,
+      "week": 2,
+      "posts": {
+        "morning": {
+          "theme": "Sit down for the first meal",
+          "draft": "Not longer. Just sitting.\n\nBreakfast standing at the counter is over in ninety seconds, and you are hungry again by ten without ever having noticed you ate.\n\nSame food, on a chair. It is the cheapest change on this whole list.",
+          "engagementQuestion": "Standing or sitting for breakfast this morning?",
+          "imageIdea": "A chair pulled out at a small table, a plate already on it."
+        },
+        "afternoon": {
+          "theme": "Curd instead of the cold drink",
+          "draft": "A bottle of something cold at three is forty rupees and gone in a minute.\n\nA cup of curd, or buttermilk from home, costs almost nothing and does not leave you flat twenty minutes later.\n\nSame relief from the heat. Different afternoon.",
+          "engagementQuestion": "What do you drink at three in the afternoon?",
+          "imageIdea": "A small cup of curd next to an unopened cold drink bottle."
+        },
+        "night": {
+          "theme": "The festival street",
+          "draft": "The best thing about any festival here is not in anybody's house. It is on the street between them.\n\nThe sweets that get carried across, the plate that comes back never empty, the neighbours who are suddenly in your kitchen.\n\nTo everyone celebrating anything this week — enjoy it properly.",
+          "engagementQuestion": "What gets carried between houses on your street?",
+          "imageIdea": "A plate of sweets covered with a cloth, being carried outdoors."
+        }
+      }
+    },
+    {
+      "day": 13,
+      "week": 2,
+      "posts": {
+        "morning": {
+          "theme": "The banana nobody eats",
+          "draft": "There is usually one going spotty on the counter.\n\nThat is the one worth eating rather than throwing — it is sweeter, softer and easier on the stomach than the green one next to it.\n\nMashed with curd, or straight, on the way out of the door.",
+          "engagementQuestion": "How many bananas are on your counter right now?",
+          "imageIdea": "A small bunch of bananas, one of them clearly spotted."
+        },
+        "afternoon": {
+          "theme": "Snacks that survive a desk drawer",
+          "draft": "Roasted chana. Groundnuts. A small jar of murmura. Dry fruit if it is in the house.\n\nThings that do not need a fridge, do not spill, and are there at four when nothing else is.\n\nFill the drawer on Sunday and the week takes care of itself.",
+          "engagementQuestion": "What is in your desk drawer right now?",
+          "imageIdea": "A desk drawer open with a couple of small jars in it."
+        },
+        "night": {
+          "theme": "Somebody cooked this",
+          "draft": "Every plate that reaches a table was somebody's afternoon.\n\nUsually the same person, most days, for years, and usually without being thanked for any particular one of them.\n\nSay it tonight. Out loud, to whoever it was. That is the whole post.",
+          "engagementQuestion": "Who cooked your dinner tonight?",
+          "imageIdea": "A kitchen just after cooking — used vessels, nobody in frame yet."
+        }
+      }
+    },
+    {
+      "day": 14,
+      "week": 2,
+      "posts": {
+        "morning": {
+          "theme": "Two weeks in",
+          "draft": "Fourteen days of small things.\n\nYou will not have done all of them, and nobody expected you to. But something is different — you drink the water, or you sit down, or you eat before you leave.\n\nName the one that stuck. That one is yours now.",
+          "engagementQuestion": "Which one actually stuck?",
+          "imageIdea": "A worn kitchen item that is clearly used every single day."
+        },
+        "afternoon": {
+          "theme": "The Sunday plate, honestly",
+          "draft": "Bigger than usual, and that is fine.\n\nThe useful thing is not eating less of it. It is what happens on Monday — whether the week starts again, or whether Sunday turns into four days of finishing things up.\n\nEat it. Then let it be Sunday's.",
+          "engagementQuestion": "What happens to Sunday's leftovers at your house?",
+          "imageIdea": "Covered vessels on a counter after a large meal."
+        },
+        "night": {
+          "theme": "Two weeks of your street",
+          "draft": "The shop, the cart, the neighbour who lives alone, the group full of forwards.\n\nNone of it is about food really. It is about the fact that a street where people know each other eats better than one where they do not.\n\nThat is not sentiment. It is just true.",
+          "engagementQuestion": "Who on your street would you call at midnight?",
+          "imageIdea": "A residential street at night, several windows lit."
+        }
+      }
+    },
+    {
+      "day": 15,
+      "week": 3,
+      "posts": {
+        "morning": {
+          "theme": "Fruit where people walk past",
+          "draft": "Fruit in the fridge is fruit nobody eats.\n\nA bowl of it on the table by the door gets finished by Thursday. Same fruit, same money, different shelf.\n\nThis is most of what changes whether a household eats fruit — not intention, position.",
+          "engagementQuestion": "Where does the fruit sit in your house?",
+          "imageIdea": "A full fruit bowl on a table beside a doorway."
+        },
+        "afternoon": {
+          "theme": "Fibre is what stops four o'clock",
+          "draft": "The reason a plate of only rice leaves you hungry at four is that there was nothing in it that takes time to digest.\n\nDal, vegetables, the skin left on the fruit, a spoon of sprouts.\n\nYou do not need to know the word. You just need something on the plate that is not white.",
+          "engagementQuestion": "What is the most colourful thing on your lunch plate?",
+          "imageIdea": "A plate photographed from above, colours clearly varied."
+        },
+        "night": {
+          "theme": "Healthier is not a separate kitchen",
+          "draft": "Nobody needs a different set of vessels or a shelf of things with English names.\n\nIt is the same dal, the same rice, the same shop. A little more of what was already there, a little less of what was crowding it out.\n\nNo new kitchen required.",
+          "engagementQuestion": "What is the healthiest thing already in your kitchen?",
+          "imageIdea": "An ordinary Indian kitchen shelf, nothing special on it."
+        }
+      }
+    },
+    {
+      "day": 16,
+      "week": 3,
+      "posts": {
+        "morning": {
+          "theme": "Eat the peel",
+          "draft": "Apple, guava, cucumber, ridge gourd.\n\nMost of the fibre is in the part that gets peeled off and thrown, and peeling takes time you did not have anyway.\n\nWash it properly and eat it whole. Less work, more food.",
+          "engagementQuestion": "Which fruit do you always peel?",
+          "imageIdea": "A guava cut in half, skin on, on a steel plate."
+        },
+        "afternoon": {
+          "theme": "The meeting that ate your lunch",
+          "draft": "It happens to everybody. One o'clock becomes three, and by then you are past hungry and into a headache.\n\nKeep something in the bag for exactly this. A banana, a packet of chana.\n\nNot instead of lunch. Just so the day does not fall apart while you wait for it.",
+          "engagementQuestion": "How often does your lunch get pushed to three?",
+          "imageIdea": "A banana on a table next to a notebook and a phone."
+        },
+        "night": {
+          "theme": "Warm beats cold at night",
+          "draft": "A cooked vegetable sits easier than a raw salad after dark.\n\nNothing wrong with salad — just not at ten o'clock, when your body has largely finished for the day.\n\nYou do not feel the difference tonight. You feel it tomorrow morning.",
+          "engagementQuestion": "What was on your plate tonight?",
+          "imageIdea": "A steaming bowl of vegetable khichdi, spoon resting in it."
+        }
+      }
+    },
+    {
+      "day": 17,
+      "week": 3,
+      "posts": {
+        "morning": {
+          "theme": "Whole fruit, not juice",
+          "draft": "Three oranges make one glass of juice, and the part that was doing the work stays in the strainer.\n\nOne orange, eaten, does more and costs a third as much.\n\nJuice is a nice thing sometimes. It is not the same thing as fruit.",
+          "engagementQuestion": "Juice or the whole fruit at your house?",
+          "imageIdea": "Three oranges beside one small glass of juice."
+        },
+        "afternoon": {
+          "theme": "Wednesday, and everything is flat",
+          "draft": "Midweek is where good intentions quietly collapse — not on Monday, when everyone is trying.\n\nEnergy is gone, the cooking gets shortcut, and lunch becomes whatever is fastest.\n\nOne vegetable on the plate today. That is the whole ask. The week survives on Wednesdays.",
+          "engagementQuestion": "What is your Wednesday lunch usually?",
+          "imageIdea": "A canteen counter at midday, unglamorous and honest."
+        },
+        "night": {
+          "theme": "Nobody is trying to fix you",
+          "draft": "This channel has never told anyone they are eating badly, and it is not going to start.\n\nMost people already know what would help. What they do not have is time, energy, or a reason to bother on a Wednesday.\n\nSo: one small thing, when it suits you. That is all this ever was.",
+          "engagementQuestion": "What is the one thing you already know you would like to change?",
+          "imageIdea": "A quiet kitchen at night, lamp on, nothing dramatic happening."
+        }
+      }
+    },
+    {
+      "day": 18,
+      "week": 3,
+      "posts": {
+        "morning": {
+          "theme": "The fruit that is cheap this week",
+          "draft": "Whatever is heaped on the cart is what to buy.\n\nIt is in season, it travelled the shortest distance, it costs the least and it tastes the most like itself.\n\nThat is four good reasons, and you did not have to look anything up to find them.",
+          "engagementQuestion": "What fruit is cheapest near you this week?",
+          "imageIdea": "A fruit cart piled high with one seasonal fruit."
+        },
+        "afternoon": {
+          "theme": "A smaller plate, not less willpower",
+          "draft": "Deciding before the meal is easier than deciding halfway through it.\n\nServe a little less, and go back if you want more. Almost nobody does — not because they resisted, but because they were full and had already stopped.\n\nThe decision moves to where it is easy.",
+          "engagementQuestion": "Small plate or big plate at your house?",
+          "imageIdea": "Two plates side by side, one noticeably smaller than the other."
+        },
+        "night": {
+          "theme": "Ten minutes on your own",
+          "draft": "Family time is good. So is time alone, and almost nobody says the second half out loud.\n\nTea on the terrace. Ten minutes with nobody asking you anything.\n\nThat is not selfishness and it never was. Take it before the house wakes up or after it goes quiet.",
+          "engagementQuestion": "Where do you go for ten minutes alone?",
+          "imageIdea": "A single chair on a terrace at dusk, one cup beside it."
+        }
+      }
+    },
+    {
+      "day": 19,
+      "week": 3,
+      "posts": {
+        "morning": {
+          "theme": "A fruit before you leave",
+          "draft": "Not instead of breakfast. Before it, or with it.\n\nIt takes no cooking, no plate and no decision, and it is the easiest fibre anybody gets all day.\n\nWhatever is on the counter. Whatever was cheapest this week. It does not have to be interesting.",
+          "engagementQuestion": "What fruit is in your house right now?",
+          "imageIdea": "A hand taking a banana from a bowl on the way out."
+        },
+        "afternoon": {
+          "theme": "Put the phone down for one meal",
+          "draft": "One meal a day, phone face down on the table.\n\nYou taste the food, you notice when you are full, and you stop sooner without deciding to.\n\nLunch is the hardest one. Breakfast is the easiest place to start.",
+          "engagementQuestion": "Which meal could go phone-free?",
+          "imageIdea": "A phone face down on a table beside a plate."
+        },
+        "night": {
+          "theme": "Friday, and nothing to fix",
+          "draft": "The week is done. People stay up later, the house is louder, and somebody probably ordered something in.\n\nNo advice tonight.\n\nEat what is cooked, sit with whoever is home, and let it be Friday.",
+          "engagementQuestion": "What does Friday night sound like at yours?",
+          "imageIdea": "A lit kitchen at night seen from the street outside."
+        }
+      }
+    },
+    {
+      "day": 20,
+      "week": 3,
+      "posts": {
+        "morning": {
+          "theme": "Two fruits, two colours",
+          "draft": "Not a rule. Just an easy way to stop eating the same banana every day for a year.\n\nWhatever is cheap, and something a different colour next to it.\n\nVariety without a chart, a plan, or a single thing you have to remember.",
+          "engagementQuestion": "What two fruits are in your house today?",
+          "imageIdea": "Two clearly different fruits together in one bowl."
+        },
+        "afternoon": {
+          "theme": "Saturday lunch has time in it",
+          "draft": "The one meal of the week nobody has to rush.\n\nSo eat it slowly, at a table, with other people, and let it take an hour.\n\nEverything this channel has suggested about how to eat is easy exactly once a week. Today is that day.",
+          "engagementQuestion": "How long does Saturday lunch take at your house?",
+          "imageIdea": "A table mid-meal, plates half full, people still talking."
+        },
+        "night": {
+          "theme": "Health is not a project",
+          "draft": "It has no start date, no end date and nothing to complete.\n\nIt is a hundred small ordinary things — the water, the chair, the vegetable, the walk to the shop — repeated for years without anyone noticing.\n\nNothing to sign up for. Nothing to finish.",
+          "engagementQuestion": "What small thing have you done for years without thinking?",
+          "imageIdea": "A path worn into the ground by daily use."
+        }
+      }
+    },
+    {
+      "day": 21,
+      "week": 3,
+      "posts": {
+        "morning": {
+          "theme": "Three weeks",
+          "draft": "Twenty-one days.\n\nOne or two of these are now just how you do things. You are not trying any more — you have stopped noticing, which is the actual finish line.\n\nEverything else was optional and always was.",
+          "engagementQuestion": "What do you now do without thinking?",
+          "imageIdea": "A tumbler left in the same spot on a counter, clearly habitual."
+        },
+        "afternoon": {
+          "theme": "Sunday, and no counting",
+          "draft": "The big meal, the guests, the second helping.\n\nNothing to balance, nothing to earn, nothing to make up for tomorrow.\n\nA week that has a Sunday in it is a week that lasts. One that does not, does not.",
+          "engagementQuestion": "How many at your table today?",
+          "imageIdea": "Serving dishes crowded at the centre of a full table."
+        },
+        "night": {
+          "theme": "The flat feeling on Sunday evening",
+          "draft": "Everybody gets it. Monday coming into view, the house going quiet.\n\nSomething light tonight, and ten minutes on the steps with whoever is around.\n\nNot a plan for the week. Just the ten minutes.",
+          "engagementQuestion": "Where do you sit on a Sunday evening?",
+          "imageIdea": "A doorstep at dusk with two cups of tea on it."
+        }
+      }
+    },
+    {
+      "day": 22,
+      "week": 4,
+      "posts": {
+        "morning": {
+          "theme": "Four times out of seven is a habit",
+          "draft": "Nobody does anything every day. Not the people who look like they do.\n\nFour mornings out of seven, kept for a year, beats seven out of seven kept for eleven days and then abandoned.\n\nAim lower and keep going. That is the entire method.",
+          "engagementQuestion": "How many days a week is realistic for you?",
+          "imageIdea": "A calendar with an uneven scatter of ticks across a month."
+        },
+        "afternoon": {
+          "theme": "The plate you will still be eating in ten years",
+          "draft": "Dal, rice, a vegetable, curd, whatever fruit was cheap.\n\nIt is not exciting and it was never supposed to be. It is what people here have eaten for a very long time, and it holds up.\n\nAnything you cannot imagine eating in ten years is not worth starting this week.",
+          "engagementQuestion": "What did your grandparents eat most days?",
+          "imageIdea": "A simple, complete thali — nothing unusual on it."
+        },
+        "night": {
+          "theme": "Where this started",
+          "draft": "Grillo began because getting fresh sprouts and fruit in your own neighbourhood was harder than it should have been.\n\nNot a mission statement. Just a gap on a shelf that somebody decided to fill.\n\nEverything since has been the same idea: good food, close by, through the shop you already trust.",
+          "engagementQuestion": "What is hard to find in your neighbourhood?",
+          "imageIdea": "A half-empty shelf in a small shop."
+        }
+      }
+    },
+    {
+      "day": 23,
+      "week": 4,
+      "posts": {
+        "morning": {
+          "theme": "Stack it onto something you already do",
+          "draft": "New habits fail on their own and survive when attached to something.\n\nThe water goes with putting the kettle on. The fruit goes with picking up your keys. The soaking goes with switching off the kitchen light.\n\nYou do not need a reminder. You need a hook.",
+          "engagementQuestion": "What do you already do at the same time every day?",
+          "imageIdea": "A kettle and a tumbler of water side by side on a counter."
+        },
+        "afternoon": {
+          "theme": "Small things, added up over years",
+          "draft": "One glass of water a morning is 365 glasses a year.\n\nOne vegetable at lunch is 250 working days of it. One fruit before you leave the house is most of a crate.\n\nNothing here is dramatic. That is exactly why it works.",
+          "engagementQuestion": "Which one would you like to still be doing next year?",
+          "imageIdea": "A long row of identical tumblers, receding."
+        },
+        "night": {
+          "theme": "The shopkeeper is the last mile",
+          "draft": "Fresh food goes off. That is the whole problem with selling it.\n\nThe only way it reaches you still fresh is if the last stop is two minutes from your house — which means the small shop, not a warehouse in another district.\n\nYour street is the supply chain.",
+          "engagementQuestion": "How far is your nearest fresh food shop?",
+          "imageIdea": "A shopfront seen from across a narrow street."
+        }
+      }
+    },
+    {
+      "day": 24,
+      "week": 4,
+      "posts": {
+        "morning": {
+          "theme": "Miss a day properly",
+          "draft": "You will miss days. Everyone does.\n\nWhat matters is the day after — whether it starts again, or whether one missed morning quietly becomes three weeks.\n\nMiss one. Never miss two. That is the only rule on this whole list.",
+          "engagementQuestion": "How long does a broken habit usually stay broken?",
+          "imageIdea": "A calendar with one blank day between ticked ones."
+        },
+        "afternoon": {
+          "theme": "Food is not medicine",
+          "draft": "No vegetable cures anything, and anyone who tells you otherwise is selling something.\n\nWhat food does is quieter: it fills you up, it is easy or hard to digest, it gives you the afternoon or takes it away.\n\nThat is enough. It does not need to be more than that.",
+          "engagementQuestion": "What have you been told about a food that turned out to be nonsense?",
+          "imageIdea": "An ordinary vegetable on a plain background, no styling."
+        },
+        "night": {
+          "theme": "What we do not do",
+          "draft": "No prices on this channel. No offers, no discount codes, nothing to click.\n\nIf a post ever tries to sell you something, we have got it wrong and you should say so.\n\nThis is a channel about food. The shop at the end of your street handles the rest.",
+          "engagementQuestion": "What do you actually want to read here?",
+          "imageIdea": "A phone showing a message thread, no advertising anywhere in frame."
+        }
+      }
+    },
+    {
+      "day": 25,
+      "week": 4,
+      "posts": {
+        "morning": {
+          "theme": "The habit that survives a bad week",
+          "draft": "Anything that needs planning, shopping or good mood will not last past the first difficult week.\n\nThe ones that survive are the ones that need nothing: a glass of water, sitting down, finishing dinner earlier.\n\nPick for the bad week, not the good one.",
+          "engagementQuestion": "Which of these would survive your worst week?",
+          "imageIdea": "A single glass of water on an otherwise cluttered counter."
+        },
+        "afternoon": {
+          "theme": "Nobody eats well every day",
+          "draft": "Not the people who write about food. Not us.\n\nThere are days of biscuits and skipped lunches and dinner at eleven, and they do not undo anything, because nothing is a streak that can be broken.\n\nThe next meal is the next meal. That is all it is.",
+          "engagementQuestion": "What did your worst eating day this month look like?",
+          "imageIdea": "An empty biscuit packet on a desk, honestly photographed."
+        },
+        "night": {
+          "theme": "Growing, slowly, on purpose",
+          "draft": "One shop, then a street, then a few neighbourhoods.\n\nIt would be faster to go around the kirana stores. It would also break the only thing that makes fresh food work here — somebody nearby who knows what their customers actually buy.\n\nSlower on purpose.",
+          "engagementQuestion": "Has your neighbourhood shop been there longer than you have?",
+          "imageIdea": "A map or street sketch with a few marks on it, hand drawn."
+        }
+      }
+    },
+    {
+      "day": 26,
+      "week": 4,
+      "posts": {
+        "morning": {
+          "theme": "Tell somebody what you are doing",
+          "draft": "A habit said out loud to one person lasts longer than one kept quiet.\n\nNot a declaration. Just mentioning that you have been drinking water first thing, to whoever is in the kitchen.\n\nHalf the time they start doing it too.",
+          "engagementQuestion": "Who in your house would join you?",
+          "imageIdea": "Two tumblers of water on a counter instead of one."
+        },
+        "afternoon": {
+          "theme": "The long game with the elders at the table",
+          "draft": "Softer food, served a little earlier, and the same dish as everybody else.\n\nNobody needs a separate meal cooked, and being handed a different plate at your own table is its own kind of unwell.\n\nOne pot. Cooked a bit softer. Theirs served first.",
+          "engagementQuestion": "Who eats first in your house?",
+          "imageIdea": "A plate being set down in front of an older person's hands."
+        },
+        "night": {
+          "theme": "Saturday, with the whole street out",
+          "draft": "Children on the road, chairs outside, somebody's television too loud.\n\nThis is the evening the neighbourhood is actually a neighbourhood rather than a set of front doors.\n\nSit outside for a bit of it. That is the entire suggestion.",
+          "engagementQuestion": "Do people sit outside on your street in the evening?",
+          "imageIdea": "Plastic chairs outside a house at dusk, some occupied."
+        }
+      }
+    },
+    {
+      "day": 27,
+      "week": 4,
+      "posts": {
+        "morning": {
+          "theme": "Sunday, and no alarm again",
+          "draft": "Four weeks ago this was day six and it was easy.\n\nDo the whole thing properly today — the water, the sitting down, the slow breakfast with other people at the table.\n\nOne morning a week done properly is what the other six are copying from.",
+          "engagementQuestion": "What is Sunday breakfast at yours?",
+          "imageIdea": "A breakfast spread with several people still in the room."
+        },
+        "afternoon": {
+          "theme": "The meal everyone waits for",
+          "draft": "Whatever it is at your house, today is the day it happens.\n\nNo counting, no verdict, nothing to balance out on Monday. Go back for a second helping if you want one.\n\nA month of small sensible things exists so that today does not have to be one of them.",
+          "engagementQuestion": "What is the dish your family waits all week for?",
+          "imageIdea": "A serving spoon going back into a dish for a second helping."
+        },
+        "night": {
+          "theme": "Thank you for reading",
+          "draft": "Four weeks of posts, morning, afternoon and night, and you are still here.\n\nSome of it was useful and some of it was not, and the ones that were useful were probably the smallest ones.\n\nThat is how it usually goes.",
+          "engagementQuestion": "Which post did you actually act on?",
+          "imageIdea": "A phone on a bedside table, screen dark, lamp on."
+        }
+      }
+    },
+    {
+      "day": 28,
+      "week": 4,
+      "posts": {
+        "morning": {
+          "theme": "Four weeks",
+          "draft": "Twenty-eight days.\n\nDo not add anything up and do not score it. Just notice whether mornings feel different from the way they felt a month ago.\n\nThat was the only measure that ever mattered here.",
+          "engagementQuestion": "Do your mornings feel different?",
+          "imageIdea": "A window at first light, curtain half open."
+        },
+        "afternoon": {
+          "theme": "Ten years from now",
+          "draft": "Nothing on this channel was ever about this month.\n\nThe glass of water, the vegetable at lunch, the walk to the shop — none of it does anything in four weeks. All of it does something in ten years.\n\nThat is a strange thing to sell and the only thing worth saying.",
+          "engagementQuestion": "What would you like to still be doing in ten years?",
+          "imageIdea": "An old, well-used vessel that has clearly lasted decades."
+        },
+        "night": {
+          "theme": "Know Your Food Better",
+          "draft": "Four words that have been at the bottom of every post this month.\n\nNot eat better. Not eat less. Know — where it came from, who sold it to you, what it does, and whether it was worth the money.\n\nThe rest follows on its own.",
+          "engagementQuestion": "What do you know about your food now that you did not a month ago?",
+          "imageIdea": "A hand holding a single piece of fruit up to the light."
+        }
+      }
+    },
+    {
+      "day": 29,
+      "week": 4,
+      "posts": {
+        "morning": {
+          "theme": "Keep one thing",
+          "draft": "Not all of it. One.\n\nThe glass of water, the earlier dinner, the fruit by the door, the sitting down.\n\nOne thing kept for a year is worth more than thirty things kept for a month, and it is the only realistic ask anybody has made of you here.",
+          "engagementQuestion": "Which one are you keeping?",
+          "imageIdea": "A single tumbler on an empty counter."
+        },
+        "afternoon": {
+          "theme": "The one that did not work",
+          "draft": "Something on this list did not fit your house, your work or your family.\n\nThat is information, not failure. Drop it properly rather than carrying it around and feeling bad about it every few weeks.\n\nIt was never compulsory. None of it was.",
+          "engagementQuestion": "Which one was never going to work at yours?",
+          "imageIdea": "A handwritten list with one line crossed out."
+        },
+        "night": {
+          "theme": "The channel is not the point",
+          "draft": "Posts are easy to read and easy to forget, and a month of them changes nothing on its own.\n\nWhat changes something is one small thing, done on an ordinary Tuesday when nobody is watching and there is no post about it.\n\nThat part is yours.",
+          "engagementQuestion": "What will you do tomorrow that has nothing to do with this channel?",
+          "imageIdea": "A quiet kitchen in use, phone nowhere in the frame."
+        }
+      }
+    },
+    {
+      "day": 30,
+      "week": 4,
+      "posts": {
+        "morning": {
+          "theme": "Day thirty, and it is just breakfast",
+          "draft": "The month ends and nothing special happens.\n\nThe same glass of water, the same plate, the same chair, the same shop at the end of the street.\n\nThat is what it was for. Not a finish — just an ordinary morning that works a bit better than it used to.",
+          "engagementQuestion": "What did today's breakfast look like?",
+          "imageIdea": "An ordinary breakfast plate, no styling at all."
+        },
+        "afternoon": {
+          "theme": "Tell one person",
+          "draft": "Whatever stuck for you, mention it to one person this week.\n\nNot as advice — nobody wants advice. Just what you did and whether it helped.\n\nThat is how any of this actually travels, and it always has been. Not through a channel. Through a compound wall.",
+          "engagementQuestion": "Who are you going to tell?",
+          "imageIdea": "Two people talking over a compound wall."
+        },
+        "night": {
+          "theme": "Know Your Food Better",
+          "draft": "Thirty days, ninety posts, and one idea underneath all of them.\n\nGood food should be close by, from someone you know, and simple enough that you do not have to think about it much.\n\nThat is the whole mission. Thank you for the month.\n\n— Grillo",
+          "engagementQuestion": "What should we write about next month?",
+          "imageIdea": "A neighbourhood street at night, shops lit, people out. Wide shot."
+        }
+      }
+    }
+  ]
+}

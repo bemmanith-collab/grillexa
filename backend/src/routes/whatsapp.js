@@ -321,4 +321,180 @@ router.post('/history/:id', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// The 30-day calendar
+//
+// Ninety planned cells seeded from whatsapp/strategy/30-day.json. Everything
+// below sits under the same three gates as the rest of this file — session,
+// ADMIN/MANAGER, and the WHATSAPP_AUTHORS allowlist — because it writes to the
+// same channel.
+// ---------------------------------------------------------------------------
+
+// Which generator type each time of day is polished as. The calendar's three
+// slots are the channel's own (7:30 / 13:00 / 20:30); the generator's types are
+// a different vocabulary, so the two are joined here rather than either side
+// pretending to be the other.
+//
+// afternoon carries a meal slot because `meal` is a slotted type and lunch is
+// what one o'clock is. morning and evening take none.
+const SLOT_TO_TYPE = {
+  morning: { type: 'morning' },
+  afternoon: { type: 'meal', slot: 'lunch' },
+  night: { type: 'evening' },
+};
+
+const CALENDAR_SLOTS = Object.keys(SLOT_TO_TYPE);
+
+// The whole plan in one response, fullPost included.
+//
+// Ninety rows with their prose is a couple of hundred kilobytes at absolute
+// worst and almost always far less, since most cells have no generated post for
+// weeks. Paying that once beats ninety follow-up requests as somebody opens
+// cells, and it means the grid renders complete rather than filling in.
+router.get('/calendar', async (req, res) => {
+  const cells = await prisma.whatsAppContent.findMany({
+    orderBy: [{ day: 'asc' }, { id: 'asc' }],
+  });
+
+  res.json({
+    slots: CALENDAR_SLOTS,
+    days: 30,
+    // Counted here rather than in the browser so the header cannot disagree
+    // with the grid if a filter is added later.
+    summary: {
+      total: cells.length,
+      sent: cells.filter((c) => c.sent).length,
+      generated: cells.filter((c) => c.fullPost).length,
+    },
+    cells,
+  });
+});
+
+// Polish one cell's draft into a full post.
+//
+// The draft is handed to the existing generator as the topic, so the brand
+// voice, the format, the audience rules and the everyday-ingredient rotation
+// all come from prompts/ exactly as they do for a hand-written post. Nothing
+// about the voice is re-stated here, which is the only way the calendar and the
+// daily panel can stay saying the same thing.
+router.post('/calendar/:id/generate', generateLimiter, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad cell id.' });
+
+  const cell = await prisma.whatsAppContent.findUnique({ where: { id } });
+  if (!cell) return res.status(404).json({ error: 'No such calendar cell.' });
+
+  const { options, generate, provider } = await generator();
+  const mapped = SLOT_TO_TYPE[cell.timeSlot] ?? SLOT_TO_TYPE.morning;
+
+  // The panel may override the type — a night cell about the market reads
+  // better as `seasonal` than as an evening wind-down, and whoever is writing
+  // can see that and the mapping cannot.
+  const type = req.body?.type && options.TYPES[req.body.type] ? req.body.type : mapped.type;
+  const slotted = options.TYPES[type]?.slotted;
+  const language = options.LANGUAGES[req.body?.language] ? req.body.language : options.DEFAULTS.language;
+
+  // Theme, draft and question go in together. The question matters: without it
+  // the generator writes a post that ends on the quote and the reply prompt has
+  // to be pasted on afterwards, which is how it gets forgotten.
+  const topic = [
+    cell.theme,
+    '',
+    cell.draft,
+    cell.engagementQuestion ? `\n\nEnd by asking the reader: ${cell.engagementQuestion}` : '',
+  ].join('\n').trim();
+
+  try {
+    const result = await generate.generate({
+      type,
+      audience: options.DEFAULTS.audience,
+      tone: options.DEFAULTS.tone,
+      language,
+      quoteLanguage: options.DEFAULTS.quoteLanguage,
+      // Not capped at 300 like the free-text field on the daily panel: this is
+      // our own seeded copy, under a hundred words by construction, not
+      // something typed into a box.
+      topic,
+      slot: slotted ? mapped.slot : undefined,
+    });
+
+    const updated = await prisma.whatsAppContent.update({
+      where: { id },
+      data: { fullPost: result.text },
+    });
+
+    // Also recorded as history, so a calendar post counts towards "what has the
+    // channel actually shown people" alongside the hand-written ones. A failure
+    // here must not lose the post the person is waiting for.
+    try {
+      await prisma.whatsAppPost.create({
+        data: {
+          type: result.options.type,
+          audience: result.options.audience,
+          language: result.options.language,
+          slot: result.options.slot ?? null,
+          day: result.options.day,
+          postDate: result.options.date,
+          occasion: result.options.occasions?.map((o) => o.name).join(', ') || null,
+          ingredient: result.options.ingredient?.name ?? null,
+          topic: `Calendar day ${cell.day} ${cell.timeSlot}: ${cell.theme}`,
+          provider: provider.describeProvider().name,
+          text: result.text,
+          authorId: req.user.id,
+        },
+      });
+    } catch (saveError) {
+      console.error('whatsapp: could not record calendar post history', saveError);
+    }
+
+    res.json({ id: updated.id, fullPost: updated.fullPost });
+  } catch (err) {
+    if (err?.name !== 'GenerationError') throw err;
+    const operatorProblem = err.code === 'not-configured';
+    res.status(operatorProblem ? 503 : 502).json({
+      error: err.message,
+      hint: operatorProblem
+        ? 'Ask an administrator to set GEMINI_API_KEY on the server.'
+        : err.hint,
+    });
+  }
+});
+
+// Mark a cell sent, or un-send one that was ticked by mistake. sentAt follows
+// sent rather than being passed in — the server's clock is the only one that
+// cannot be wrong about when the button was actually pressed.
+//
+// fullPost is editable here too: the generator gets it close and the person
+// posting almost always changes a line before it goes out, and losing that edit
+// on the next page load would make the whole panel untrustworthy.
+router.patch('/calendar/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad cell id.' });
+
+  const data = {};
+  if (typeof req.body?.sent === 'boolean') {
+    data.sent = req.body.sent;
+    data.sentAt = req.body.sent ? new Date() : null;
+  }
+  if (typeof req.body?.fullPost === 'string') {
+    data.fullPost = req.body.fullPost.trim() || null;
+  }
+  if (!Object.keys(data).length) {
+    return res.status(400).json({ error: 'Nothing to update.', valid: ['sent', 'fullPost'] });
+  }
+
+  try {
+    const cell = await prisma.whatsAppContent.update({ where: { id }, data });
+    res.json({ id: cell.id, sent: cell.sent, sentAt: cell.sentAt, fullPost: cell.fullPost });
+  } catch {
+    res.status(404).json({ error: 'No such calendar cell.' });
+  }
+});
+
 module.exports = router;
+
+// Exported for test/whatsapp-calendar.js, which checks that every type and meal
+// named here still exists in the generator's own registry. Renaming a type in
+// whatsapp/lib/options.js would otherwise break Generate Full Post silently, and
+// only for whichever time of day pointed at it.
+module.exports.SLOT_TO_TYPE = SLOT_TO_TYPE;

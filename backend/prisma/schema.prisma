@@ -484,3 +484,41 @@ model MapUsage {
   loads    Int    @default(0)
   geocodes Int    @default(0)
 }
+
+// One planned cell of the 30-day channel calendar: day 1-30, one of three
+// times of day. Ninety rows, seeded once from whatsapp/strategy/30-day.json.
+//
+// Deliberately separate from WhatsAppPost. That table is history — what the
+// generator actually wrote, when, for whom, with a rating against it. This one
+// is a plan: it exists before anything is written and most of its rows will sit
+// empty of prose for weeks. Merging them would mean every history query had to
+// filter out ninety rows of intent, and the plan would be rewritten every time
+// somebody pressed Generate.
+//
+// draft is the short version written by hand in the strategy file and is never
+// empty. fullPost is what the generator produced from that draft and is null
+// until somebody asks for it — the calendar is usable, and free, before any of
+// them exist.
+model WhatsAppContent {
+  id                 Int       @id @default(autoincrement())
+  day                Int // 1-30, a position in the plan rather than a calendar date
+  timeSlot           String // "morning" | "afternoon" | "night"
+  theme              String
+  engagementQuestion String?
+  imageIdea          String?
+  draft              String
+  fullPost           String?
+  // Planned is not sent, the same distinction WhatsAppPost.used draws. Only
+  // these two fields are written by the dashboard; everything above comes from
+  // the seed and is left alone.
+  sent               Boolean   @default(false)
+  sentAt             DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // The seed is run more than once — after an edit to the strategy file, and on
+  // every fresh database. This is what lets it upsert instead of duplicating,
+  // and it is also the calendar's natural sort.
+  @@unique([day, timeSlot])
+  @@index([sent])
+}
