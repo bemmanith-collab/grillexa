@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Download, X } from 'lucide-react';
+import { Download, FileText, X } from 'lucide-react';
 import client from '../api/client';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
@@ -8,6 +8,7 @@ import { formatCurrency } from '../lib/format';
 import { formatDate, todayStr, startOfWeekStr, startOfMonthStr } from '../utils/date';
 import Chart, { lineData, barData, doughnutData, TEAL, FLAME, WARN, money } from '../components/Chart';
 import SearchSelect, { RECENT_STORES } from '../components/SearchSelect';
+import { buildReportPdf, reportFileName } from '../lib/reportPdf';
 
 // Empty id, not 'all': every filter here already treats '' as "no filter".
 const ALL_STORES = { id: '', name: 'All stores' };
@@ -37,6 +38,7 @@ export default function Reports() {
   const [pnl, setPnl] = useState(null);
   const [productSales, setProductSales] = useState(null);
   const [error, setError] = useState('');
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const [from, to] = range === 'custom' ? [custom.from, custom.to] : RANGES[range].of();
 
@@ -113,6 +115,28 @@ export default function Reports() {
   const productName = analytics?.filters.products.find((p) => String(p.id) === productId)?.name;
   const personName = analytics?.filters.people.find((p) => String(p.id) === userId)?.name;
 
+  // The Excel export covers the whole store/date range and ignores the product
+  // and person filters; the PDF is written from exactly what is on screen, so it
+  // has to say so on its own front page or the two will quietly disagree.
+  const scopeLabel = [storeName, productName, personName].filter(Boolean).join(' · ') || null;
+
+  async function downloadPdf() {
+    setPdfBusy(true);
+    try {
+      const doc = await buildReportPdf({
+        from, to, summary, pnl, analytics, productSales, scope: scopeLabel,
+      });
+      doc.save(reportFileName({ from, to }));
+    } catch (err) {
+      // jsPDF is fetched on demand, so this is usually a dropped connection
+      // rather than a bug — say something a person can act on.
+      console.error('report pdf', err);
+      setError('Could not build the PDF. Check the connection and try again.');
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   if (error) return <div className="page"><div className="form-error">{error}</div></div>;
   if (!analytics || !summary || !pnl || !productSales) return <Spinner label="Loading reports…" />;
 
@@ -129,6 +153,17 @@ export default function Reports() {
           </p>
         </div>
         <div className="page-header-actions">
+          {/* Two exports, two jobs. Excel is the raw rows for whoever wants to
+              work on them; the PDF is the written version somebody forwards. */}
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={downloadPdf}
+            disabled={pdfBusy}
+            title="A written summary of what these numbers say"
+          >
+            <FileText size={15} /> {pdfBusy ? 'Building…' : 'Download PDF'}
+          </button>
           <a className="btn-primary btn-sm" href={excelUrl} download>
             <Download size={15} /> Download Excel
           </a>

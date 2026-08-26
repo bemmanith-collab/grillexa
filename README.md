@@ -270,6 +270,22 @@ All five series arrive in **one** response (`GET /api/reports/analytics`). Five 
 
 `GET /api/reports/excel?from=&to=&storeId=` streams a six-sheet workbook: Summary, Store Performance, Product Performance, Salesperson Performance, Consignment Summary, Wastage Breakdown. Headers are bold on petrol with the row frozen and a filter on it, money is `₹#,##0.00`, percentages carry two decimals, dates are **real dates** in `dd/mm/yyyy` (text would not sort or filter by month, which is most of why anyone opens this in Excel), and columns are measured to their content. It runs the same aggregation as the charts (`backend/src/lib/analytics.js`), so the file and the screen cannot disagree.
 
+### The written report (Download PDF)
+
+Two exports, two jobs. Excel is the raw rows for whoever wants to work on them. The **PDF is the written version** — the same numbers arranged as the questions somebody actually asks, each with a one-line answer before any detail, for the person who was never going to read five charts.
+
+It answers six: *Did we make money? · Which shops are carrying us? · What is actually selling? · What are we throwing away? · Who is out there selling? · What should I look at this week?* The last one is derived from the other five — a shop trading at a loss, the biggest thing being thrown away, a salesperson under 70% store coverage — so it is instructions rather than a summary.
+
+**The wording is the product here.** It says "about 18 paise in every rupee" rather than "18.4% margin", "2 shops lost money, the worst is X" rather than a table, and it never dresses up a loss. `frontend/src/lib/reportNarrative.js` is deliberately pure — no jsPDF, no React, no network — which is what lets `test/reportNarrative.js` check the sentences and the arithmetic under plain Node: that a loss says "No", that a period with no sales says "nothing sold" instead of printing zeros, and that no wastage counted is reported as a possibly-missed count rather than as good news.
+
+**Money is formatted by a function passed in, not imported.** The screen wants ₹; the PDF must not have it, because jsPDF's built-in fonts are WinAnsi and render ₹ as a broken superscript that also throws the text-width maths off and clips the digits after it — the same trap `lib/invoice.js` documents. One of the tests asserts no ₹ survives into the PDF text.
+
+**Text is drawn, not screenshotted.** html2canvas would have been fewer lines and would have produced a blurry raster nobody can select, search or print. Bar labels that do not fit are cut with a visible `...`: `splitTextToSize`'s first line was used at first and it drops the overflow silently, turning "Guru krupa Kirana store (Rocky)" into "Guru krupa Kirana store" and quietly losing the rep tag that says whose shop it is.
+
+**Colour never carries meaning alone.** Every bar prints its own number, and the bars are blue rather than the brand green-against-red: those two are 4.2 apart for a red-green colourblind reader, which makes "good" and "bad" the same colour. Green is chrome only.
+
+jsPDF is imported on demand so it stays out of the bundle for everyone who never presses the button, and the PDF is written from **exactly what is on screen** — including the product and person filters, which the Excel export ignores. Any filter in force is printed on the front page so the two can never quietly disagree.
+
 **exceljs, not SheetJS.** The free build of SheetJS cannot write bold or filled cells — styling is a paid feature there — and bold filled headers on a frozen row are most of what makes six sheets readable. `backend/src/lib/excelReport.js` is the only file that would change to swap back.
 
 Three columns that were asked for are **not** in the workbook, because the data behind them does not exist:
@@ -309,7 +325,7 @@ Every row records **who counted it** (`createdById`). An end-of-shift count belo
 | Action | Admin | Manager | Sales |
 |---|:--:|:--:|:--:|
 | My Dashboard (own personal metrics) | ✅ | ✅ | ✅ |
-| Charts on Reports, Download Excel | ✅ | ✅ | ❌ |
+| Charts on Reports, Download Excel, Download PDF | ✅ | ✅ | ❌ |
 | Dashboard for another person, or company-wide | ✅ | ✅ | ❌ |
 | Today's Stock, Stock History | ✅ any store | ✅ any store | ✅ own stores |
 | Deliver to Store (create / edit consignment) | ✅ any | ✅ any | ✅ own stores |
@@ -489,7 +505,8 @@ grillexa/
 │   │                    SettleConsignment, DirectSale, Sales, Dispatches,
 │   │                    Products, StockHistory, Reports, Stores, Users
 │   ├── test/            invoice.js, greeting.js, searchSelect.js,
-│   │                    storeLinks.js, reorder.js   (npm test)
+│   │                    storeLinks.js, reorder.js, reportNarrative.js
+│   │                    (npm test)
 │   └── vite.config.js   dev proxy, build target down to iOS 14
 ├── whatsapp/         standalone content generator for the Grillo WhatsApp
 │   │                 channel — see below. Not part of the app.
@@ -798,4 +815,5 @@ Frontend, five files:
 - `test/invoice.js` — a Consignment Note never calls itself an invoice. Both renderers (the WhatsApp text and the PDF) are checked against the same `documentOptions`, the PDF by building it in Node with jsPDF and reading the labels back out of the finished document.
 - `test/searchSelect.js` — the combobox every store and product picker is built on: matching anywhere in the name and case-insensitively, recent picks first without reordering the caller's list, and highlighting that covers every occurrence without losing characters.
 - `test/storeLinks.js` — the Directions and Call links. A wrong maps URL sends a delivery to the wrong end of the city and never looks like an error, so half a pin is never sent as a coordinate, zero is treated as a real coordinate rather than a missing one, and a pair pasted from Google Maps lands in both fields.
+- `test/reportNarrative.js` — the Reports PDF is a document somebody forwards, which makes the wording part of the product: a report that says "Yes, we made money" about a period that lost money is worse than no report. A loss says "No" and never reports paise-in-the-rupee; a period with no sales says "nothing sold" rather than printing zeros; no wastage counted is flagged as a possibly-missed count rather than as good news; someone can top the sales table and still be named for leaving half their shops unvisited. One test asserts no ₹ reaches the PDF, since jsPDF's fonts have no glyph for it.
 - `test/reorder.js` — "Reorder from Last …" repeats the order, not last month's prices: lines are re-priced from the current catalogue, a product with no price comes back blank rather than as an explicit `0`, and a discontinued product is dropped and named rather than silently removed.
