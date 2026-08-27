@@ -651,6 +651,18 @@ One subtlety that cost a bug: the count excludes your own messages with an expli
 
 **The room opens with a system message.** Seeded by the migration with `senderId` NULL and `isSystem` true — a system announcement has no author, and attributing it to whichever Admin happened to have the lowest id would put words in a real person's mouth in a room the whole team reads. It is pinned, it is not deletable by anyone including a moderator, and it counts as one unread for everybody so the badge shows a 1 the first time each person opens the app. The same migration puts every existing account in the room, because a chat that opens with nobody in it needs an Admin to add six people by hand before anyone can speak.
 
+### The launcher on the dashboard
+
+The chat is also a floating button on `/`, and nowhere else. `App.jsx` gates it on `location.pathname === '/'` rather than putting it inside the dashboard page, because it is fixed to the viewport and must not be clipped or scrolled by a page container.
+
+**Dashboard only, on purpose.** On the till and delivery screens a floating button lands on the fields somebody is filling in — Direct Sale and Deliver to Store are the clearest cases. Those screens already have the sidebar entry, which costs nothing and covers nothing.
+
+**Draggable, and it snaps to the nearer side on release.** A launcher welded to one corner eventually covers the one control somebody needs, and this dashboard puts cards and buttons exactly there. Snapping is what makes dragging safe: it can be moved out of the way but never left stranded over the middle of a form. Position is remembered per browser.
+
+Three details make it feel like a control rather than a bug. Movement under 6px counts as a tap, so trying to move it does not open the chat. `setPointerCapture` keeps the drag alive when the finger slides off the bubble, which is what drops it on a fast flick otherwise. And only the snap-back is animated — transitioning during the drag makes the bubble lag the finger.
+
+`#2F5664` is deliberately outside the palette: the launcher floats above the app rather than belonging to it, so it stays put while the page changes underneath. White on it is 7.97:1, and it holds 7.3:1 or better against every ground the app uses.
+
 ### Deploying it
 
 ```bash

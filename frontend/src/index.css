@@ -3437,3 +3437,199 @@ a.btn-danger {
   background: var(--danger);
   border: 1.5px solid var(--surface);
 }
+
+/* ---------------------------------------------------------------------------
+   The chat launcher, on the dashboard only.
+
+   Draggable because a launcher welded to one corner eventually covers the one
+   control somebody needs, and this dashboard puts cards and buttons exactly
+   there. It snaps to the nearer side on release, so it can never be left over
+   the middle of a form.
+
+   #2F5664 is deliberately outside the palette: the launcher floats above the
+   app rather than belonging to it, so it stays put while the page changes
+   underneath. White on it is 7.97:1, and it holds 7.3:1 or better against
+   every ground the app uses.
+   --------------------------------------------------------------------------- */
+:root {
+  --fab: #2F5664;
+  --fab-deep: #25434E;
+}
+
+.chat-fab {
+  position: fixed;
+  z-index: 60;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--fab);
+  color: #fff;
+  border: none;
+  cursor: grab;
+  display: grid;
+  place-items: center;
+  /* Without this the browser scrolls the page instead of giving us the drag. */
+  touch-action: none;
+  box-shadow: 0 6px 20px -4px rgba(20, 40, 50, .45), 0 0 0 3px var(--surface);
+  transition: background var(--t), box-shadow var(--t), transform var(--t);
+}
+.chat-fab:hover { background: var(--fab-deep); }
+/* Only the snap-back is animated. Transitioning during the drag makes the
+   bubble lag the finger, which reads as a broken control. */
+.chat-fab.snapping { transition: left var(--t), top var(--t), background var(--t), box-shadow var(--t), transform var(--t); }
+.chat-fab.dragging { cursor: grabbing; transform: scale(1.08); }
+.chat-fab:focus-visible { outline: 3px solid var(--fab); outline-offset: 3px; }
+
+.chat-fab-count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The panel. Anchored to the bottom-right of the viewport rather than to the
+   bubble: the bubble moves, and a panel that chased it around would be harder
+   to read than one that always opens in the same place. */
+.chat-pop {
+  position: fixed;
+  z-index: 61;
+  right: 16px;
+  bottom: 16px;
+  width: min(360px, calc(100vw - 32px));
+  height: min(500px, calc(100vh - 120px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 60px -20px rgba(20, 30, 25, .45);
+  animation: chatPopIn 200ms ease;
+}
+@keyframes chatPopIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .chat-pop { animation: none; } }
+
+/* On a phone it takes the screen — a 360px card on a 375px display with a
+   keyboard open is unusable. */
+@media (max-width: 480px) {
+  .chat-pop { inset: 8px; width: auto; height: auto; }
+}
+
+.chat-pop-head {
+  background: var(--fab);
+  color: #fff;
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.chat-pop-head strong { font-size: 14.5px; display: block; }
+.chat-pop-head small { font-size: 11.5px; opacity: .8; }
+.chat-pop-acts { display: flex; gap: 4px; }
+.chat-pop-acts button {
+  background: rgba(255, 255, 255, .16);
+  border: none;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.chat-pop-acts button:hover { background: rgba(255, 255, 255, .28); }
+.chat-pop-acts button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+
+.chat-pop-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+.chat-pop-note { color: var(--text-muted); font-size: 13.5px; margin: auto; }
+
+.chat-pop-msg {
+  max-width: 84%;
+  align-self: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px 12px 12px 4px;
+  padding: 6px 10px 4px;
+  margin-bottom: 5px;
+}
+.chat-pop-msg.mine {
+  align-self: flex-end;
+  background: #E6EDF0;
+  border-color: #C3D3DA;
+  border-radius: 12px 12px 4px 12px;
+}
+.chat-pop-msg.gone { font-style: italic; color: var(--text-muted); border-style: dashed; }
+.chat-pop-msg .who { display: block; font-size: 11.5px; font-weight: 600; color: var(--fab-deep); }
+.chat-pop-msg .txt { display: block; font-size: 13.5px; white-space: pre-wrap; word-break: break-word; }
+.chat-pop-msg .tm { display: block; font-size: 10px; color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+.chat-pop-system {
+  align-self: stretch;
+  background: var(--teal-soft);
+  border: 1px solid var(--primary);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.chat-pop-system pre {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+
+.chat-pop-foot {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.chat-pop-foot input {
+  flex: 1;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+}
+.chat-pop-foot input:focus-visible { outline: 2px solid var(--fab); outline-offset: 1px; }
+.chat-pop-foot button {
+  min-width: 44px;
+  min-height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: var(--fab);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.chat-pop-foot button:hover:not(:disabled) { background: var(--fab-deep); }
+.chat-pop-foot button:disabled { opacity: .5; cursor: default; }

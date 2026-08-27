@@ -1,7 +1,8 @@
 import React, { Suspense, lazy, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Sidebar from './components/Sidebar';
+import TeamChatBubble from './components/TeamChatBubble';
 import GreetingOverlay from './components/GreetingOverlay';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
@@ -65,7 +66,13 @@ function useTableLabels() {
 
 export default function App() {
   const { user, loading } = useAuth();
+  const location = useLocation();
   useTableLabels();
+
+  // The chat launcher lives on the landing dashboard and nowhere else. On the
+  // till and delivery screens it would float over the fields somebody is
+  // filling in — and those screens already have the sidebar entry.
+  const showChatBubble = Boolean(user) && location.pathname === '/';
 
   if (loading) return <Spinner />;
 
@@ -88,6 +95,7 @@ export default function App() {
       />
       <GreetingOverlay />
       {user && <Sidebar />}
+      {showChatBubble && <TeamChatBubble />}
       <main className={user ? 'app-main' : ''}>
         <RouteErrorBoundary>
         <Suspense fallback={<Spinner />}>
@@ -189,17 +197,17 @@ export default function App() {
               element={
                 <ProtectedRoute roles={['ADMIN']}>
                   <Users />
-                        {/* Everyone with an account is in the room; membership is checked on
-            the server, so there is no role gate here. */}
-        <Route
-          path="/team-chat"
-          element={
-            <ProtectedRoute>
-              <TeamChat />
-            </ProtectedRoute>
-          }
-        />
-</ProtectedRoute>
+                </ProtectedRoute>
+              }
+            />
+            {/* Everyone with an account is in the room; membership is checked
+                on the server, so there is no role gate here. */}
+            <Route
+              path="/team-chat"
+              element={
+                <ProtectedRoute>
+                  <TeamChat />
+                </ProtectedRoute>
               }
             />
             {/* Admin/Manager gets past the router; WHATSAPP_AUTHORS decides
