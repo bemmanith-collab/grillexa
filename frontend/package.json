@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node test/invoice.js && node test/greeting.js && node test/searchSelect.js && node test/storeLinks.js && node test/reorder.js && node test/push.js && node test/iconShadow.js && node test/seriesColour.js && node test/reportNarrative.js"
+    "test": "node test/invoice.js && node test/greeting.js && node test/searchSelect.js && node test/storeLinks.js && node test/reorder.js && node test/push.js && node test/iconShadow.js && node test/seriesColour.js && node test/reportNarrative.js && node test/route-structure.js"
   },
   "dependencies": {
     "axios": "^1.7.7",
