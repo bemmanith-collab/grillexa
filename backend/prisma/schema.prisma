@@ -41,6 +41,13 @@ model User {
   // because two relations now join User and Store and Prisma cannot guess.
   createdStores    Store[]           @relation("StoreCreatedBy")
   pushSubscriptions PushSubscription[]
+
+  // Team chat. Four relations join User to two tables, so every one is named —
+  // Prisma cannot guess which is which.
+  chatMessages     TeamChatMessage[] @relation("ChatSender")
+  chatDeletions    TeamChatMessage[] @relation("ChatDeletedBy")
+  chatMembership   TeamChatMember?   @relation("ChatMember")
+  chatAdditions    TeamChatMember[]  @relation("ChatAddedBy")
 }
 
 // One row per browser-and-device that agreed to receive notifications, not one
@@ -521,4 +528,76 @@ model WhatsAppContent {
   // and it is also the calendar's natural sort.
   @@unique([day, timeSlot])
   @@index([sent])
+}
+
+// ---------------------------------------------------------------------------
+// Team chat — one room, the whole staff in it.
+//
+// A WhatsApp group, not a support system: no threads, no channels, no
+// reactions. Everybody reads and writes; only Admins add people, remove people
+// and delete messages.
+// ---------------------------------------------------------------------------
+
+model TeamChatMessage {
+  id        Int      @id @default(autoincrement())
+  // Nullable, because a system announcement has no author. Attributing one to
+  // whichever Admin happened to have the lowest id would put words in a real
+  // person's mouth in a room their whole team reads.
+  senderId  Int?
+  sender    User?    @relation("ChatSender", fields: [senderId], references: [id], onDelete: SetNull)
+  body      String
+
+  // Posted by the app, not a person. Rendered as a notice across the thread
+  // rather than as a message bubble, and never deletable from the UI.
+  isSystem  Boolean  @default(false)
+
+  // Pinned messages are shown above the thread. A boolean rather than a
+  // separate table: there is one room, and "pinned" is a property of the
+  // message in it.
+  isPinned  Boolean  @default(false)
+
+  // Deleted, not gone. WhatsApp leaves "This message was deleted" in the
+  // thread, and so does this: a message vanishing without trace makes the
+  // conversation above and below it stop making sense, and there is no way to
+  // tell a moderation from a bug afterwards. Who did it is recorded.
+  deletedAt   DateTime?
+  deletedById Int?
+  deletedBy   User?    @relation("ChatDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  // The thread is read newest-last and polled with "anything after id N", so
+  // both of those are index lookups rather than scans.
+  @@index([createdAt])
+  @@index([isPinned])
+}
+
+model TeamChatMember {
+  id       Int      @id @default(autoincrement())
+  // One row per person: a user is either in the room or not. The unique
+  // constraint is what makes "add" idempotent — re-adding someone who left
+  // reactivates their row instead of creating a second one and doubling them
+  // in the member list.
+  userId   Int      @unique
+  user     User     @relation("ChatMember", fields: [userId], references: [id], onDelete: Cascade)
+
+  addedById Int?
+  addedBy   User?    @relation("ChatAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+
+  isActive Boolean  @default(true)
+  joinedAt DateTime @default(now())
+  leftAt   DateTime?
+
+  // The unread badge, in one column.
+  //
+  // The alternative — a row per message per member — is a row count that grows
+  // with traffic times headcount, and turns the badge into a NOT IN over a
+  // growing table on every poll. This is a single indexed count of messages
+  // newer than a timestamp, and one write when somebody opens the room.
+  //
+  // What it cannot do is say who read which message. If "seen by" ticks are
+  // ever wanted, that is the point to add a receipts table — not before.
+  lastReadAt DateTime?
+
+  @@index([isActive])
 }

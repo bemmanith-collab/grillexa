@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useChannelAccess } from '../lib/channelAccess';
+import { useTeamChatUnread } from '../lib/teamChatUnread';
 import {
   LayoutDashboard,
   BarChart3,
@@ -55,6 +56,9 @@ const NAV = [
   // narrower — see the isAdmin gates in Stores.jsx.
   { to: '/stores', icon: Store, label: 'Stores', roles: ALL },
   { to: '/users', icon: Users, label: 'Users', roles: 'ADMIN' },
+  // Everyone. The room is the whole staff, and the badge is the only reason
+  // most people will open it.
+  { to: '/team-chat', icon: MessagesSquare, label: 'Team Chat', short: 'Chat', roles: ALL, badge: 'chat' },
 ];
 
 // Not in NAV: role is not what decides this one. Only the addresses in
@@ -90,10 +94,13 @@ export default function Sidebar() {
   // Sales can never be on the allowlist, so do not spend a refused request
   // on every page load for most of the staff.
   const channel = useChannelAccess({ enabled: user.role !== 'SALES' });
+  const chat = useTeamChatUnread();
   const items = NAV.filter((item) => item.roles.includes(user.role))
     .concat(channel.state === 'allowed' ? [CHANNEL_LINK] : []);
   const primary = items.slice(0, PRIMARY_COUNT);
   const rest = items.slice(PRIMARY_COUNT);
+  // True when something folded under More is asking for attention.
+  const restUnread = rest.some((item) => item.badge === 'chat') && chat.unread > 0;
   const onMoreRoute = rest.some((item) => location.pathname === item.to);
 
   const initials = user.name
@@ -138,7 +145,7 @@ export default function Sidebar() {
         </div>
 
         <nav className="sidebar-nav">
-          {items.map(({ to, end, icon: Icon, label }) => (
+          {items.map(({ to, end, icon: Icon, label, badge }) => (
             <NavLink
               key={to}
               to={to}
@@ -147,6 +154,11 @@ export default function Sidebar() {
             >
               <Icon className="sidebar-link-icon" size={18} strokeWidth={1.8} />
               <span className="sidebar-link-label">{label}</span>
+              {badge === 'chat' && chat.unread > 0 && (
+                <span className="sidebar-badge" aria-label={`${chat.unread} unread`}>
+                  {chat.unread > 99 ? '99+' : chat.unread}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -198,6 +210,7 @@ export default function Sidebar() {
         >
           <MoreHorizontal size={21} strokeWidth={1.8} />
           <span>More</span>
+          {restUnread && <span className="tabbar-dot" aria-label={`${chat.unread} unread messages`} />}
         </button>
       </nav>
 
@@ -220,10 +233,15 @@ export default function Sidebar() {
             </div>
 
             <div className="more-grid">
-              {rest.map(({ to, icon: Icon, label }) => (
+              {rest.map(({ to, icon: Icon, label, badge }) => (
                 <NavLink key={to} to={to} className={({ isActive }) => `more-item${isActive ? ' active' : ''}`}>
                   <Icon size={19} strokeWidth={1.8} />
                   <span>{label}</span>
+                  {badge === 'chat' && chat.unread > 0 && (
+                    <span className="sidebar-badge" aria-label={`${chat.unread} unread`}>
+                      {chat.unread > 99 ? '99+' : chat.unread}
+                    </span>
+                  )}
                 </NavLink>
               ))}
             </div>

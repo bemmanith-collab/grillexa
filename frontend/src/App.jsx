@@ -9,6 +9,7 @@ import Spinner from './components/Spinner';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 
 const Login = lazy(() => import('./pages/Login'));
+const TeamChat = lazy(() => import('./pages/TeamChat'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Dispatches = lazy(() => import('./pages/Dispatches'));
@@ -188,7 +189,17 @@ export default function App() {
               element={
                 <ProtectedRoute roles={['ADMIN']}>
                   <Users />
-                </ProtectedRoute>
+                        {/* Everyone with an account is in the room; membership is checked on
+            the server, so there is no role gate here. */}
+        <Route
+          path="/team-chat"
+          element={
+            <ProtectedRoute>
+              <TeamChat />
+            </ProtectedRoute>
+          }
+        />
+</ProtectedRoute>
               }
             />
             {/* Admin/Manager gets past the router; WHATSAPP_AUTHORS decides

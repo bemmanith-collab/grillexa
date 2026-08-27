@@ -3189,3 +3189,251 @@ a.btn-danger {
   border-color: var(--primary);
   color: var(--deep);
 }
+
+/* ---------------------------------------------------------------------------
+   Team chat.
+
+   One room the whole staff is in. The thread scrolls inside its own box rather
+   than the page, so the compose field stays put while the history moves — a
+   chat that scrolls the whole page puts the input off screen the moment the
+   conversation gets long.
+   --------------------------------------------------------------------------- */
+.chat-page { display: flex; flex-direction: column; min-height: 0; }
+
+.chat-pinned {
+  background: var(--gold-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px var(--space-2);
+  margin-bottom: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chat-pinned-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  /* Charcoal on gold-soft, never gold as ink — 1.97:1 as text. */
+  color: var(--text);
+}
+.chat-pinned-row > span { flex: 1; min-width: 0; }
+.chat-pinned-row strong { font-weight: 600; }
+
+.chat-thread {
+  flex: 1;
+  min-height: 320px;
+  max-height: 62vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chat-empty { color: var(--text-muted); text-align: center; margin: auto 0; font-size: 14.5px; }
+
+.chat-day {
+  align-self: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg);
+  padding: 3px 12px;
+  border-radius: 999px;
+  margin: 12px 0 6px;
+}
+
+.chat-msg {
+  position: relative;
+  max-width: 78%;
+  align-self: flex-start;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px 12px 12px 4px;
+  padding: 7px 11px 5px;
+  margin-bottom: 5px;
+}
+.chat-msg.mine {
+  align-self: flex-end;
+  background: var(--primary-soft);
+  border-color: var(--primary-soft);
+  border-radius: 12px 12px 4px 12px;
+}
+.chat-msg.gone {
+  background: var(--bg);
+  border-style: dashed;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.chat-sender {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--deep);
+  margin-bottom: 1px;
+}
+.chat-badge-admin { opacity: .7; }
+.chat-body { display: block; font-size: 14.5px; white-space: pre-wrap; word-break: break-word; }
+.chat-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The announcement. A notice across the thread rather than a bubble from a
+   person, because it has no author to attribute it to. */
+.chat-system {
+  align-self: stretch;
+  background: var(--teal-soft);
+  border: 1px solid var(--primary);
+  border-radius: 12px;
+  padding: var(--space-2);
+  margin: 8px 0 10px;
+}
+.chat-system pre {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+.chat-system-foot {
+  display: block;
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+/* Moderator controls, revealed on the message rather than always on — five
+   buttons per row would make the thread unreadable. */
+.chat-actions { position: absolute; top: 3px; right: 5px; display: none; gap: 2px; }
+.chat-msg:hover .chat-actions,
+.chat-msg:focus-within .chat-actions { display: flex; }
+.chat-icon-btn {
+  border: none;
+  background: var(--surface);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  box-shadow: 0 1px 3px rgba(45, 52, 54, .14);
+}
+.chat-icon-btn:hover { color: var(--deep); }
+.chat-icon-btn.danger:hover { color: var(--danger); }
+.chat-icon-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* Always visible on a touch screen: hover does not exist there, so the controls
+   would be unreachable. */
+@media (hover: none) {
+  .chat-actions { display: flex; position: static; margin-top: 6px; justify-content: flex-end; }
+  .chat-icon-btn { width: 44px; height: 44px; }
+}
+
+.chat-error { margin-top: var(--space-1); }
+
+.chat-compose {
+  display: flex;
+  gap: var(--space-1);
+  align-items: flex-end;
+  margin-top: var(--space-2);
+}
+.chat-compose textarea {
+  flex: 1;
+  resize: none;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+  padding: 11px 13px;
+  min-height: 46px;
+  max-height: 140px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+.chat-compose textarea:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.chat-send { min-width: 46px; min-height: 46px; padding: 0; border-radius: 12px; }
+
+/* ---- members sheet -------------------------------------------------------- */
+.member-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.member-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 14.5px;
+}
+.member-list li:last-child { border-bottom: none; }
+.member-name { display: flex; align-items: center; gap: 6px; font-weight: 500; flex: 1; min-width: 0; }
+.member-you {
+  font-size: 10.5px;
+  font-weight: 700;
+  background: var(--primary-soft);
+  color: var(--deep);
+  padding: 2px 7px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.member-role { font-size: 12.5px; color: var(--text-muted); text-transform: capitalize; }
+.member-subhead {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: var(--space-2) 0 4px;
+}
+
+/* ---- unread badges -------------------------------------------------------- */
+.sidebar-badge {
+  margin-left: auto;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+.sidebar-link.active .sidebar-badge { background: var(--surface); color: var(--danger); }
+
+/* On the phone bar Team Chat is folded under More, so the count cannot be shown
+   there — a dot on More is the only way the badge reaches a phone at all. */
+.tabbar-item { position: relative; }
+.tabbar-dot {
+  position: absolute;
+  top: 6px;
+  right: calc(50% - 16px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: 1.5px solid var(--surface);
+}

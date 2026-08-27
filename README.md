@@ -633,6 +633,37 @@ The three times of day are the *channel's* vocabulary and the nine content types
 
 `WhatsAppContent` is deliberately **not** merged into `WhatsAppPost`. That table is history — what was written, when, by whom, with a rating against it. This one is a plan: it exists before anything is written and most of its rows sit empty of prose for weeks. Merging them would mean every history query had to filter out ninety rows of intent, and the plan would be rewritten every time somebody pressed Generate.
 
+## Team Chat
+
+One room, the whole staff in it. A WhatsApp group, not a support desk: no threads, no channels, no reactions. Everyone reads and writes; Admins add people, remove people, pin and delete.
+
+**Polled, not socketed.** `fly.toml` sets `auto_start_machines = true`, so more than one machine can be awake — a socket opened against one would never see a message posted to the other, the same problem the WhatsApp reminder solves with a unique constraint rather than a flag in memory. The room polls `GET /api/team-chat?after=<id>` every five seconds while the tab is visible, which is an indexed lookup returning nothing most of the time, and the existing web push covers the app being closed. A socket layer would need shared pub/sub before it beat this.
+
+**Membership is the gate, not role.** Every role can talk here, so there is no `requireRole` on the router. `TeamChatMember` decides instead, and it is read on every request rather than baked into the session — an Admin removing somebody has to bite immediately, not at their next login.
+
+**Moderation is Admin *and* an allowlist.** `TEAM_CHAT_ADMINS` is a comma-separated list of emails checked on top of the role, the same shape as `WHATSAPP_AUTHORS`. Five accounts carry ADMIN and only two of them run the room; being able to reset a password should not also mean being able to remove somebody from the group. Unset means every Admin — the **opposite** of the channel route, and deliberately: there, failing closed protects customers from an unapproved post, whereas here it would leave a room full of people with nobody able to remove a mistake.
+
+**Deleted messages keep their place.** `deletedAt` is set and the body stops being returned — `lib/teamChat.js:present()` blanks it, so no route can leak it by forgetting. The thread shows "This message was deleted by X". A message vanishing without trace makes the conversation above and below it stop making sense, and leaves no way to tell moderation from a bug.
+
+**The unread badge is one column, not a table.** `TeamChatMember.lastReadAt`, and the count is messages newer than it. The alternative — a row per message per member — grows with traffic times headcount and turns the badge into a `NOT IN` over a growing table on every poll, from every page in the app. What it cannot do is say who read what; that is the point to add a receipts table, not before.
+
+One subtlety that cost a bug: the count excludes your own messages with an explicit `OR [{ senderId: null }, { senderId: { not: viewerId } }]` rather than a plain not-equals. `senderId <> $1` is **unknown** for a NULL sender in SQL, so every authorless system message was silently dropped from the count and the launch announcement lit no badge at all.
+
+**The room opens with a system message.** Seeded by the migration with `senderId` NULL and `isSystem` true — a system announcement has no author, and attributing it to whichever Admin happened to have the lowest id would put words in a real person's mouth in a room the whole team reads. It is pinned, it is not deletable by anyone including a moderator, and it counts as one unread for everybody so the badge shows a 1 the first time each person opens the app. The same migration puts every existing account in the room, because a chat that opens with nobody in it needs an Admin to add six people by hand before anyone can speak.
+
+### Deploying it
+
+```bash
+# 1. Who moderates. Without this every Admin can remove people.
+flyctl secrets set TEAM_CHAT_ADMINS="emmanithbussa2000@gmail.com,sairajesh140@gmail.com" -a grillexa
+
+# 2. Deploy. `npm start` runs `prisma migrate deploy`, so the tables, the
+#    membership rows and the announcement all land on boot.
+flyctl deploy -a grillexa
+```
+
+Nothing else is needed — push already works, since the chat reuses the VAPID setup and `lib/push.js` that store notifications were built on.
+
 ## Local development
 
 Node 20+ and a reachable Postgres. `docker compose up -d` starts one on `localhost:5432`.
@@ -732,6 +763,7 @@ The service worker caches nothing, deliberately — this app writes bills, and a
 | `WHATSAPP_REMINDER` | Optional, default on. `off` silences the daily "today's post isn't written" push notification |
 | `WHATSAPP_REMINDER_HOUR` | Optional, default `7`. The IST hour the reminder may go out from. An empty value falls back to 7 rather than to midnight |
 | `WHATSAPP_AUTHORS` | Comma-separated **email addresses** allowed to write channel posts, checked on top of the Admin/Manager role. **Fails closed** — unset means nobody, and the panel does not appear for anyone. Emails rather than names because they are unique in the database and stable |
+| `TEAM_CHAT_ADMINS` | Comma-separated **email addresses** allowed to moderate the team chat, checked on top of the Admin role. Unlike `WHATSAPP_AUTHORS` this **fails open** — unset means every Admin, because a room nobody can manage is worse than one extra person having the button |
 | `ZENQUOTES_KEY` | **Optional, and currently pointless.** It configured the Wisdom Planner's suggestion button, and that page has been removed — `GET /api/quotes/suggestions` still honours the key but nothing calls it. Safe to leave unset |
 
 Read from the environment or `.env`. One exception worth knowing: the business's own name, address and FSSAI licence number are hardcoded in `frontend/src/lib/businessInfo.js` because they are printed on every invoice. Not secret, but they are per-business and would need changing for anyone else.
@@ -780,6 +812,15 @@ Read from the environment or `.env`. One exception worth knowing: the business's
 | GET | `/api/whatsapp/calendar` | Same gate — all ninety planned cells in one response, generated posts included |
 | POST | `/api/whatsapp/calendar/:id/generate` | Same gate — polishes one cell's draft into a full post, same 60/hour limit |
 | PATCH | `/api/whatsapp/calendar/:id` | Same gate — `{ sent }` to tick a cell off, `{ fullPost }` to keep an edit |
+| GET | `/api/team-chat?after=&limit=` | Authenticated **and** an active chat member — the thread, the pinned messages and whether you may moderate |
+| GET | `/api/team-chat/unread` | Authenticated — just the number, for the sidebar badge. Answers 0 for a non-member rather than 403 |
+| POST | `/api/team-chat` | Active member — send. Rate-limited to 30/minute |
+| POST | `/api/team-chat/read` | Active member — marks the room read now |
+| DELETE | `/api/team-chat/:id` | Admin **and** on `TEAM_CHAT_ADMINS` — soft delete. Refuses the system announcement |
+| POST | `/api/team-chat/:id/pin` | Same gate — pin or unpin. Refuses the announcement and deleted messages |
+| GET | `/api/team-chat/members` | Active member — the roster. Who is *not* in it is sent only to a moderator |
+| POST | `/api/team-chat/members` | Same gate — add, or re-add somebody who left. Upsert, so it never doubles a person |
+| DELETE | `/api/team-chat/members/:userId` | Same gate — a flag, not a delete, so their messages stay readable. You cannot remove yourself |
 
 ## Tests
 
@@ -790,7 +831,7 @@ cd frontend && npm test
 
 No framework, no database, no browser — plain Node scripts that print `ok` lines.
 
-Backend, seventeen files:
+Backend, eighteen files:
 
 - `test/crash-guards.js` — malformed request bodies return 400 rather than killing the process (an unhandled rejection in an async handler exits Node on Express 4), `todayStr` is ISO and round-trips, and public signup stays gone.
 - `test/stock-cascade.js` — the ledger cascade against an in-memory Prisma stub: back-dated writes re-chain later days, moving a document between dates leaves nothing behind, and reversing a bill restores stock exactly.
@@ -804,6 +845,8 @@ Backend, seventeen files:
 - `test/offline-import.js` — the offline CSV import end to end without a database: the parser (quotes, CRLF, a UTF-8 BOM), every rule that stops a bad row reaching the ledger, and the write path against the same in-memory Prisma stub — a re-import creates no second bill and adds no second lot of wastage, a corrected file applies the difference, and wastage entered by hand is not swallowed.
 
 - `test/wastage.js` — the end-of-shift count's rules, which are mostly about what is *not* an error: the modal posts every product in the catalogue and most of them are blank, so a blank is skipped rather than written as a zero or rejected, an empty submission is caught as "nothing counted", a fractional count is refused before it can hit an Int column, the same product twice is refused rather than double-counted, and there is no upper bound because there is nothing to bound it against. The summary values at cost and keeps the reason split.
+
+- `test/team-chat.js` — one room the whole staff writes in, and two of five Admins moderate it. The part that must not be wrong is who may delete a message and remove a person, so: the two named Admins moderate and the other three do not, the allowlist narrows the Admin role but can never widen it to a Manager, a removed member cannot post, a deleted message loses its body but keeps its place, and nobody — moderator included — can delete the announcement. One test exists because of a real bug: the badge must count authorless system messages, which a plain `senderId <> N` silently dropped.
 
 - `test/whatsapp-calendar.js` — the 30-day calendar is ninety rows of copy in a JSON file plus one small map, and both rot quietly. The strategy file is checked for thirty contiguous days with all three times of day, nothing blank that the schema requires, no draft over a hundred words, and none of the words `prompts/brand.md` forbids outright — beef and pork among them, which lose readers permanently. Then the join: every time of day must still name a content type the generator actually has, and pass a meal only to a type that takes one.
 
