@@ -17,6 +17,7 @@ import {
   Store,
   Users,
   MessageCircle,
+  MessagesSquare,
   LogOut,
   KeyRound,
   MoreHorizontal,
