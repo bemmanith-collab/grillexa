@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { name, email, password, role, storeIds } = req.body;
+  const { name, email, password, role, storeIds, allStores } = req.body;
   // typeof, not just truthiness: a non-string email throws inside Prisma and a
   // non-string password throws inside bcrypt.
   if (![name, email, password, role].every((v) => typeof v === 'string' && v)) {
@@ -47,7 +47,10 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
   const ids = uniqueIds(storeIds);
-  if (role === 'SALES' && ids.length === 0) {
+  const everyStore = allStores === true;
+  // "All stores" is an assignment in its own right, so it satisfies the rule
+  // that a Sales account must cover something.
+  if (role === 'SALES' && !everyStore && ids.length === 0) {
     return res.status(400).json({ error: 'Sales accounts must be assigned at least one store' });
   }
   const storeError = await validateStoreIds(ids);
@@ -64,7 +67,10 @@ router.post('/', async (req, res) => {
       email,
       passwordHash,
       role,
-      stores: role === 'SALES' ? { connect: ids.map((id) => ({ id })) } : undefined,
+      allStores: everyStore,
+      // The explicit list is not kept alongside the flag — two sources of truth
+      // for "which shops" is how they drift apart. The flag is the answer.
+      stores: role === 'SALES' && !everyStore ? { connect: ids.map((id) => ({ id })) } : undefined,
     },
     include: { stores: true },
   });
@@ -73,7 +79,7 @@ router.post('/', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const { name, email, role, storeIds, password } = req.body;
+  const { name, email, role, storeIds, password, allStores } = req.body;
 
   if (role && !ROLES.includes(role)) {
     return res.status(400).json({ error: `role must be one of ${ROLES.join(', ')}` });
@@ -90,8 +96,9 @@ router.patch('/:id', async (req, res) => {
 
   const nextRole = role !== undefined ? role : current.role;
   const nextIds = storeIds !== undefined ? uniqueIds(storeIds) : current.stores.map((s) => s.id);
+  const everyStore = allStores !== undefined ? allStores === true : current.allStores;
 
-  if (nextRole === 'SALES' && nextIds.length === 0) {
+  if (nextRole === 'SALES' && !everyStore && nextIds.length === 0) {
     return res.status(400).json({ error: 'Sales accounts must be assigned at least one store' });
   }
   const storeError = await validateStoreIds(nextIds);
@@ -108,7 +115,11 @@ router.patch('/:id', async (req, res) => {
         ...(email !== undefined && { email }),
         ...(passwordHash !== undefined && { passwordHash }),
         role: nextRole,
-        stores: { set: nextRole === 'SALES' ? nextIds.map((sid) => ({ id: sid })) : [] },
+        allStores: everyStore,
+        // Clearing the list when the flag goes on keeps one answer to "which
+        // shops": the flag. Turning it back off leaves the account with none,
+        // which the rule above then insists is fixed.
+        stores: { set: nextRole === 'SALES' && !everyStore ? nextIds.map((sid) => ({ id: sid })) : [] },
       },
       include: { stores: true },
     });

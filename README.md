@@ -320,6 +320,16 @@ Every row records **who counted it** (`createdById`). An end-of-shift count belo
 
 `POST /api/wastage` is open to any signed-in account including Sales, because they are the ones doing the counting. It is the only write in the app with no `assertStoreAccess` behind it — there is no store to scope to — which is exactly why authorship is recorded. `GET /api/wastage/summary` is staff-only, following Reports: your own count is yours, but what everyone together threw away is a manager's number. It totals by product, valued **at cost**, and keeps the reason split rather than flattening it: "40 units wasted" and "40 wasted, 38 of them expired" are different problems.
 
+### Assigning stores, and "all stores"
+
+A sales account is normally given a list of shops. With eighty-odd of them that list is a long scroll, so the dialog has a search box and keeps Cancel/OK pinned — only the list scrolls.
+
+**"All stores" is a standing assignment, not a tick-everything shortcut**, and that distinction is the whole point. Checking every box covers the shops that exist at that moment and silently misses the one that opens next month; the account meant to see everything would quietly stop seeing everything, with nothing to indicate it. So it is a flag on the user (`allStores`) and the store list is resolved **per request** in `middleware/auth.js` — a shop opened an hour ago is already covered, and nobody has to reopen the dialog.
+
+Turning it on clears the explicit list, because two answers to "which shops" is how they drift apart. `lib/scope.js:resolveStoreIds` is the rule, kept pure so `test/scope.js` can check it without a database — including the case that matters: the same account, asked twice, with a new store in between.
+
+One consequence worth knowing: this resolves through `req.user.storeIds`, which every store-scoped query already filters on, so nothing else needed changing. The cost is one extra id-only query per request, and only for accounts carrying the flag.
+
 ## Roles & permissions
 
 | Action | Admin | Manager | Sales |

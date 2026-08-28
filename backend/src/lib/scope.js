@@ -13,4 +13,21 @@ function assertStoreAccess(user, storeId) {
   }
 }
 
-module.exports = { assertStoreAccess };
+/**
+ * Which stores an account covers.
+ *
+ * `allStores` is a standing assignment, not a saved list: it resolves to
+ * whatever exists at the moment of the request. That is the whole difference
+ * between it and ticking every box — a snapshot covers the shops that existed
+ * when somebody opened the dialog, and silently misses the one that opened
+ * afterwards.
+ *
+ * Pure so the rule can be checked without a database. auth.js supplies the ids.
+ */
+function resolveStoreIds(user, everyStoreId) {
+  if (!user) return [];
+  if (user.allStores) return everyStoreId;
+  return (user.stores || []).map((s) => s.id);
+}
+
+module.exports = { assertStoreAccess, resolveStoreIds };

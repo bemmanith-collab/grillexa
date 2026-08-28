@@ -8,7 +8,8 @@ import ResetPasswordModal from '../components/ResetPasswordModal';
 const ROLES = ['ADMIN', 'MANAGER', 'SALES'];
 const MAX_VISIBLE_STORES = 3;
 
-function storesLabel(stores) {
+function storesLabel(stores, allStores) {
+  if (allStores) return 'All stores — including new ones';
   if (stores.length === 0) return 'No stores assigned';
   if (stores.length <= MAX_VISIBLE_STORES) return stores.map((s) => s.name).join(', ');
   const shown = stores.slice(0, MAX_VISIBLE_STORES).map((s) => s.name).join(', ');
@@ -22,7 +23,7 @@ export default function Users() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formOpen, setFormOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'SALES', storeIds: [] });
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'SALES', storeIds: [], allStores: false });
   const [creating, setCreating] = useState(false);
   const [assignModal, setAssignModal] = useState(null);
   const [resetModal, setResetModal] = useState(null);
@@ -58,14 +59,18 @@ export default function Users() {
   async function handleCreate(e) {
     e.preventDefault();
     setError('');
-    if (form.role === 'SALES' && form.storeIds.length === 0) {
+    if (form.role === 'SALES' && !form.allStores && form.storeIds.length === 0) {
       setError('Sales accounts must be assigned at least one store.');
       return;
     }
     setCreating(true);
     try {
-      await client.post('/users', { ...form, storeIds: form.role === 'SALES' ? form.storeIds : undefined });
-      setForm({ name: '', email: '', password: '', role: 'SALES', storeIds: [] });
+      await client.post('/users', {
+        ...form,
+        storeIds: form.role === 'SALES' && !form.allStores ? form.storeIds : undefined,
+        allStores: form.role === 'SALES' ? form.allStores : false,
+      });
+      setForm({ name: '', email: '', password: '', role: 'SALES', storeIds: [], allStores: false });
       setFormOpen(false);
       load();
     } catch (err) {
@@ -77,19 +82,21 @@ export default function Users() {
 
   function handleRoleChange(u, role) {
     if (role === 'SALES') {
-      setAssignModal({ context: 'role-change', userId: u.id, role, initialSelectedIds: u.stores.map((s) => s.id) });
+      setAssignModal({ context: 'role-change', userId: u.id, role, initialSelectedIds: u.stores.map((s) => s.id), initialAllStores: u.allStores });
       return;
     }
     patchUser(u.id, { role });
   }
 
-  async function handleAssignConfirm(ids) {
+  async function handleAssignConfirm({ storeIds: ids, allStores }) {
     if (!assignModal) return;
     if (assignModal.context === 'create') {
-      setForm((f) => ({ ...f, storeIds: ids }));
+      setForm((f) => ({ ...f, storeIds: ids, allStores }));
       return;
     }
-    const payload = assignModal.context === 'role-change' ? { role: assignModal.role, storeIds: ids } : { storeIds: ids };
+    const payload = assignModal.context === 'role-change'
+      ? { role: assignModal.role, storeIds: ids, allStores }
+      : { storeIds: ids, allStores };
     await client.patch(`/users/${assignModal.userId}`, payload);
     load();
   }
@@ -145,7 +152,7 @@ export default function Users() {
             />
             <select
               value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value, storeIds: e.target.value === 'SALES' ? form.storeIds : [] })}
+              onChange={(e) => setForm({ ...form, role: e.target.value, storeIds: e.target.value === 'SALES' ? form.storeIds : [], allStores: e.target.value === 'SALES' ? form.allStores : false })}
             >
               {ROLES.map((r) => (
                 <option key={r} value={r}>{r}</option>
@@ -155,9 +162,11 @@ export default function Users() {
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => setAssignModal({ context: 'create', initialSelectedIds: form.storeIds })}
+                onClick={() => setAssignModal({ context: 'create', initialSelectedIds: form.storeIds, initialAllStores: form.allStores })}
               >
-                {form.storeIds.length > 0 ? `${form.storeIds.length} store(s) selected` : 'Assign stores…'}
+                {form.allStores
+                  ? 'All stores'
+                  : form.storeIds.length > 0 ? `${form.storeIds.length} store(s) selected` : 'Assign stores…'}
               </button>
             )}
             <button type="submit" className="btn-primary" disabled={creating}>
@@ -203,7 +212,7 @@ export default function Users() {
                     {u.role === 'SALES' ? (
                       <div className="store-cell">
                         <span className="store-names" title={u.stores.map((s) => s.name).join(', ')}>
-                          {storesLabel(u.stores)}
+                          {storesLabel(u.stores, u.allStores)}
                         </span>
                         <button
                           type="button"
@@ -244,6 +253,7 @@ export default function Users() {
           stores={stores}
           currentUserId={assignModal.userId ?? null}
           initialSelectedIds={assignModal.initialSelectedIds}
+          initialAllStores={assignModal.initialAllStores ?? false}
           onClose={() => setAssignModal(null)}
           onConfirm={handleAssignConfirm}
         />

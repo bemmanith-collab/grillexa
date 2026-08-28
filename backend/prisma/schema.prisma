@@ -26,6 +26,16 @@ model User {
   email     String   @unique
   passwordHash String
   role      String   @default("SALES")
+
+  // "Every store, including the ones that do not exist yet."
+  //
+  // A standing assignment rather than a snapshot. Ticking every box in the
+  // picker would cover today's shops and silently miss the one opened next
+  // month, which is exactly the case this is for — the account that is meant to
+  // see everything. Resolved per request in middleware/auth.js, so a store
+  // added an hour ago is already included.
+  allStores Boolean  @default(false)
+
   createdAt DateTime @default(now())
 
   stores           Store[]
