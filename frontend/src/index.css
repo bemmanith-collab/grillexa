@@ -3521,10 +3521,49 @@ a.btn-danger {
 @keyframes chatPopIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .chat-pop { animation: none; } }
 
-/* On a phone it takes the screen — a 360px card on a 375px display with a
-   keyboard open is unusable. */
-@media (max-width: 480px) {
-  .chat-pop { inset: 8px; width: auto; height: auto; }
+/* On a phone it takes the whole screen.
+
+   inset:8px left an 8px gap on every side, and the dashboard showed through it
+   down the edges — which read as the page being behind the chat rather than
+   replaced by it. Full bleed instead, with the notch and the home indicator
+   kept clear by the safe-area insets. Those only report real values because
+   index.html carries viewport-fit=cover; without it they are all zero.
+
+   Height comes from --chat-vh, which the component keeps in step with
+   visualViewport. 100vh and even 100dvh both ignore the on-screen keyboard on
+   iOS, so the compose field ends up underneath it. */
+@media (max-width: 640px) {
+  .chat-pop {
+    inset: 0;
+    width: auto;
+    height: var(--chat-vh, 100dvh);
+    max-height: none;
+    border-radius: 0;
+    border: none;
+    animation: none;
+  }
+  .chat-pop-head { padding-top: calc(11px + env(safe-area-inset-top)); }
+  .chat-pop-foot {
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    padding-left: calc(12px + env(safe-area-inset-left));
+    padding-right: calc(12px + env(safe-area-inset-right));
+  }
+  .chat-pop-body {
+    padding-left: calc(12px + env(safe-area-inset-left));
+    padding-right: calc(12px + env(safe-area-inset-right));
+  }
+}
+
+/* Nothing behind the panel should move.
+
+   overflow:hidden alone does not hold — the document still scrolls, and on iOS
+   it rubber-bands behind a fixed overlay regardless. Taking the body out of
+   flow at a fixed offset is the only lock that actually stops it; the component
+   records the scroll position and puts it back on close. */
+body.chat-open {
+  position: fixed;
+  width: 100%;
+  overflow: hidden;
 }
 
 .chat-pop-head {
@@ -3619,6 +3658,10 @@ a.btn-danger {
   background: var(--bg);
   color: var(--text);
 }
+/* 16px is the smallest size iOS will render without zooming the page in when
+   the field takes focus — and that zoom is what leaves the layout stranded
+   half off-screen afterwards. */
+.chat-pop-foot input { font-size: 16px; }
 .chat-pop-foot input:focus-visible { outline: 2px solid var(--fab); outline-offset: 1px; }
 .chat-pop-foot button {
   min-width: 44px;

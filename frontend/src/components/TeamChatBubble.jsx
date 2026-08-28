@@ -78,6 +78,42 @@ export default function TeamChatBubble() {
     return () => window.removeEventListener('resize', onResize);
   }, [place]);
 
+  // While the panel is open: freeze the page behind it, and keep the panel's
+  // height matched to the part of the screen that is actually visible.
+  //
+  // On iOS the on-screen keyboard shrinks the visual viewport but not the
+  // layout viewport, so a full-height fixed panel keeps its size and pushes the
+  // compose field down behind the keyboard. visualViewport is the only thing
+  // that reports the real number.
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const doc = document.documentElement;
+    // Pin the body at its current offset. Restoring it on close is the whole
+    // reason the offset is recorded — without that the page jumps to the top
+    // the moment the chat closes.
+    const scrollY = window.scrollY;
+    document.body.style.top = `${-scrollY}px`;
+    document.body.classList.add('chat-open');
+
+    const vv = window.visualViewport;
+    const sync = () => {
+      doc.style.setProperty('--chat-vh', `${vv ? vv.height : window.innerHeight}px`);
+    };
+    sync();
+    vv?.addEventListener('resize', sync);
+    vv?.addEventListener('scroll', sync);
+
+    return () => {
+      document.body.classList.remove('chat-open');
+      document.body.style.top = '';
+      window.scrollTo(0, scrollY);
+      doc.style.removeProperty('--chat-vh');
+      vv?.removeEventListener('resize', sync);
+      vv?.removeEventListener('scroll', sync);
+    };
+  }, [open]);
+
   // --- messages ------------------------------------------------------------
   const load = useCallback(async (incremental) => {
     try {
