@@ -179,6 +179,40 @@ const tests = {
     assert.strictEqual(out.mine, false);
   },
 
+  'only the author may edit, and never a moderator': () => {
+    // Deleting leaves a tombstone in the thread; editing would put different
+    // words under somebody's name with nothing to show it happened. So this is
+    // the one action a moderator does not get.
+    const raw = {
+      id: 1, senderId: 5, body: 'hello', isPinned: false, deletedAt: null,
+      createdAt: new Date(), sender: { name: 'Sales', role: 'SALES' },
+    };
+    assert.strictEqual(present(raw, { viewerId: 5, moderator: false }).canEdit, true, 'the author edits');
+    assert.strictEqual(present(raw, { viewerId: 1, moderator: true }).canEdit, false, 'a moderator does not');
+    // …but a moderator still deletes.
+    assert.strictEqual(present(raw, { viewerId: 1, moderator: true }).canDelete, true);
+  },
+
+  'the announcement cannot be edited by anyone': () => {
+    const sys = {
+      id: 1, senderId: null, body: 'announcement', isSystem: true,
+      isPinned: true, deletedAt: null, createdAt: new Date(),
+    };
+    assert.strictEqual(present(sys, { viewerId: 1, moderator: true }).canEdit, false);
+    // senderId is null and viewerId could be undefined — that must not read as
+    // "this is mine".
+    assert.strictEqual(present(sys, { viewerId: undefined, moderator: false }).canEdit, false);
+  },
+
+  'an edited message says so': () => {
+    const raw = {
+      id: 1, senderId: 5, body: 'fixed', isPinned: false, deletedAt: null,
+      editedAt: new Date(), createdAt: new Date(), sender: { name: 'Sales', role: 'SALES' },
+    };
+    assert.strictEqual(present(raw, { viewerId: 5, moderator: false }).edited, true);
+    assert.strictEqual(present({ ...raw, editedAt: null }, { viewerId: 5, moderator: false }).edited, false);
+  },
+
   'the push preview is one line and does not run on': () => {
     const long = pushPreview('Sai Rajesh', 'word '.repeat(200));
     assert.ok(long.body.length <= 120, `preview was ${long.body.length} characters`);

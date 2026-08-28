@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Send, Users, Pin, PinOff, Trash2, ShieldCheck } from 'lucide-react';
+import { Send, Users, Pin, PinOff, Trash2, ShieldCheck, Pencil } from 'lucide-react';
 import client from '../api/client';
 import Spinner from '../components/Spinner';
 import TeamChatMembers from '../components/TeamChatMembers';
@@ -27,6 +27,10 @@ export default function TeamChat() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [showMembers, setShowMembers] = useState(false);
+  // The message whose action sheet is open, and the one being edited.
+  const [sheetFor, setSheetFor] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [editDraft, setEditDraft] = useState('');
 
   const threadRef = useRef(null);
   const lastId = useRef(0);
@@ -150,6 +154,69 @@ export default function TeamChat() {
     }
   }, [me]);
 
+  // --- hold to act --------------------------------------------------------
+  // 450ms matches what a phone user already expects from a chat app. Any
+  // movement cancels it, so scrolling the thread never opens the sheet.
+  const HOLD_MS = 450;
+  const holdTimer = useRef(null);
+  const holdFrom = useRef(null);
+
+  const hasActions = useCallback(
+    (m) => !m.deleted && !m.isSystem && (m.canDelete || m.canPin || m.canEdit),
+    []
+  );
+
+  const holdStart = useCallback((e, m) => {
+    if (!hasActions(m)) return;
+    holdFrom.current = { x: e.clientX, y: e.clientY };
+    clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(() => setSheetFor(m), HOLD_MS);
+  }, [hasActions]);
+
+  const holdEnd = useCallback(() => {
+    clearTimeout(holdTimer.current);
+    holdFrom.current = null;
+  }, []);
+
+  // A drag is a scroll, not a hold.
+  useEffect(() => {
+    const onMove = (e) => {
+      const from = holdFrom.current;
+      if (!from) return;
+      if (Math.abs(e.clientX - from.x) + Math.abs(e.clientY - from.y) > 10) holdEnd();
+    };
+    document.addEventListener('pointermove', onMove);
+    return () => document.removeEventListener('pointermove', onMove);
+  }, [holdEnd]);
+
+  useEffect(() => () => clearTimeout(holdTimer.current), []);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      setSheetFor(null);
+      setEditing(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  const saveEdit = useCallback(async () => {
+    const text = editDraft.trim();
+    const target = editing;
+    if (!text || !target) return;
+    if (text === target.body) { setEditing(null); return; }
+    try {
+      const res = await client.patch(`/team-chat/${target.id}`, { body: text });
+      const updated = res.data.message;
+      setMessages((prev) => prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)));
+      setPinned((prev) => prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)));
+      setEditing(null);
+    } catch (err) {
+      setError(err.response?.data || { error: 'Could not save that edit.' });
+    }
+  }, [editDraft, editing]);
+
   const togglePin = useCallback(async (msg) => {
     try {
       const res = await client.post(`/team-chat/${msg.id}/pin`, { isPinned: !msg.isPinned });
@@ -238,7 +305,29 @@ export default function TeamChat() {
                   <span className="chat-system-foot">{timeOf(m.createdAt)}</span>
                 </div>
               ) : (
-              <div className={`chat-msg${m.mine ? ' mine' : ''}${m.deleted ? ' gone' : ''}`}>
+              <div
+                className={`chat-msg${m.mine ? ' mine' : ''}${m.deleted ? ' gone' : ''}${sheetFor?.id === m.id ? ' held' : ''}`}
+                // Hold to open the actions, the way every chat app does. A row
+                // of buttons on every message turned the thread into a wall of
+                // icons on a phone, where hover does not exist to hide them.
+                onPointerDown={(e) => holdStart(e, m)}
+                onPointerUp={holdEnd}
+                onPointerLeave={holdEnd}
+                onPointerCancel={holdEnd}
+                // Long-press on iOS otherwise raises the system text-selection
+                // menu on top of ours.
+                onContextMenu={(e) => { if (hasActions(m)) e.preventDefault(); }}
+                {...(hasActions(m) ? {
+                  role: 'button',
+                  tabIndex: 0,
+                  'aria-haspopup': 'menu',
+                  // Hold is unreachable from a keyboard, so Enter opens the
+                  // same sheet.
+                  onKeyDown: (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSheetFor(m); }
+                  },
+                } : {})}
+              >
                 {!m.mine && !m.deleted && (
                   <span className="chat-sender">
                     {m.senderName}
@@ -256,20 +345,9 @@ export default function TeamChat() {
                 )}
                 <span className="chat-meta">
                   {m.isPinned && !m.deleted && <Pin size={11} />}
+                  {m.edited && !m.deleted && <span className="chat-edited">edited</span>}
                   {timeOf(m.createdAt)}
                 </span>
-                {moderator && !m.deleted && !m.isSystem && (
-                  <span className="chat-actions">
-                    <button type="button" className="chat-icon-btn" onClick={() => togglePin(m)}
-                      aria-label={m.isPinned ? 'Unpin' : 'Pin'} title={m.isPinned ? 'Unpin' : 'Pin'}>
-                      {m.isPinned ? <PinOff size={13} /> : <Pin size={13} />}
-                    </button>
-                    <button type="button" className="chat-icon-btn danger" onClick={() => remove(m.id)}
-                      aria-label="Delete" title="Delete">
-                      <Trash2 size={13} />
-                    </button>
-                  </span>
-                )}
               </div>
               )}
             </React.Fragment>
@@ -297,6 +375,90 @@ export default function TeamChat() {
 
       {showMembers && (
         <TeamChatMembers moderator={moderator} onClose={() => setShowMembers(false)} />
+      )}
+
+      {/* Held-message actions. A sheet rather than buttons on every row: the
+          thread stays readable, and each action gets a full-width tap target
+          instead of a 26px icon. */}
+      {sheetFor && (
+        <div
+          className="msg-sheet-backdrop"
+          onClick={(e) => { if (e.target === e.currentTarget) setSheetFor(null); }}
+        >
+          <div className="msg-sheet" role="menu" aria-label="Message actions">
+            <p className="msg-sheet-preview">{sheetFor.body}</p>
+            {sheetFor.canEdit && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => { setEditing(sheetFor); setEditDraft(sheetFor.body); setSheetFor(null); }}
+              >
+                <Pencil size={17} /> Edit
+              </button>
+            )}
+            {sheetFor.canPin && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => { togglePin(sheetFor); setSheetFor(null); }}
+              >
+                {sheetFor.isPinned ? <PinOff size={17} /> : <Pin size={17} />}
+                {sheetFor.isPinned ? 'Unpin' : 'Pin'}
+              </button>
+            )}
+            {sheetFor.canDelete && (
+              <button
+                type="button"
+                role="menuitem"
+                className="danger"
+                onClick={() => { remove(sheetFor.id); setSheetFor(null); }}
+              >
+                <Trash2 size={17} /> Delete
+              </button>
+            )}
+            <button type="button" className="msg-sheet-cancel" onClick={() => setSheetFor(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {editing && (
+        <div
+          className="msg-sheet-backdrop"
+          onClick={(e) => { if (e.target === e.currentTarget) setEditing(null); }}
+        >
+          <div className="msg-edit" role="dialog" aria-modal="true" aria-label="Edit message">
+            <h2>Edit message</h2>
+            <textarea
+              value={editDraft}
+              onChange={(e) => setEditDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); }
+                if (e.key === 'Escape') setEditing(null);
+              }}
+              rows={3}
+              maxLength={4000}
+              // eslint-disable-next-line jsx-a11y/no-autofocus
+              autoFocus
+              aria-label="Message text"
+            />
+            <p className="form-hint">Everyone will see this was edited.</p>
+            <div className="msg-edit-actions">
+              <button type="button" className="btn-secondary btn-sm" onClick={() => setEditing(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary btn-sm"
+                onClick={saveEdit}
+                disabled={!editDraft.trim() || editDraft.trim() === editing.body}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

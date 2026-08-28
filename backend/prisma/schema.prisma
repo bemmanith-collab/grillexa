@@ -566,6 +566,11 @@ model TeamChatMessage {
 
   createdAt DateTime @default(now())
 
+  // Set when the author rewrites a message. The thread marks it "edited", the
+  // way every chat app does — a message that changes silently after people have
+  // read it is worse than one that was never sent.
+  editedAt  DateTime?
+
   // The thread is read newest-last and polled with "anything after id N", so
   // both of those are index lookups rather than scans.
   @@index([createdAt])

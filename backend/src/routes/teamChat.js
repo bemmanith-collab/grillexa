@@ -154,6 +154,34 @@ router.post('/', sendLimiter, requireMembership, async (req, res) => {
   });
 });
 
+// Editing your own message. Not a moderator power and not gated on the
+// allowlist: the author owns their words. A moderator who disagrees with a
+// message can delete it, which leaves a visible tombstone — rewriting one
+// would put different words under somebody's name with nothing to show for it.
+router.patch('/:id', requireMembership, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad message id.' });
+
+  const check = validateMessage(req.body?.body);
+  if (!check.ok) return res.status(400).json({ error: check.error });
+
+  const existing = await prisma.teamChatMessage.findUnique({ where: { id } });
+  if (!existing) return res.status(404).json({ error: 'No such message.' });
+  if (existing.isSystem) return res.status(400).json({ error: 'The announcement cannot be edited.' });
+  if (existing.deletedAt) return res.status(400).json({ error: 'That message was deleted.' });
+  if (existing.senderId !== req.user.id) {
+    return res.status(403).json({ error: 'You can only edit your own messages.' });
+  }
+
+  const message = await prisma.teamChatMessage.update({
+    where: { id },
+    data: { body: check.text, editedAt: new Date() },
+    include: { sender: senderSelect },
+  });
+
+  res.json({ message: present(message, { viewerId: req.user.id, moderator: req.moderator }) });
+});
+
 // ---------------------------------------------------------------------------
 // Moderation — Admin, and on TEAM_CHAT_ADMINS when that is set
 // ---------------------------------------------------------------------------

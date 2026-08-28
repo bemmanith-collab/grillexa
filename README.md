@@ -651,6 +651,14 @@ One subtlety that cost a bug: the count excludes your own messages with an expli
 
 **The room opens with a system message.** Seeded by the migration with `senderId` NULL and `isSystem` true — a system announcement has no author, and attributing it to whichever Admin happened to have the lowest id would put words in a real person's mouth in a room the whole team reads. It is pinned, it is not deletable by anyone including a moderator, and it counts as one unread for everybody so the badge shows a 1 the first time each person opens the app. The same migration puts every existing account in the room, because a chat that opens with nobody in it needs an Admin to add six people by hand before anyone can speak.
 
+### Acting on a message
+
+**Hold a message to get its actions** — Edit, Pin, Delete — in a sheet, the way every chat app does. There were a pin and a delete button on every row before, and on a phone hover does not exist to hide them, so the thread became a wall of icons with the messages squeezed between and every control a 26px target.
+
+A hold is 450ms and any movement over 10px cancels it, so scrolling the thread never opens the sheet. Long-press also raises the system text-selection menu on iOS, so the message blocks the context menu — but the message **body** stays selectable, because people copy order numbers out of here. Holding is unreachable from a keyboard, so the message is focusable and Enter opens the same sheet.
+
+**Editing belongs to the author alone, and is deliberately not a moderator power.** Deleting somebody else's message leaves a visible tombstone in the thread; rewriting one would put different words under their name with nothing to show it happened. A moderator who disagrees can delete and say why. An edited message is marked *edited*, and `editedAt` records when.
+
 ### The launcher on the dashboard
 
 The chat is also a floating button on `/`, and nowhere else. `App.jsx` gates it on `location.pathname === '/'` rather than putting it inside the dashboard page, because it is fixed to the viewport and must not be clipped or scrolled by a page container.

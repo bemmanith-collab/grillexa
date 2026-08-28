@@ -3320,32 +3320,134 @@ a.btn-danger {
   text-align: right;
 }
 
-/* Moderator controls, revealed on the message rather than always on — five
-   buttons per row would make the thread unreadable. */
-.chat-actions { position: absolute; top: 3px; right: 5px; display: none; gap: 2px; }
-.chat-msg:hover .chat-actions,
-.chat-msg:focus-within .chat-actions { display: flex; }
-.chat-icon-btn {
-  border: none;
-  background: var(--surface);
-  border-radius: 6px;
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  color: var(--text-muted);
-  box-shadow: 0 1px 3px rgba(45, 52, 54, .14);
-}
-.chat-icon-btn:hover { color: var(--deep); }
-.chat-icon-btn.danger:hover { color: var(--danger); }
-.chat-icon-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+/* Hold a message to act on it.
+ *
+ * There used to be a pin and a delete button on every row. On a phone hover
+ * does not exist to hide them, so the thread became a wall of icons with the
+ * messages squeezed between — and each control was a 26px target. Holding is
+ * what everyone already does in a chat app, and it gives the actions a sheet
+ * with room to be read and pressed. */
+.chat-msg { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+/* The body itself stays selectable — people copy order numbers out of here. */
+.chat-msg .chat-body { user-select: text; -webkit-user-select: text; }
+.chat-msg[role='button'] { cursor: pointer; }
+.chat-msg[role='button']:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+/* Held: the message lifts while the sheet is open, so it is obvious which one
+   the actions belong to. */
+.chat-msg.held { box-shadow: 0 0 0 2px var(--primary); }
 
-/* Always visible on a touch screen: hover does not exist there, so the controls
-   would be unreachable. */
-@media (hover: none) {
-  .chat-actions { display: flex; position: static; margin-top: 6px; justify-content: flex-end; }
-  .chat-icon-btn { width: 44px; height: 44px; }
+.chat-edited { font-style: italic; opacity: .75; }
+
+.msg-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(45, 52, 54, .45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--space-2);
+  animation: sheetFade 150ms ease;
+}
+@keyframes sheetFade { from { opacity: 0; } to { opacity: 1; } }
+
+.msg-sheet {
+  width: min(420px, 100%);
+  background: var(--surface);
+  border-radius: 16px;
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -8px 40px -12px rgba(45, 52, 54, .4);
+  animation: sheetUp 200ms cubic-bezier(.4, 0, .2, 1);
+}
+@keyframes sheetUp { from { transform: translateY(20px); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .msg-sheet-backdrop, .msg-sheet { animation: none; }
+}
+/* On a wide screen it belongs in the middle, not stuck to the bottom edge. */
+@media (min-width: 700px) {
+  .msg-sheet-backdrop { align-items: center; }
+  .msg-sheet { border-radius: 14px; }
+}
+
+/* The message being acted on, so there is no doubt which one it is. */
+.msg-sheet-preview {
+  margin: 0;
+  padding: 14px var(--space-2);
+  font-size: 13.5px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  max-height: 4.5em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.msg-sheet button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--space-2);
+  border: none;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface);
+  font: inherit;
+  font-size: 15.5px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.msg-sheet button:hover { background: var(--primary-soft); }
+.msg-sheet button:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.msg-sheet button.danger { color: var(--danger); }
+.msg-sheet button.danger:hover { background: var(--danger-soft); }
+.msg-sheet .msg-sheet-cancel {
+  justify-content: center;
+  border-bottom: none;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* ---- edit dialog ---------------------------------------------------------- */
+.msg-edit {
+  width: min(460px, 100%);
+  background: var(--surface);
+  border-radius: 16px;
+  padding: var(--space-3);
+  margin-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -8px 40px -12px rgba(45, 52, 54, .4);
+}
+.msg-edit h2 {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 var(--space-2);
+}
+.msg-edit textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  /* 16px so iOS does not zoom the page in when the field takes focus. */
+  font-size: 16px;
+  line-height: 1.5;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+}
+.msg-edit textarea:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.msg-edit .form-hint { margin: var(--space-1) 0 0; }
+.msg-edit-actions {
+  display: flex;
+  gap: var(--space-1);
+  justify-content: flex-end;
+  margin-top: var(--space-2);
 }
 
 .chat-error { margin-top: var(--space-1); }

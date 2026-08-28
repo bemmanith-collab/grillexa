@@ -120,12 +120,18 @@ function present(message, { viewerId, moderator }) {
   return {
     ...base,
     body: message.body,
+    edited: Boolean(message.editedAt),
     // Only shown to somebody who could act on it, so the UI never has to decide.
     // The announcement is not deletable by anyone — it is the explanation of
     // what this room is, and a new person joining next month should still find
     // it rather than an empty screen.
     canDelete: moderator && !message.isSystem,
     canPin: moderator && !message.isSystem,
+    // Editing is the author's alone, deliberately — not a moderator power.
+    // Deleting somebody's message leaves a visible tombstone in the thread;
+    // rewriting one would put different words under their name with nothing to
+    // show it happened. A moderator who disagrees can delete and say why.
+    canEdit: !message.isSystem && message.senderId === viewerId,
   };
 }
 
