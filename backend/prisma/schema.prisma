@@ -50,6 +50,7 @@ model User {
   // This is authorship: who walked up to it and put it in the system. Named
   // because two relations now join User and Store and Prisma cannot guess.
   createdStores    Store[]           @relation("StoreCreatedBy")
+  createdLeads     RetailerLead[]    @relation("LeadCreatedBy")
   pushSubscriptions PushSubscription[]
 
   // Team chat. Four relations join User to two tables, so every one is named —
@@ -615,4 +616,58 @@ model TeamChatMember {
   lastReadAt DateTime?
 
   @@index([isActive])
+}
+
+// A shop that has approached us, or that we want to approach.
+//
+// Separate from Store on purpose: a Store is somewhere we already trade, with
+// stock and settlements hanging off it. A lead is a candidate, and most of them
+// never become one. Merging the two would put rows with no stock, no sales and
+// no settlement terms into every store query in the app.
+//
+// Almost everything is nullable because a lead arrives however it arrives — a
+// name and a phone number scribbled down at a market is a real lead, and a
+// table that refuses it just moves the lead to somebody's notebook.
+model RetailerLead {
+  id     Int    @id @default(autoincrement())
+  name   String
+  // How they came to us: WALK_IN, REFERRAL, FIELD_VISIT, INBOUND_CALL, OTHER.
+  // A plain string rather than an enum — the list of ways a shop reaches a
+  // small distributor changes faster than a migration can keep up with.
+  source String @default("OTHER")
+  status String @default("NEW")
+
+  contactName String?
+  phone       String?
+  email       String?
+
+  address   String?
+  // Same shape as Store, and for the same reason: the address is for people,
+  // these are for the distance maths. Without them a lead cannot be scored on
+  // location at all, which is most of what decides whether it is worth a visit.
+  lat       Float?
+  lng       Float?
+  accuracyM Float?
+
+  // What the field rep observed. Self-reported and rough — used as a weak
+  // signal with the weight to match, never as a measurement.
+  monthlyFootfall Int?
+  shelfSpaceCm    Int?
+
+  notes String?
+
+  // Cached from the last scoring run so a list can be ordered without
+  // recomputing every row. Null means never scored; the score is only ever a
+  // snapshot of the network as it stood at scoredAt.
+  score    Float?
+  scoredAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdById Int?
+  createdBy   User? @relation("LeadCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([score])
 }

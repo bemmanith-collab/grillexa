@@ -852,6 +852,16 @@ Read from the environment or `.env`. One exception worth knowing: the business's
 | POST | `/api/team-chat/members` | Same gate — add, or re-add somebody who left. Upsert, so it never doubles a person |
 | DELETE | `/api/team-chat/members/:userId` | Same gate — a flag, not a delete, so their messages stay readable. You cannot remove yourself |
 
+## MCP servers
+
+`mcp-servers/grillexa-growth-hunter` is an MCP server that looks for revenue the
+network is not yet taking: whether a location is a genuine gap or would
+cannibalise a shop we already supply, which parts of a city are underserved,
+what can honestly be told a retailer, and which leads are worth the drive. It
+reads the same database through the backend's own Prisma client, and every
+answer carries the coverage it was drawn from — currently one geocoded store, so
+the caveats are the point. See its own README.
+
 ## Tests
 
 ```bash

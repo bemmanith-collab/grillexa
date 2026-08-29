@@ -1,0 +1,16 @@
+{
+  "name": "grillexa-growth-hunter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP server that hunts for revenue opportunities in the Grillexa store network.",
+  "bin": { "grillexa-growth-hunter": "index.js" },
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test/analysis.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.23.8"
+  }
+}
