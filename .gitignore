@@ -11,3 +11,6 @@ backend/prisma/migrations/**/migration.sql.bak
 
 # Generated WhatsApp posts (local only)
 whatsapp/posts/
+
+# personal Claude Code permissions, not the team's
+.claude/settings.local.json
