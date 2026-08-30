@@ -158,8 +158,12 @@ check('a transposed or out-of-range pair is caught at the keyboard', () => {
 });
 
 check('accuracy tiers separate a GPS fix from a wifi guess', () => {
-  assert.equal(accuracyTier(8), 'perfect');
-  assert.equal(accuracyTier(15), 'perfect');
+  assert.equal(accuracyTier(4), 'perfect');
+  assert.equal(accuracyTier(5), 'perfect');
+  // 8m and 15m were 'perfect' while the bar was 15m. They are honest 'good'
+  // readings now that a pin is only kept at 5m or better.
+  assert.equal(accuracyTier(8), 'good');
+  assert.equal(accuracyTier(15), 'good');
   // 65m is the good boundary, not 50: a real GNSS fix on a street between two
   // tall buildings sits in that band, and calling it 'fair' sends people back
   // outside to re-capture a pin that was already right.
@@ -184,7 +188,7 @@ check('accuracy reads in the unit a person would say it in', () => {
 });
 
 check('the accuracy label names the tier and says what to do about it', () => {
-  assert.equal(accuracyLabel(9), 'GPS accuracy: ±9m (perfect)');
+  assert.equal(accuracyLabel(9), 'GPS accuracy: ±9m (good)');
   assert.equal(accuracyLabel(40), 'GPS accuracy: ±40m (good)');
   assert.equal(accuracyLabel(150), 'GPS accuracy: ±150m (fair — check the address)');
   assert.equal(accuracyLabel(2000), 'GPS accuracy: ±2.0km (poor — step outside)');
@@ -192,7 +196,7 @@ check('the accuracy label names the tier and says what to do about it', () => {
 });
 
 check('the row badge is the short form of the same thing', () => {
-  assert.equal(accuracyBadge(9), '±9m perfect');
+  assert.equal(accuracyBadge(9), '±9m good');
   assert.equal(accuracyBadge(40), '±40m good');
   assert.equal(accuracyBadge(2000), '±2.0km poor');
   assert.equal(accuracyBadge(null), '');

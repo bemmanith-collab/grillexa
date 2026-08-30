@@ -175,8 +175,29 @@ The other guards are all about not hammering a free service or overwriting somet
 - **Never overwrites an existing pin**, from any source.
 - **The write is `updateMany ... where: { lat: null }`**, not a re-read. A GPS fix from someone billing in the shop can land during the second the lookup takes, and that one is worth more — letting the database enforce it makes the race impossible rather than unlikely.
 - Everything written is `pinSource: 'GEOCODED'` with a null `accuracyM`, so the first decent GPS reading still replaces it.
+- **The answer is checked before it is written.** See below — this is the guard that was missing.
 
 The pure guards are in `shouldAttempt`/`queryFor`, covered by `backend/test/storeGeocode.js` without a database, a clock or a network.
+
+### The plausibility gate, and why it exists
+
+On 2026-08-29 this feature had written **16 pins from addresses, and every one of them was wrong.** Measured against the five pins staff phones had actually recorded inside the shops: median **8.5 km** out, worst **14.1 km**, and **not one within 2 km**. Three different stores whose address read `"Sbi colony"` all resolved to the same arbitrary point; two reading `"Ntr nagar"` to another. Nothing about the rows looked wrong — a pin is a pin once it is in the column.
+
+Two causes, both now fixed:
+
+1. **The live path never passed a proximity anchor.** `lib/storeGeocode.js` called `searchPlaces(query, null)` while `scripts/backfill-store-coordinates.js`, three files over, was computing and passing one correctly. So every lookup ranked a bare colony name against the whole of a 650 km² city.
+2. **Nothing rejected an implausible answer.** This file says repeatedly that a wrong pin is worse than no pin, and then wrote whatever came back first.
+
+The gate lives in `lib/storePin.js` as `acceptGeocode`, so both writers route through one rule:
+
+- **Anchors are only pins somebody stood on** — `GPS` inside `ANCHOR_ACCURACY_M` (65 m), or `MANUAL`. Never `GEOCODED`: judging a guess against other guesses is how one bad pin recruits the next. The two legacy ±2000 m GPS rows are excluded too, because a 2 km-wide reading cannot anchor a 2 km test.
+- **A hit further than `STORE_GEOCODE_MAX_KM` (default 2 km) from the *nearest* anchor is refused**, and the store is left unpinned. Nearest rather than centroid, so the rule stays correct as the network spreads and a centroid drifts into open ground.
+- **Every candidate is considered, not just the first.** For a landmark string the top-ranked answer is routinely the wrong side of the city while a lower one is right.
+- **It fails closed with no anchor at all.** The ungated version had no anchor either, and wrote sixteen confident wrong answers rather than none. One pin placed by hand, or one bill rung up inside a shop with location on, is what opens it.
+
+`backend/test/storePin.js` replays all 16 real coordinates and asserts every one is refused.
+
+**Understand what this feature can and cannot give you.** A geocoder returns a neighbourhood or street centroid; a perfect rooftop match from a paid provider is still tens of metres. These addresses — `"Varalakshmi tiffin line"`, `"Gowtam model school Line"`, `"Opp to max vision"` — are landmark strings that exist in no geocoding database at all. **Address geocoding cannot produce a shutter-accurate pin, and no amount of tuning changes that.** It is for putting a store roughly on a map so aggregate questions have something to work with. Precision comes from the GPS capture, or from a person placing the pin by hand on satellite imagery, which beats consumer GNSS outright.
 
 ### Who hears about a captured pin
 
@@ -881,6 +902,8 @@ The service worker caches nothing, deliberately — this app writes bills, and a
 | `TEAM_CHAT_ADMINS` | Comma-separated **email addresses** allowed to moderate the team chat, checked on top of the Admin role. Unlike `WHATSAPP_AUTHORS` this **fails open** — unset means every Admin, because a room nobody can manage is worse than one extra person having the button |
 | `STORE_GEOCODE_CITY` | Optional, and **off when unset — which is the safe default, not an oversight**. The city to resolve bare store addresses against ("MG Road", "Whitefield") when filling a missing pin in the background after a bill. Unset, no background geocoding happens at all. Set it only to the city these shops are actually in: run without one, a real backfill matched three of six Bengaluru shops onto Chennai lookalikes, every one a confident-looking result |
 | `GEO_NOTIFY_EMAIL` | **One** email address told when a store gets located — successes only, from both the GPS capture and the address fill. **Fails closed**, like `WHATSAPP_AUTHORS`: unset means nobody, never "everybody". That direction is deliberate — these notifications say where a member of staff physically was when they rang up a bill, so a missing or misspelt value has to produce silence rather than broadcast location data to the whole team. Matched case-insensitively. The push **expires after 24 hours**, so a phone that was off all weekend gets nothing on Monday rather than a stack |
+| `STORE_PIN_MAX_ACCURACY_M` | Optional, default `5`. The widest GPS reading still allowed to become a pin. **Was effectively 65 m**, which is the right line for "is this a real GNSS fix" and the wrong one for "is this precise enough to mark a shutter" — a 65 m pin lands anywhere on the block. Be aware what 5 m costs: the best captures ever recorded on this network are 20-23 m, and a phone billing *inside* a shop will rarely clear it, because indoor multipath is the worst case for GNSS. Raise it if the map is starving rather than being protected |
+| `STORE_GEOCODE_MAX_KM` | Optional, default `2`. How far a geocoded point may sit from the nearest pin somebody actually stood on before it is thrown away. 2 km because the trusted pins on this network span 1.4 km end to end. Widen it for a network spread across a district rather than a few adjoining colonies — a limit that cannot be raised is one somebody works around by turning the check off |
 | `STORE_GEOCODE_TIMEOUT_MS` | Optional, default `2000`. How long the background pin fill waits for a geocoder before giving up on this bill's attempt. The HTTP calls abort themselves at 8s regardless, so this only shortens the *waiting*, and racing it does not cancel the request. Raise it if pins are not appearing and the logs show it giving up — the work is off the request path, so a longer wait costs nobody anything |
 | `ZENQUOTES_KEY` | **Optional, and currently pointless.** It configured the Wisdom Planner's suggestion button, and that page has been removed — `GET /api/quotes/suggestions` still honours the key but nothing calls it. Safe to leave unset |
 

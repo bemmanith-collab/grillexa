@@ -13,15 +13,31 @@
 // Pure, and separate from the route, so the rule can be checked without a
 // database or a browser. See test/storePin.js.
 
-// Mirrors ACCURACY_GOOD_M in frontend/src/lib/storeLinks.js. Duplicated rather
-// than shared because the two run in different processes with no build step
-// between them; if you move one, move the other. Below this is a genuine GNSS
-// fix. Above it, on a dense street, is a guess off wifi or a cell tower.
-const ACCEPT_ACCURACY_M = 65;
+// The widest reading still allowed to become a pin.
+//
+// WAS 65m, mirroring ACCURACY_GOOD_M in frontend/src/lib/storeLinks.js — the
+// threshold that separates a genuine GNSS fix from a guess off wifi or a cell
+// tower. That is the right question for "is this reading real", and the wrong
+// one for "is this reading precise enough to pin a shutter". A 65m pin lands
+// anywhere on the block.
+//
+// Now 5m, because that is the bar the pins are actually held to. Be aware what
+// it costs: on this network the best captures ever recorded are 20-23m, so at
+// 5m nothing captured so far would have qualified, and a phone billing INSIDE a
+// shop will very rarely clear it — indoor multipath is the worst case for GNSS.
+// A store pinned to 5m in practice gets there from somebody standing outside at
+// the shutter, or from a pin placed by hand on satellite imagery, which beats
+// consumer GNSS outright.
+//
+// Tunable, so the bar can be relaxed without a deploy if it turns out to be
+// starving the map rather than protecting it.
+const ACCEPT_ACCURACY_M =
+  Number(process.env.STORE_PIN_MAX_ACCURACY_M) > 0 ? Number(process.env.STORE_PIN_MAX_ACCURACY_M) : 5;
 
-// Mirrors ACCURACY_PERFECT_M. At or under this the hardware has nothing left to
-// give, so there is no reason to ask a phone for another reading.
-const PERFECT_ACCURACY_M = 15;
+// At or under this, stop asking a phone for another reading. Equal to the
+// accept bar: anything coarser is not kept, so there is nothing to improve on
+// by settling earlier.
+const PERFECT_ACCURACY_M = ACCEPT_ACCURACY_M;
 
 /**
  * Should we ask this store's next bill for a location fix?
@@ -97,4 +113,106 @@ function sourceFor(coords) {
   return coords.accuracyM == null ? 'MANUAL' : 'GPS';
 }
 
-module.exports = { wantsPin, shouldSavePin, sourceFor, ACCEPT_ACCURACY_M, PERFECT_ACCURACY_M };
+// ---------------------------------------------------------------------------
+// Is a geocoded point plausible at all?
+//
+// WHY THIS EXISTS: without it, 13 of 13 pins written from addresses were wrong
+// — median 8.5km from where the shops actually are, worst 14.1km, not one
+// within 2km. Three different stores whose address read "Sbi colony" all
+// resolved to the same arbitrary point, and two reading "Ntr nagar" to another.
+//
+// The addresses here are landmark micro-strings — "Varalakshmi tiffin line",
+// "Gowtam model school Line", "Opp to max vision". No geocoder holds these.
+// What a geocoder does instead is return its most confident match for the
+// fragment it *can* parse, somewhere in a 650km² city, and that answer looks
+// exactly like a correct one once written to the row.
+//
+// So this does not try to make the lookup smarter. It checks the answer against
+// the one thing we actually know: where staff phones have stood inside these
+// shops. A result far from every such pin is thrown away, and the store is left
+// unpinned for the GPS path to fill properly.
+
+const EARTH_RADIUS_KM = 6371;
+const toRad = (deg) => (deg * Math.PI) / 180;
+
+function haversineKm(a, b) {
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
+}
+
+// How good a reading has to be to ANCHOR the plausibility test below — a much
+// looser question than whether it is precise enough to be a pin, and the two
+// must not share a number. A 20m fix is nowhere near the 5m bar for storing a
+// pin, but it says which part of the city these shops are in to well inside a
+// metre of what a 2km test needs. Tying anchoring to ACCEPT_ACCURACY_M instead
+// threw away all five real pins on this network the moment the bar moved to 5m,
+// which would have disabled the check entirely and silently.
+//
+// 65m is the old ACCURACY_GOOD_M line: below it a reading is a genuine GNSS
+// fix, above it a guess off wifi or a cell tower. That is exactly the right
+// question here.
+const ANCHOR_ACCURACY_M = 65;
+
+/**
+ * The pins worth measuring against: a phone that reported a believable accuracy
+ * while standing in the shop, or a point a person placed by hand.
+ *
+ * Deliberately excludes GEOCODED — judging a guess against other guesses is how
+ * one bad pin recruits the next. It also excludes the coarse GPS rows written
+ * before any gate existed (two of them sit at ±2000m), because a 2km-wide
+ * reading cannot anchor a 2km test.
+ */
+function trustedPins(stores) {
+  return stores.filter(
+    (s) =>
+      s.lat != null &&
+      s.lng != null &&
+      (s.pinSource === 'MANUAL' ||
+        (s.pinSource === 'GPS' && s.accuracyM != null && s.accuracyM <= ANCHOR_ACCURACY_M))
+  );
+}
+
+// How far a geocoded point may sit from the nearest trusted pin. Two kilometres
+// because the trusted pins on this network span 1.4km end to end, so 2km covers
+// the trading area with margin while still rejecting every one of the 13 wrong
+// pins that prompted this. Tunable, because a network spread across a district
+// rather than a few adjoining colonies needs a wider figure — and a number that
+// cannot be raised is one somebody works around by turning the check off.
+const DEFAULT_MAX_KM = 2;
+
+/**
+ * Whether to write this geocoder hit. Pure — see test/storePin.js.
+ *
+ * FAILS CLOSED with no trusted pin to judge against. That direction is the
+ * whole point: the ungated version had nothing to compare with either, and it
+ * wrote thirteen confident wrong answers. Somebody placing one pin by hand, or
+ * one bill rung up inside a shop with location on, is what opens this.
+ */
+function acceptGeocode(hit, trusted, maxKm = DEFAULT_MAX_KM) {
+  if (!hit || !Number.isFinite(hit.lat) || !Number.isFinite(hit.lng)) {
+    return { accept: false, reason: 'no-coordinates', km: null };
+  }
+  if (!trusted.length) {
+    return { accept: false, reason: 'nothing-to-check-against', km: null };
+  }
+  const km = Math.min(...trusted.map((p) => haversineKm(hit, p)));
+  if (km > maxKm) return { accept: false, reason: 'too-far', km };
+  return { accept: true, reason: 'plausible', km };
+}
+
+module.exports = {
+  wantsPin,
+  shouldSavePin,
+  sourceFor,
+  haversineKm,
+  trustedPins,
+  acceptGeocode,
+  ACCEPT_ACCURACY_M,
+  PERFECT_ACCURACY_M,
+  DEFAULT_MAX_KM,
+  ANCHOR_ACCURACY_M,
+};

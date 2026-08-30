@@ -5,7 +5,7 @@
 // against real captures on real streets; a plain getCurrentPosition somewhere
 // else in the app would quietly undo all of it.
 
-import { ACCURACY_GOOD_M, ACCURACY_PERFECT_M } from './storeLinks';
+import { ACCURACY_PERFECT_M } from './storeLinks';
 
 // How long to keep watching for a better fix before settling for the best one
 // seen. Long enough for a cold GNSS start on a street where the sky is a strip
@@ -76,7 +76,11 @@ export function captureFix({ onProgress } = {}) {
         // calling the error handler.
         if (!improved) return;
         clearTimeout(settle);
-        settle = setTimeout(finish, best.coords.accuracy <= ACCURACY_GOOD_M ? SETTLE_MS : STALL_MS);
+        // PERFECT, not GOOD. Settling quickly on a merely "good" 65m reading
+        // returned a fix the server rejects as too coarse, so the capture cost
+        // somebody 3s in the street and produced no pin. Only a reading already
+        // worth keeping settles fast; anything else keeps hunting.
+        settle = setTimeout(finish, best.coords.accuracy <= ACCURACY_PERFECT_M ? SETTLE_MS : STALL_MS);
       },
       (err) => {
         if (done) return;

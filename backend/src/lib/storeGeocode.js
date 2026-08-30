@@ -23,6 +23,7 @@ const prisma = require('../db');
 const { searchPlaces, answerWith } = require('./geocode');
 const mapbox = require('./mapbox');
 const { notifyPinWatcher } = require('./push');
+const { trustedPins, acceptGeocode, DEFAULT_MAX_KM } = require('./storePin');
 
 // OFF UNLESS A CITY IS CONFIGURED, and that is the point rather than an
 // oversight. Store addresses here are bare neighbourhood names — "MG Road",
@@ -53,6 +54,14 @@ const RETRY_MS = 24 * 60 * 60 * 1000;
 // have arrived at 3s is a pin thrown away for nothing, and this work is off the
 // request path where the extra second costs no one anything.
 const TIMEOUT_MS = Number(process.env.STORE_GEOCODE_TIMEOUT_MS) > 0 ? Number(process.env.STORE_GEOCODE_TIMEOUT_MS) : 2000;
+
+// How far a result may sit from the nearest pin somebody actually stood on.
+//
+// This exists because the version without it wrote sixteen pins from these
+// addresses and every single one was wrong — median 8.5km out, worst 14.1km,
+// none within 2km of the shops. Three stores whose address read "Sbi colony"
+// all landed on the same arbitrary point. Nothing about the rows looked wrong.
+const MAX_KM = Number(process.env.STORE_GEOCODE_MAX_KM) > 0 ? Number(process.env.STORE_GEOCODE_MAX_KM) : DEFAULT_MAX_KM;
 
 // ponytail: in-memory, so the throttle resets on deploy and is per-process.
 // Both are fine at one machine and a handful of stores — the worst case is a
@@ -107,24 +116,55 @@ async function fillPin(storeId, timeoutMs) {
   // or a store that cannot be geocoded is exactly the one retried hardest.
   attempts.set(storeId, now);
 
+  // The pins somebody actually stood on. Loaded before the lookup because they
+  // are both the proximity hint sent to the geocoder AND the yardstick the
+  // answer is measured against afterwards.
+  const trusted = trustedPins(
+    await prisma.store.findMany({
+      where: { lat: { not: null }, lng: { not: null } },
+      select: { lat: true, lng: true, accuracyM: true, pinSource: true },
+    })
+  );
+  if (!trusted.length) {
+    console.log(`No trusted pin to check a geocode against — leaving ${store.name} unpinned.`);
+    return;
+  }
+  // Centroid, purely as the search's proximity hint. The accept/reject decision
+  // below uses distance to the NEAREST trusted pin instead, which stays correct
+  // as the network spreads out and a centroid drifts into open ground.
+  const near = [
+    trusted.reduce((t, p) => t + p.lat, 0) / trusted.length,
+    trusted.reduce((t, p) => t + p.lng, 0) / trusted.length,
+  ];
+
   const query = queryFor(store.address, CITY);
   // Mapbox first, Nominatim if it is absent or refuses — the same fallback the
   // routes use, so this can never resolve a store somewhere the Stores page
   // would disagree with.
+  //
+  // `near` was hardcoded null here until the sixteen-wrong-pins incident, so
+  // every lookup ranked a bare colony name against the whole of a 650km² city
+  // while the backfill script three files over was passing an anchor correctly.
   const { value: results } = await stopWaitingAfter(
     answerWith(
       mapbox.hasMapbox(),
-      () => mapbox.searchPlaces(query, null),
-      () => searchPlaces(query, null),
+      () => mapbox.searchPlaces(query, near),
+      () => searchPlaces(query, near),
       (err) => console.warn(`Mapbox failed geocoding ${store.name}, using Nominatim: ${err.message}`)
     ),
     timeoutMs,
     `Geocoding ${store.name}`
   );
 
-  const hit = results[0];
+  // Every candidate, not just the first: the top-ranked answer for a landmark
+  // string is routinely the wrong side of the city while a lower one is right.
+  const hit = results.find((r) => acceptGeocode(r, trusted, MAX_KM).accept) || null;
   if (!hit) {
-    console.log(`No geocode match for "${query}" (${store.name}) — leaving it unpinned.`);
+    const best = results[0] && acceptGeocode(results[0], trusted, MAX_KM);
+    console.log(
+      `No usable geocode for "${query}" (${store.name}) — ` +
+        (best ? `closest of ${results.length} was ${best.km.toFixed(1)}km away, limit ${MAX_KM}km.` : 'no matches at all.')
+    );
     return;
   }
 
@@ -179,4 +219,4 @@ function ensureStoreCoordinates(storeId, { timeoutMs = TIMEOUT_MS } = {}) {
   });
 }
 
-module.exports = { ensureStoreCoordinates, shouldAttempt, queryFor, RETRY_MS, TIMEOUT_MS };
+module.exports = { ensureStoreCoordinates, shouldAttempt, queryFor, RETRY_MS, TIMEOUT_MS, MAX_KM };

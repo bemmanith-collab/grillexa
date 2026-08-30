@@ -58,8 +58,18 @@ export function formatPin(store) {
 // Tune this against real captures, not against what the spec says GPS can do.
 export const ACCURACY_GOOD_M = 65;
 
-// Open sky, hardware GPS, nothing left to wait for — stop the watch on sight.
-export const ACCURACY_PERFECT_M = 15;
+// The bar a pin is actually held to, and the point the watch stops on sight.
+//
+// WAS 15m. Lowered to 5 to match STORE_PIN_MAX_ACCURACY_M on the server, which
+// is what decides whether a reading becomes a pin at all. At 15 the watch would
+// settle the moment it saw 15m and hand back a reading the server then threw
+// away — a spinner, a permission prompt, and no pin. Stopping only at 5 means
+// the full 25s window is actually spent hunting for a fix worth keeping.
+//
+// Mirrors ACCEPT_ACCURACY_M in backend/src/lib/storePin.js. Duplicated because
+// the two run in different processes with no build step between them; if you
+// move one, move the other.
+export const ACCURACY_PERFECT_M = 5;
 
 // The line between "check this" and "don't trust this". 200m still reverse
 // geocodes to the right road most of the time; past it the answer is a street
