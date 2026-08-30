@@ -14,7 +14,9 @@ const {
 } = require('../lib/geocode');
 const mapbox = require('../lib/mapbox');
 const mapUsage = require('../lib/mapUsage');
-const { notifyOthers } = require('../lib/push');
+const { notifyOthers, notifyPinWatcher } = require('../lib/push');
+const { assertStoreAccess } = require('../lib/scope');
+const { shouldSavePin, sourceFor } = require('../lib/storePin');
 
 const router = express.Router();
 
@@ -216,7 +218,7 @@ router.post('/', async (req, res) => {
   let store;
   try {
     store = await prisma.store.create({
-      data: { name, address, phone, ...coords.data, createdById: req.user.id },
+      data: { name, address, phone, ...coords.data, pinSource: sourceFor(coords.data), createdById: req.user.id },
     });
   } catch (err) {
     if (err.code === 'P2002') {
@@ -238,6 +240,63 @@ router.post('/', async (req, res) => {
   res.status(201).json({ store });
 });
 
+// A pin captured automatically while somebody was billing.
+//
+// Not PATCH /:id, which is ADMIN-only and can rename or re-address a store.
+// This one writes lat/lng/accuracyM and nothing else, so the account that is
+// allowed to bill for a shop is allowed to locate it — which it must be, since
+// the salesperson holding the phone in the shop is the only one who can.
+//
+// Deliberately quiet. It answers 200 whether or not the fix was kept, because
+// the caller is a fire-and-forget request behind a bill that has already been
+// saved: there is no screen waiting on this, nobody to show an error to, and a
+// rejected fix is the normal case rather than a fault. What was decided goes to
+// the server log, so a pin that never appears can be explained later.
+router.post('/:id/pin', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'A valid store id is required' });
+
+  try {
+    assertStoreAccess(req.user, id);
+  } catch (err) {
+    return res.status(err.status || 403).json({ error: err.message });
+  }
+
+  // Same validator the add-a-store form goes through: half a pin is rejected
+  // rather than half-saved, and 0,0 stays a real coordinate.
+  const coords = readCoords(req.body);
+  if (!coords.ok) return res.status(400).json({ error: coords.error });
+  if (coords.data.lat == null || coords.data.lng == null) {
+    return res.status(400).json({ error: 'lat and lng are required' });
+  }
+
+  const store = await prisma.store.findUnique({ where: { id } });
+  if (!store) return res.status(404).json({ error: 'Store not found' });
+
+  const { save, reason } = shouldSavePin(store, coords.data);
+  if (!save) {
+    console.log(`Store ${id} pin from billing not saved (${reason}, ±${coords.data.accuracyM ?? '?'}m)`);
+    return res.json({ saved: false, reason });
+  }
+
+  const updated = await prisma.store.update({
+    where: { id },
+    data: { ...coords.data, pinSource: 'GPS' },
+  });
+  console.log(`Store ${id} pin ${reason} from billing (±${coords.data.accuracyM}m)`);
+  res.json({ saved: true, reason, store: updated });
+
+  // Successes only, and only to the one address in GEO_NOTIFY_EMAIL. After the
+  // response and swallowed, so a push service having a bad day cannot cost us
+  // the pin we just saved.
+  notifyPinWatcher({
+    title: '📍 Store located',
+    body: `${updated.name} pinned to ±${Math.round(coords.data.accuracyM)}m while billing (${reason}).`,
+    url: `/stores?focus=${id}`,
+    tag: `store-pin-${id}`,
+  }).catch((err) => console.warn(`Pin notification failed: ${err.message}`));
+});
+
 router.patch('/:id', requireRole('ADMIN'), async (req, res) => {
   const id = Number(req.params.id);
   const { name, address, phone } = req.body;
@@ -251,6 +310,9 @@ router.patch('/:id', requireRole('ADMIN'), async (req, res) => {
         ...(address !== undefined && { address }),
         ...(phone !== undefined && { phone }),
         ...coords.data,
+        // Only when this request actually carried a pin — a rename must not
+        // relabel the source of a pin it never touched.
+        ...('lat' in coords.data && { pinSource: sourceFor(coords.data) }),
       },
     });
     res.json({ store });

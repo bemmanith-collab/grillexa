@@ -22,9 +22,8 @@ import {
   mapsPickUrl,
   parseCoordInput,
   coordError,
-  ACCURACY_GOOD_M,
-  ACCURACY_PERFECT_M,
 } from '../lib/storeLinks';
+import { captureFix } from '../lib/locate';
 
 // Mapbox GL and its stylesheet are ~1.9MB that most visits to this page never
 // need — the map only opens when someone asks for it. Lazily loaded so the
@@ -36,20 +35,6 @@ const EMPTY_FORM = { name: '', address: '', phone: '', lat: null, lng: null, acc
 
 // Empty id, like the filters on Reports — '' reads as "no filter" everywhere.
 const ALL_PEOPLE = { id: '', name: 'All sales people' };
-
-// How long to keep watching for a better fix before settling for the best one
-// seen. Long enough for a cold GNSS start on a street where the sky is a strip
-// between two buildings — which is most of them here.
-const WATCH_MS = 25000;
-
-// The watch rarely runs the full 25s, because readings stop improving long
-// before they stop arriving. These settle it once that happens: a short pause
-// after a usable fix in case a better one is right behind it, and a longer one
-// for a fix still too coarse to keep. The second doubles as the stall guard —
-// a phone on a weak network goes quiet without ever calling the error handler,
-// and a silent watch would otherwise spin to the full WATCH_MS.
-const SETTLE_MS = 2500;
-const STALL_MS = 8000;
 
 // A coordinate box. It holds the TEXT that was typed, and that is the entire
 // reason it is a component rather than an <input> inline in coordFields.
@@ -80,16 +65,6 @@ function CoordInput({ value, label, onType }) {
       onBlur={() => setDraft(null)}
     />
   );
-}
-
-// getCurrentPosition's error codes, in the words of someone holding the phone.
-// A denial is the common one and is not a failure — the address can always be
-// typed, so it reads as a redirection rather than an error.
-function geoMessage(err) {
-  if (err.code === 1) return 'Location permission was denied. Allow it in your browser settings, or type the address below.';
-  if (err.code === 2) return "Couldn't get a fix — try stepping outside, or type the address below.";
-  if (err.code === 3) return 'Locating timed out. Try again, or type the address below.';
-  return 'Location is unavailable. Type the address below.';
 }
 
 export default function Stores() {
@@ -210,74 +185,17 @@ export default function Stores() {
   // even attempted. Nominatim being slow or down must not cost the fix — that
   // is the part that can't be typed back in later.
   function locate(apply) {
-    if (!navigator.geolocation) {
-      setGeo({ busy: false, error: 'This browser cannot report a location. Type the address or coordinates below.', note: '' });
-      return;
-    }
     setGeo({ busy: true, error: '', note: 'Locating… hold still for a few seconds.' });
+    captureFix({
+      onProgress: (accuracy) =>
+        setGeo({ busy: true, error: '', note: `Locating… best so far ${formatAccuracy(accuracy)}` }),
+    }).then(finish, (err) => setGeo({ busy: false, error: err.message, note: '' }));
 
-    // watchPosition, not getCurrentPosition. The FIRST fix a phone returns is
-    // usually the cheap one — wifi or cell, hundreds of metres out, sometimes
-    // kilometres — and the true GNSS fix arrives seconds later. Taking the
-    // first reading is what puts a store on the wrong road. So: watch, keep
-    // the most accurate reading seen, and stop early once it is good enough.
-    let best = null;
-    let done = false;
-    let settle = null;
-
-    // Don't watch forever: a phone that never gets a clean fix must still hand
-    // back the best it managed rather than spinning.
-    const maxTimer = setTimeout(() => finish(), WATCH_MS);
-
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const improved = !best || pos.coords.accuracy < best.coords.accuracy;
-        if (improved) best = pos;
-        setGeo({ busy: true, error: '', note: `Locating… best so far ${formatAccuracy(best.coords.accuracy)}` });
-        // Open sky: this is as good as the hardware gets, so stop asking.
-        if (best.coords.accuracy <= ACCURACY_PERFECT_M) return finish();
-        // Wait out a quiet spell, re-armed only when the fix actually got
-        // BETTER. Re-arming on every reading instead meant it never fired: a
-        // phone delivers a fix about once a second and almost all of them are
-        // no improvement on the best, so the timer was pushed back before it
-        // could ever expire and every capture ran the full 25s with someone
-        // stood in the street holding a phone. Armed on the first reading, so
-        // it is still the stall guard for a watch that goes quiet without ever
-        // calling the error handler.
-        if (!improved) return;
-        clearTimeout(settle);
-        settle = setTimeout(finish, best.coords.accuracy <= ACCURACY_GOOD_M ? SETTLE_MS : STALL_MS);
-      },
-      (err) => {
-        if (done) return;
-        // A later error after a good reading isn't a failure — keep what we have.
-        if (best) return finish();
-        done = true;
-        stop();
-        setGeo({ busy: false, error: geoMessage(err), note: '' });
-      },
-      { enableHighAccuracy: true, timeout: WATCH_MS, maximumAge: 0 }
-    );
-
-    function stop() {
-      clearTimeout(maxTimer);
-      clearTimeout(settle);
-      navigator.geolocation.clearWatch(watchId);
-    }
-
-    async function finish() {
-      if (done) return;
-      done = true;
-      stop();
-      if (!best) {
-        setGeo({ busy: false, error: "Couldn't get a fix — type the address or coordinates below.", note: '' });
-        return;
-      }
-      const { latitude: lat, longitude: lng, accuracy } = best.coords;
+    async function finish({ lat, lng, accuracyM: accuracy }) {
       const tier = accuracyTier(accuracy);
       // The pin lands first, always — it is the part that cannot be typed back
       // in later, and the address lookup may fail or be slow.
-      apply({ lat, lng, accuracyM: Math.round(accuracy) });
+      apply({ lat, lng, accuracyM: accuracy });
 
       // A fix this coarse would reverse-geocode to a confidently wrong street.
       // Filling that in is worse than leaving it blank: it looks authoritative

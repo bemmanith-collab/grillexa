@@ -139,6 +139,91 @@ The same button sits in the row editor as **📍 Re-capture**, because fifty sto
 
 The address is stored as the single `Store.address` string the table already had, composed from the geocoded parts. The coordinates and the address text are **independent fields** — editing one never touches the other, and Directions always prefers the coordinates. Schema additions: `lat`, `lng`, `accuracyM`, and `phone` (`phone` because a Call button needs a number and there was nowhere to keep one).
 
+### Where a pin came from (`pinSource`)
+
+`accuracyM` could not tell a pin somebody placed by hand from one a machine guessed off an address — **both record a null accuracy, because neither was measured** — and the two need opposite treatment. `Store.pinSource` names it: `GPS`, `MANUAL`, or `GEOCODED`. Null means the row predates the column, and accuracy decides exactly as it did before.
+
+It exists to answer one question: **may something automatic overwrite this?** `MANUAL` never — a person put it there, possibly to correct a bad guess. `GEOCODED` always, given a fix good enough to pass the accuracy gate — an address lands on the middle of a neighbourhood as often as on the shutter, and there is no accuracy figure on a geocode to compare against, so a reading taken standing in the shop wins outright. `GPS` only when the new reading is *strictly* tighter, so a store's row is not rewritten by every bill of the day. The rules are in `backend/src/lib/storePin.js`, pure and away from the routes, and covered by `backend/test/storePin.js`.
+
+### Pins captured while billing
+
+Most stores have no pin, and the errand of going to stand outside each one with the Stores page open is the errand that never gets run. But ringing up a bill is a moment we can be sure a phone is *inside the shop* — so that is when the fix is taken, automatically.
+
+**Nothing is asked of the person billing and nothing is shown to them.** The capture starts only after the bill is already saved, so it cannot slow billing down or fail it; every outcome is swallowed on the client, because there is no screen waiting on it and no error anybody could act on. The one part that cannot be made invisible is the browser's own permission prompt the first time a device is asked — that is enforced by the browser, not by this code.
+
+**The server decides, twice.** `POST /api/sales` returns `pinWanted` alongside the new bill, from the store row it had already loaded — false for a store whose pin is `MANUAL`, or already as tight as the hardware gets. That is what keeps the permission prompt from appearing on shops we have already located well: a page that never calls for a position never triggers one. Then `POST /api/stores/:id/pin` re-decides on arrival and **drops any fix coarser than 65m** (`ACCEPT_ACCURACY_M`, mirroring `ACCURACY_GOOD_M` on the client). Indoors is precisely where a reading is most likely to come off wifi and be kilometres out, and **no pin beats a wrong pin** — a wrong one never looks like an error, it just sends drivers to the wrong road forever. Rejecting a fix costs nothing; there is another bill along in an hour.
+
+That endpoint is deliberately *not* `PATCH /api/stores/:id`, which is Admin-only and can rename or re-address a store. It writes `lat`/`lng`/`accuracyM`/`pinSource` and nothing else, so the account allowed to bill for a shop is allowed to locate it — which it must be, since the salesperson holding the phone is the only one who can. It answers `200` whether or not the fix was kept, with the reason (`first-pin`, `improved`, `replaces-geocoded`, `too-coarse`, `hand-placed`, `not-better`, `no-accuracy`) in the body and the server log, so a pin that never appears can be explained without guessing.
+
+The watcher itself is **shared, not re-written**: `frontend/src/lib/locate.js` holds the `watchPosition` loop that was tuned on the Stores page — keep the most accurate reading, stop early at 15m, settle once readings stop improving — and both callers use it. A plain `getCurrentPosition` somewhere else in the app would have quietly undone all of that tuning, since the first fix a phone returns is usually the cheap one.
+
+### Filling a missing pin in the background (backend only)
+
+A store added without a pin would otherwise wait for the weekly backfill, or for somebody to bill there with location permission granted and a clean fix. `backend/src/lib/storeGeocode.js` closes that gap from the server alone: after a bill is saved, an unpinned store gets a provisional pin from its address.
+
+**It cannot disturb billing, by construction.** The obvious shape — a middleware that awaits a geocode before creating the bill — puts a third-party HTTP call between a customer and their receipt, so a slow or down geocoder becomes a slow or down till; and an async middleware that throws takes the process with it on Express 4, which is what `test/crash-guards.js` exists for. So instead: nothing is awaited by the route, the call is queued with `setImmediate` *after* `res.json` has gone out, and `ensureStoreCoordinates(storeId)` returns `undefined` **synchronously** — not a promise — so a caller cannot block on it even by writing `await`. The bill cannot tell whether it ran, succeeded or failed. A test asserts exactly that, against every malformed argument it could be handed.
+
+It is called after the response from **every endpoint that creates a bill against a store**: `POST /api/sales`, `POST /api/consignments/:id/settle`, and the offline CSV import (once per distinct store in the file, not once per row). All the guards live in the function, not at the call sites, so calling it for an already-pinned store on every bill is free and safe.
+
+**Two timeouts, doing different jobs.** The HTTP calls abort themselves at 8s (`AbortSignal.timeout`), so nothing can hang. On top of that, `STORE_GEOCODE_TIMEOUT_MS` (default `2000`) is a shorter *waiting* budget: past it we stop caring about the answer and the day's throttle carries the store to tomorrow. Racing a timer does not cancel the request — the fetch runs on to its own abort — so this is "stop waiting", not "stop working", and it is tunable because 2s is tight for Nominatim on a bad day. A reply that would have arrived at 3s is a pin thrown away for nothing, and this work is off the request path where the extra second costs nobody anything.
+
+**Off unless `STORE_GEOCODE_CITY` is set**, and that default is deliberate — see the flag's row in the environment table, and the three-of-six Chennai mishap below that explains it.
+
+The other guards are all about not hammering a free service or overwriting something better:
+
+- **One attempt per store per day**, marked *before* the lookup rather than after — a failed attempt has to throttle too, or the store that can never be geocoded is the one retried on every bill it ever rings up.
+- **Never overwrites an existing pin**, from any source.
+- **The write is `updateMany ... where: { lat: null }`**, not a re-read. A GPS fix from someone billing in the shop can land during the second the lookup takes, and that one is worth more — letting the database enforce it makes the race impossible rather than unlikely.
+- Everything written is `pinSource: 'GEOCODED'` with a null `accuracyM`, so the first decent GPS reading still replaces it.
+
+The pure guards are in `shouldAttempt`/`queryFor`, covered by `backend/test/storeGeocode.js` without a database, a clock or a network.
+
+### Who hears about a captured pin
+
+One person, named by `GEO_NOTIFY_EMAIL`, and strictly nobody else. Both success paths notify — the GPS capture in `POST /api/stores/:id/pin` and the address fill in `lib/storeGeocode.js` — and the two say different things, on purpose: a GPS pin reports its accuracy, an address pin says *"provisional — a GPS fix while billing will replace it"*. A notification that blurred those would be the one place that difference stops being visible.
+
+**Failures are not notified.** A refused fix is the normal case, not an event: too coarse, not better than the pin already there, no geocoder match. Those go to the server log, where they can be read when somebody asks why a store is still unpinned, rather than to a phone.
+
+**It fails closed.** Unset means nobody, never "everybody" — the opposite of `TEAM_CHAT_ADMINS`, and deliberately so. These messages say where a member of staff physically was when they rang up a bill, so the cost of a missing or misspelt secret has to be silence, not location data broadcast to the whole team. `notifyPinWatcher` resolves exactly one user id and passes exactly that one to `sendToUsers`; there is no path that widens it.
+
+**They expire after 24 hours** (`TTL: 86400`, against the one-hour default the rest of the app uses). "Store X got located" is a today fact — delivered two days late it is not a smaller version of the same message, it is noise about a day nobody is thinking about. TTL is the right lever rather than an expiry check of our own, because the push service enforces it even when this app never runs again: a phone switched off for the weekend gets nothing on Monday instead of a stack.
+
+Seven tests in `backend/test/push.js` cover it, and the one that matters most asserts the fail-closed default by re-requiring the module with the variable unset.
+
+### Backfilling pins from addresses
+
+`node backend/scripts/backfill-store-coordinates.js` geocodes stores that trade but have never been located. Six stores had sales and no coordinates, which made their trade invisible to every question the growth tools ask about *where* to expand.
+
+```bash
+cd backend
+node scripts/backfill-store-coordinates.js                     # preview, changes nothing
+node scripts/backfill-store-coordinates.js --city="Bengaluru"  # preview, biased to one city
+node scripts/backfill-store-coordinates.js --city="Bengaluru" --apply
+node scripts/backfill-store-coordinates.js --all               # include stores with no sales yet
+node scripts/backfill-store-coordinates.js --apply --json      # machine-readable, for a scheduled run
+node scripts/backfill-store-coordinates.js --redo-geocoded --city="…" --apply   # ran it with the wrong city
+```
+
+**`--redo-geocoded` is the escape hatch for having run it with the wrong `--city`.** Without it a wrong pin is stuck: the store now has coordinates, so the next run skips it and the only fix is SQL by hand. It reconsiders `GEOCODED` pins only — a GPS fix or a hand-placed one is never touched, whatever flags are passed.
+
+**It is a dry run by default**, and that is not politeness — the first real run proved why. Store addresses here are bare neighbourhood names ("MG Road", "Whitefield", "Jayanagar"), and each of those exists in several Indian cities. The search is biased toward an already-pinned store, and the only pinned store was in Chennai while the six being geocoded were Bengaluru shops — so **three of six matched confidently onto Chennai lookalikes**: Indiranagar landed in Ambattur, Jayanagar in Tambaram, Whitefield in Medavakkam. Nothing in the output looked wrong. Applied blind, that is three shops silently misplaced by 300km and every subsequent distance drawn from them.
+
+**`--city="…"` is the fix, and the flag to reach for whenever the stores being geocoded are not in the same city as the ones already pinned.** It geocodes the city once, uses that as the bias, and — the part that actually matters — names the city *in the query itself*. The proximity hint is `bounded=0`, a preference the geocoder is free to ignore, and it does; `"Whitefield, Bengaluru"` is what pins it. With it, all six land in the right neighbourhoods.
+
+It uses the app's own geocoders (Mapbox when `MAPBOX_ACCESS_TOKEN` is set and accepted, Nominatim otherwise, through the same `answerWith` fallback the routes use) and paces itself at one request per second, because Nominatim runs on donated hardware and the whole app shares one outbound IP.
+
+Every store it writes is marked `pinSource = 'GEOCODED'` with a null `accuracyM`. Nothing measured these, so inventing a radius would make a rooftop guess indistinguishable from a GPS fix. Marking them is what lets the billing capture above replace them later with something real.
+
+Both a run's successes and its failures are reported, and every match prints the string it actually searched alongside the label it matched, so a wrong city is visible before it is written rather than after. Stores with no address are separated from stores the geocoder could not match, because the fix differs: one needs an address typed in on the Stores page, the other needs a better one. `--json` prints the whole summary — counts, every match, every failure with its reason — for a scheduled run to log.
+
+To run it on a schedule, use the Fly machine that is already deployed rather than adding a scheduler:
+
+```bash
+flyctl ssh console -a grillexa -C "node backend/scripts/backfill-store-coordinates.js --apply --json"
+```
+
+Wrap that in whatever cron you already trust (a GitHub Actions `schedule:` workflow is the least new infrastructure). Weekly is plenty — this only has work to do when a store is added without a pin, and the billing capture handles the rest.
+
 ## Mapbox, and the meter that watches the bill
 
 The map and both directions of geocoding are Mapbox's. **Two tokens, and they are not interchangeable:**
@@ -794,6 +879,9 @@ The service worker caches nothing, deliberately — this app writes bills, and a
 | `WHATSAPP_REMINDER_HOUR` | Optional, default `7`. The IST hour the reminder may go out from. An empty value falls back to 7 rather than to midnight |
 | `WHATSAPP_AUTHORS` | Comma-separated **email addresses** allowed to write channel posts, checked on top of the Admin/Manager role. **Fails closed** — unset means nobody, and the panel does not appear for anyone. Emails rather than names because they are unique in the database and stable |
 | `TEAM_CHAT_ADMINS` | Comma-separated **email addresses** allowed to moderate the team chat, checked on top of the Admin role. Unlike `WHATSAPP_AUTHORS` this **fails open** — unset means every Admin, because a room nobody can manage is worse than one extra person having the button |
+| `STORE_GEOCODE_CITY` | Optional, and **off when unset — which is the safe default, not an oversight**. The city to resolve bare store addresses against ("MG Road", "Whitefield") when filling a missing pin in the background after a bill. Unset, no background geocoding happens at all. Set it only to the city these shops are actually in: run without one, a real backfill matched three of six Bengaluru shops onto Chennai lookalikes, every one a confident-looking result |
+| `GEO_NOTIFY_EMAIL` | **One** email address told when a store gets located — successes only, from both the GPS capture and the address fill. **Fails closed**, like `WHATSAPP_AUTHORS`: unset means nobody, never "everybody". That direction is deliberate — these notifications say where a member of staff physically was when they rang up a bill, so a missing or misspelt value has to produce silence rather than broadcast location data to the whole team. Matched case-insensitively. The push **expires after 24 hours**, so a phone that was off all weekend gets nothing on Monday rather than a stack |
+| `STORE_GEOCODE_TIMEOUT_MS` | Optional, default `2000`. How long the background pin fill waits for a geocoder before giving up on this bill's attempt. The HTTP calls abort themselves at 8s regardless, so this only shortens the *waiting*, and racing it does not cancel the request. Raise it if pins are not appearing and the logs show it giving up — the work is off the request path, so a longer wait costs nobody anything |
 | `ZENQUOTES_KEY` | **Optional, and currently pointless.** It configured the Wisdom Planner's suggestion button, and that page has been removed — `GET /api/quotes/suggestions` still honours the key but nothing calls it. Safe to leave unset |
 
 Read from the environment or `.env`. One exception worth knowing: the business's own name, address and FSSAI licence number are hardcoded in `frontend/src/lib/businessInfo.js` because they are printed on every invoice. Not secret, but they are per-business and would need changing for anyone else.
@@ -811,7 +899,9 @@ Read from the environment or `.env`. One exception worth knowing: the business's
 | POST/PATCH | `/api/products`, `/api/products/:id` | Admin, Manager |
 | DELETE | `/api/products/:id` | Admin |
 | GET | `/api/stores` | Authenticated — Sales sees only its own stores, without staff names |
-| POST/PATCH/DELETE | `/api/stores`, `/api/stores/:id` | Admin |
+| POST | `/api/stores` | Authenticated — a salesperson outside a new shop is the person best placed to capture its pin |
+| PATCH/DELETE | `/api/stores/:id` | Admin — renaming or removing rewrites history that invoices and ledgers point at |
+| POST | `/api/stores/:id/pin` | Admin, Manager, Sales — store-scoped. Writes coordinates only; silently drops a fix coarser than 65m |
 | GET | `/api/stock/today?storeId=&date=` | Authenticated, store-scoped. `storeId=all` totals every store in scope |
 | GET | `/api/stock/history?storeId=&productId=&from=&to=` | Authenticated, store-scoped |
 | POST | `/api/stock/:storeId/:productId/wastage` | Authenticated, store-scoped |
@@ -871,7 +961,7 @@ cd frontend && npm test
 
 No framework, no database, no browser — plain Node scripts that print `ok` lines.
 
-Backend, eighteen files:
+Backend, twenty files:
 
 - `test/crash-guards.js` — malformed request bodies return 400 rather than killing the process (an unhandled rejection in an async handler exits Node on Express 4), `todayStr` is ISO and round-trips, and public signup stays gone.
 - `test/stock-cascade.js` — the ledger cascade against an in-memory Prisma stub: back-dated writes re-chain later days, moving a document between dates leaves nothing behind, and reversing a bill restores stock exactly.
@@ -889,6 +979,10 @@ Backend, eighteen files:
 - `test/team-chat.js` — one room the whole staff writes in, and two of five Admins moderate it. The part that must not be wrong is who may delete a message and remove a person, so: the two named Admins moderate and the other three do not, the allowlist narrows the Admin role but can never widen it to a Manager, a removed member cannot post, a deleted message loses its body but keeps its place, and nobody — moderator included — can delete the announcement. One test exists because of a real bug: the badge must count authorless system messages, which a plain `senderId <> N` silently dropped.
 
 - `test/whatsapp-calendar.js` — the 30-day calendar is ninety rows of copy in a JSON file plus one small map, and both rot quietly. The strategy file is checked for thirty contiguous days with all three times of day, nothing blank that the schema requires, no draft over a hundred words, and none of the words `prompts/brand.md` forbids outright — beef and pork among them, which lose readers permanently. Then the join: every time of day must still name a content type the generator actually has, and pass a meal only to a type that takes one.
+
+- `test/storePin.js` — whether a location captured during billing becomes a store's pin. Worth testing because both mistakes are silent: refuse too eagerly and a store stays invisible to every location question, accept too eagerly and a wifi guess is written that looks exactly like a GPS fix and misdirects deliveries for good. So: a coarse fix is refused even when there is no pin at all, `accuracyM` of `0` is "the sensor said nothing" rather than "perfectly accurate", a hand-placed pin is never overwritten, a geocoded one always is, a measured pin is only replaced by a *strictly* better reading, and the accuracy gate outranks the improvement test — a 3km fix does not replace a 5km one, since better is not the same as good enough.
+
+- `test/storeGeocode.js` — the guards on the background geocode that runs after a bill. All of them stop one of two things: hammering a free service on a shared outbound IP, or writing a guess over something better. So an unconfigured city means no lookup at all, a store that already has a pin is never touched, a store with no address is skipped rather than searched blank, a missing store returns false instead of throwing, the day-long throttle is checked at both edges, and the city is folded into the query string rather than trusted to a proximity hint the geocoder may ignore. One test covers the hard constraint directly: `ensureStoreCoordinates` returns `undefined` synchronously and throws for no argument at all — not `null`, a float, a string, `NaN` or an object — because a route that has already sent its response must not be able to block on it or be crashed by it.
 
 `test/fake-tx.js` is not a test: it is the in-memory Prisma stub `stock-cascade.js` and `offline-import.js` share, so there is one fake to keep honest rather than two that drift. It applies the schema's column defaults on insert the way Postgres does — a fake that returned a defaulted column as `undefined` turned the import's wastage delta into `NaN`, which looked exactly like a bug in the code.
 

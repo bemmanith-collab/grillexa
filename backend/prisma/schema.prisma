@@ -177,6 +177,13 @@ model Store {
   // identical once saved, and the second one silently sends drivers to the
   // wrong road. Null for a pin typed in by hand, which has no sensor estimate.
   accuracyM Float?
+  // Where the pin came from: 'GPS', 'MANUAL' or 'GEOCODED'. accuracyM cannot
+  // answer this — a hand-placed pin and one guessed from an address both record
+  // null, because neither was measured. The difference decides whether the
+  // automatic capture on billing may replace it: a machine's guess at an
+  // address should be, a person's deliberate correction never. Null means the
+  // row predates the column, and accuracyM decides as it always did.
+  pinSource String?
   createdAt DateTime @default(now())
   // Who added it. Nullable because every store already in the table was added
   // before anyone recorded this, and those cannot be attributed after the fact.

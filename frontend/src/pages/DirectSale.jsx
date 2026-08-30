@@ -13,6 +13,31 @@ import { ReceiptIcon, RefreshIcon } from '../components/icons';
 import { formatCurrency } from '../lib/format';
 import { filterToCatalog, describeDropped } from '../lib/reorder';
 import { formatDate, todayStr } from '../utils/date';
+import { captureFix } from '../lib/locate';
+
+// Fill in a store's map pin off the back of a bill.
+//
+// Ringing up a sale is the one moment we can be sure the phone is inside the
+// shop, and most shops have no coordinates at all — which is why every question
+// about where to expand currently answers from a single located store. So the
+// fix is taken here rather than asking somebody to go and stand outside with
+// the Stores page open, which is the errand that never gets run.
+//
+// Nothing about this is visible or interactive. It starts only after the bill
+// is already saved, so it cannot slow billing down or fail it; it runs only
+// when the server said a pin would actually be used; and every outcome is
+// swallowed, because there is no screen waiting on it and nobody to act on an
+// error. The server decides whether the reading is good enough to keep — a
+// coarse indoor fix is dropped there rather than saved as a store's location.
+//
+// The one part that cannot be made invisible is the browser's own permission
+// prompt, the first time a device is asked. That is enforced by the browser,
+// not by this code.
+function capturePinFor(storeId) {
+  captureFix()
+    .then((fix) => client.post(`/stores/${storeId}/pin`, fix))
+    .catch(() => {});
+}
 
 export default function DirectSale() {
   const { user } = useAuth();
@@ -205,6 +230,12 @@ export default function DirectSale() {
       const res = editingId
         ? await client.patch(`/sales/${editingId}`, payload)
         : await client.post('/sales', payload);
+      // New bills only. An edit is as often a correction typed up at the office
+      // days later, and that phone is nowhere near the shop.
+      //
+      // The store id comes off the saved bill rather than the form, because a
+      // SALES account may submit without one and the server fills it in.
+      if (res.data.pinWanted) capturePinFor(res.data.sale.storeId);
       resetForm();
       setFormOpen(false);
       setDetail(res.data.sale);

@@ -3,6 +3,7 @@ const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
 const { toRecords, planImport, applyImport } = require('../lib/offlineImport');
+const { ensureStoreCoordinates } = require('../lib/storeGeocode');
 
 const router = express.Router();
 
@@ -106,6 +107,15 @@ router.post(
         nextStep: 'Run: node scripts/recompute-ledger.js --apply',
         results,
       });
+
+      // Every store this file billed against, after the response. One call per
+      // distinct store rather than per row — a file can carry hundreds of rows
+      // for the same shop, and the day-long throttle inside would drop the rest
+      // anyway. Nothing here is awaited and nothing here can throw into the
+      // handler. See lib/storeGeocode.js.
+      for (const storeId of new Set(plan.map((p) => p.storeId))) {
+        ensureStoreCoordinates(storeId);
+      }
     } catch (err) {
       // The transaction rolled back, so the database is untouched either way.
       console.error('Offline import failed:', err);

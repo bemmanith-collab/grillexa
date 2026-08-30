@@ -15,6 +15,10 @@ const assert = require('assert');
 // VAPID keys and captures the client at module load, not per call.
 process.env.VAPID_PUBLIC_KEY = 'test-public-key';
 process.env.VAPID_PRIVATE_KEY = 'test-private-key';
+// Read at module load too. Deliberately in a different case from the row in the
+// fake users table below — an address typed into a Fly secret and one typed
+// into the database will differ in case sooner or later.
+process.env.GEO_NOTIFY_EMAIL = 'Watcher@Example.com';
 
 const sends = [];
 // Keyed by endpoint, so a test can make one device fail while the rest succeed.
@@ -47,6 +51,13 @@ require.cache[dbPath] = {
       async findMany({ where }) {
         return db.users.filter((u) => u.id !== where.id.not).map((u) => ({ id: u.id }));
       },
+      // Only ever called by notifyPinWatcher, matching one email. Insensitive
+      // to match the real query's `mode: 'insensitive'`.
+      async findFirst({ where }) {
+        const wanted = String(where.email.equals).toLowerCase();
+        const hit = db.users.find((u) => String(u.email || '').toLowerCase() === wanted);
+        return hit ? { id: hit.id } : null;
+      },
     },
     pushSubscription: {
       async findMany({ where }) {
@@ -61,7 +72,7 @@ require.cache[dbPath] = {
   },
 };
 
-const { sendToUsers, notifyOthers } = require('../src/lib/push');
+const { sendToUsers, notifyOthers, notifyPinWatcher, PIN_TTL_S } = require('../src/lib/push');
 
 function sub(id, userId, endpoint) {
   return { id, userId, endpoint, auth: 'auth-' + id, p256dh: 'p256dh-' + id };
@@ -70,7 +81,15 @@ function sub(id, userId, endpoint) {
 function reset() {
   sends.length = 0;
   answers = {};
-  db.users = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  // User 3 is the pin watcher, and has two devices — so a test can tell "sent
+  // to the right person" apart from "sent to one subscription".
+  db.users = [
+    { id: 1, email: 'sales@example.com' },
+    { id: 2, email: 'manager@example.com' },
+    { id: 3, email: 'watcher@example.com' },
+  ];
+  // The watcher's own devices are added by the tests that need them, so the
+  // existing expectations about who notifyOthers reaches stay untouched.
   db.subs = [
     sub('s1', 1, 'https://web.push.apple.com/one'),
     sub('s2', 2, 'https://fcm.googleapis.com/fcm/send/two'),
@@ -161,6 +180,90 @@ async function check(name, fn) {
     // path that runs inside store creation.
     db.subs = [];
     assert.deepEqual(await sendToUsers([1, 2], { title: 'x' }), { sent: 0, removed: 0 });
+  });
+
+  // --- Pin notifications: one named person, and only for a day -------------
+
+  await check('a pin notification reaches the configured address and nobody else', async () => {
+    // The constraint is "strictly nobody else": this says where a member of
+    // staff physically was when they rang up a bill, so the blast radius of a
+    // mistake here is not a spurious buzz, it is location data going to people
+    // who were never meant to have it. Sales and the manager have live
+    // subscriptions and must receive nothing.
+    db.subs.push(sub('s3', 3, 'https://fcm.googleapis.com/fcm/send/watcher-phone'));
+    db.subs.push(sub('s4', 3, 'https://web.push.apple.com/watcher-tablet'));
+
+    await notifyPinWatcher({ title: '📍 Store located' });
+
+    assert.deepEqual(
+      sends.map((s) => s.endpoint).sort(),
+      ['https://fcm.googleapis.com/fcm/send/watcher-phone', 'https://web.push.apple.com/watcher-tablet']
+    );
+  });
+
+  await check('every device of the configured person is reached, not just one', async () => {
+    db.subs.push(sub('s3', 3, 'https://fcm.googleapis.com/fcm/send/watcher-phone'));
+    db.subs.push(sub('s4', 3, 'https://web.push.apple.com/watcher-tablet'));
+    await notifyPinWatcher({ title: 'x' });
+    assert.equal(sends.length, 2);
+  });
+
+  await check('the address is matched without regard to case', async () => {
+    // GEO_NOTIFY_EMAIL is set to "Watcher@Example.com" at the top of this file
+    // and the row reads "watcher@example.com". A case-sensitive match would
+    // silently notify nobody, which looks exactly like "no pins were captured".
+    db.subs.push(sub('s3', 3, 'https://fcm.googleapis.com/fcm/send/watcher-phone'));
+    await notifyPinWatcher({ title: 'x' });
+    assert.equal(sends.length, 1);
+  });
+
+  await check('a pin notification expires after 24 hours, not the usual hour', async () => {
+    // "Store X got located" is a today fact. Delivered two days late it is not
+    // a smaller version of the same message, it is noise about a day nobody is
+    // thinking about. TTL is the right lever because the push service enforces
+    // it even when this app never runs again.
+    db.subs.push(sub('s3', 3, 'https://fcm.googleapis.com/fcm/send/watcher-phone'));
+    await notifyPinWatcher({ title: 'x' });
+    assert.equal(sends[0].options.TTL, 86400);
+    assert.equal(PIN_TTL_S, 86400);
+  });
+
+  await check('other notifications keep the one-hour expiry', async () => {
+    // The pin TTL is a per-caller override, not a change to the default. A
+    // fortnight of "New Store Added" arriving at once is the thing the short
+    // default exists to prevent.
+    await sendToUsers([1], { title: 'x' });
+    assert.equal(sends[0].options.TTL, 3600);
+  });
+
+  await check('an address matching no user notifies nobody and says so', async () => {
+    // A misspelt secret must not silently fall back to anyone, and must leave
+    // enough in the log to explain why no notifications are arriving.
+    db.users = [{ id: 1, email: 'sales@example.com' }];
+    db.subs.push(sub('s3', 3, 'https://fcm.googleapis.com/fcm/send/watcher-phone'));
+    const result = await notifyPinWatcher({ title: 'x' });
+    assert.deepEqual(result, { sent: 0, removed: 0 });
+    assert.equal(sends.length, 0);
+  });
+
+  await check('with GEO_NOTIFY_EMAIL unset it fails closed — nobody, never everybody', async () => {
+    // The most important one. The opposite default (unset means tell the whole
+    // team) would broadcast staff location data the moment somebody forgot to
+    // set a secret, and nothing would look wrong.
+    const pushPath = require.resolve('../src/lib/push');
+    const saved = require.cache[pushPath];
+    delete require.cache[pushPath];
+    const savedEnv = process.env.GEO_NOTIFY_EMAIL;
+    delete process.env.GEO_NOTIFY_EMAIL;
+    try {
+      const fresh = require(pushPath);
+      db.subs.push(sub('s3', 3, 'https://fcm.googleapis.com/fcm/send/watcher-phone'));
+      assert.deepEqual(await fresh.notifyPinWatcher({ title: 'x' }), { sent: 0, removed: 0 });
+      assert.equal(sends.length, 0, 'nothing may be sent when no address is configured');
+    } finally {
+      process.env.GEO_NOTIFY_EMAIL = savedEnv;
+      require.cache[pushPath] = saved;
+    }
   });
 
   process.exit(failures === 0 ? 0 : 1);

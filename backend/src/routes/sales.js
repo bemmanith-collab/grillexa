@@ -5,6 +5,8 @@ const { requireRole } = require('../middleware/role');
 const { normalizeDate, adjustStock, processReturn } = require('../lib/stock');
 const { resolveLines, billedPricesOf } = require('../lib/pricing');
 const { assertStoreAccess } = require('../lib/scope');
+const { wantsPin } = require('../lib/storePin');
+const { ensureStoreCoordinates } = require('../lib/storeGeocode');
 
 const router = express.Router();
 
@@ -234,7 +236,22 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
       });
     });
 
-    res.status(201).json({ sale: shapeSale(sale) });
+    // Billing is the one moment we know a phone is standing in the shop, so a
+    // new bill is when a missing pin can be filled for free. The store row was
+    // already fetched above, so deciding this costs no extra query.
+    //
+    // The server asks rather than the page deciding, for two reasons: a SALES
+    // account never loads a store's coordinates, so the page has nothing to
+    // judge by; and asking only when the answer could actually be used is what
+    // keeps the browser's permission prompt from appearing on shops we have
+    // already located well.
+    res.status(201).json({ sale: shapeSale(sale), pinWanted: wantsPin(store) });
+
+    // AFTER the response, deliberately. A store with no pin gets a provisional
+    // one from its address, and the bill neither waits for it nor can be failed
+    // by it — nothing below is awaited, and it cannot reject into this handler.
+    // Off entirely unless STORE_GEOCODE_CITY is set. See lib/storeGeocode.js.
+    ensureStoreCoordinates(storeId);
   } catch (err) {
     res.status(err.status || 500).json({
         error: err.status ? err.message : 'Failed to create sale',

@@ -5,6 +5,7 @@ const { requireRole } = require('../middleware/role');
 const { normalizeDate, todayStr, adjustStock } = require('../lib/stock');
 const { resolveLines } = require('../lib/pricing');
 const { assertStoreAccess } = require('../lib/scope');
+const { ensureStoreCoordinates } = require('../lib/storeGeocode');
 
 const router = express.Router();
 
@@ -680,6 +681,12 @@ router.post('/:id/settle', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req,
     });
 
     res.status(201).json({ settlement: shapeSettlement(settlement), consignment: shapeConsignment(fullConsignment) });
+
+    // Settling a consignment produces a bill against this store, same as a
+    // direct sale — so the same after-the-response, best-effort pin fill. It
+    // cannot slow or fail the settlement: nothing below is awaited, and it
+    // cannot reject into this handler. See lib/storeGeocode.js.
+    ensureStoreCoordinates(fullConsignment.storeId);
   } catch (err) {
     res.status(err.status || 500).json({
         error: err.status ? err.message : 'Failed to settle consignment',
