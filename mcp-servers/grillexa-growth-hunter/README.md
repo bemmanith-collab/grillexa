@@ -60,26 +60,37 @@ cd backend && npx prisma migrate deploy
 
 ## Add it to Claude Code
 
-```bash
-claude mcp add grillexa-growth-hunter -- node "C:/Users/bemma/grillexa/mcp-servers/grillexa-growth-hunter/index.js"
-```
-
-Or by hand, in `.claude/settings.local.json`:
+It is already registered, in the project's `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "grillexa-growth-hunter": {
       "command": "node",
-      "args": ["C:/Users/bemma/grillexa/mcp-servers/grillexa-growth-hunter/index.js"]
+      "args": ["mcp-servers/grillexa-growth-hunter/index.js"]
     }
   }
 }
 ```
 
-Then `/mcp` in Claude Code to confirm it connected. To point it at production
-instead of your local database, add an `env` block with a different
-`DATABASE_URL` — it takes precedence over `backend/.env`.
+The path is relative to the repository root, so it works on any machine that
+has the repo — nothing here is pinned to one person's home directory. Claude
+Code asks once whether to trust a project MCP server; `.claude/settings.local.json`
+already answers yes for this one via `enabledMcpjsonServers`.
+
+**Restart Claude Code, or run `/mcp`, for it to connect.** A server added while
+a session is running is not picked up by that session.
+
+To point it at production instead of your local database, add an `env` block
+with a different `DATABASE_URL` — it takes precedence over `backend/.env`:
+
+```json
+"env": { "DATABASE_URL": "postgres://..." }
+```
+
+Note `mcpServers` is **not** a valid key in `settings.json` — it belongs in
+`.mcp.json` (project) or `~/.claude.json` (personal), or use
+`claude mcp add grillexa-growth-hunter -- node mcp-servers/grillexa-growth-hunter/index.js`.
 
 ---
 

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "grillexa-growth-hunter": {
+      "command": "node",
+      "args": ["mcp-servers/grillexa-growth-hunter/index.js"]
+    }
+  }
+}
