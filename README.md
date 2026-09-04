@@ -69,6 +69,10 @@ Below six options it renders the plain native `<select>` instead: already touch-
 
 Stores: **Deliver to Store**, **Direct Sale**, **Today's Stock**, **Stock History**. Products: the **line items editor** (Deliver to Store, Direct Sale, Dispatches) and Stock History's filter. The filter pages pass an "All Stores"/"All products" row and the forms pass "Select a store…" through the same `firstOption` prop — a pinned row that is never counted as a recent pick. Settle Consignment has no store dropdown; it filters its list by a text search that already matches store names. The filtering and highlighting are pure functions in `frontend/src/lib/searchSelect.js`, covered by `frontend/test/searchSelect.js`.
 
+## Store zones
+
+Every store can belong to one sales zone — **Zone 1** to **Zone 4** — picked from a dropdown on the Add Store form and the row editor, and shown under the store name in the list. The list is fixed in `backend/src/lib/storeZones.js` (and mirrored on the page): the API refuses any other value, so a typo can never become a fifth zone in the filters (`backend/test/storeZones.js`). To rename or add a zone, edit both lists; the column is plain text, so no migration is needed. The Stores page filters by zone with a dropdown beside the salesperson filter. Zone-wise sales reports are not built yet; the column is in place for them.
+
 ## Store location
 
 A store is a shutter on a street, and "Anna Nagar" typed into Maps lands a driver in the middle of a neighbourhood. So a store carries a **GPS pin** — `lat`/`lng`, captured on the phone while standing outside it.
@@ -922,8 +926,8 @@ Read from the environment or `.env`. One exception worth knowing: the business's
 | POST/PATCH | `/api/products`, `/api/products/:id` | Admin, Manager |
 | DELETE | `/api/products/:id` | Admin |
 | GET | `/api/stores` | Authenticated — Sales sees only its own stores, without staff names |
-| POST | `/api/stores` | Authenticated — a salesperson outside a new shop is the person best placed to capture its pin |
-| PATCH/DELETE | `/api/stores/:id` | Admin — renaming or removing rewrites history that invoices and ledgers point at |
+| POST | `/api/stores` | Authenticated — a salesperson outside a new shop is the person best placed to capture its pin. Accepts `zone` |
+| PATCH/DELETE | `/api/stores/:id` | Admin — renaming or removing rewrites history that invoices and ledgers point at. PATCH accepts `zone`; an omitted key leaves it alone |
 | POST | `/api/stores/:id/pin` | Admin, Manager, Sales — store-scoped. Writes coordinates only; silently drops a fix coarser than 65m |
 | GET | `/api/stock/today?storeId=&date=` | Authenticated, store-scoped. `storeId=all` totals every store in scope |
 | GET | `/api/stock/history?storeId=&productId=&from=&to=` | Authenticated, store-scoped |

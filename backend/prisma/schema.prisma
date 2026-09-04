@@ -184,6 +184,10 @@ model Store {
   // address should be, a person's deliberate correction never. Null means the
   // row predates the column, and accuracyM decides as it always did.
   pinSource String?
+  // Which sales zone the store belongs to: 'Zone 1' … 'Zone 4', or null for
+  // a store nobody has placed yet. A fixed list checked by the API, not an
+  // enum: renaming a zone should not need a migration.
+  zone      String?
   createdAt DateTime @default(now())
   // Who added it. Nullable because every store already in the table was added
   // before anyone recorded this, and those cannot be attributed after the fact.

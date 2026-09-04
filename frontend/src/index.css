@@ -2635,6 +2635,13 @@ a.btn-danger {
   margin-bottom: 12px;
 }
 
+/* The zone path under a store's name. */
+.store-zones {
+  font-size: 0.8rem;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
 .store-coords-icon {
   color: var(--text-muted);
   flex-shrink: 0;

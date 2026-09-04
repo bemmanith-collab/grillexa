@@ -31,7 +31,11 @@ import { captureFix } from '../lib/locate';
 // than it did under Leaflet: this bundle is twelve times the size.
 const MapPicker = lazy(() => import('../components/MapPicker'));
 
-const EMPTY_FORM = { name: '', address: '', phone: '', lat: null, lng: null, accuracyM: null };
+// The sales zones a store can belong to. A fixed list, picked from a dropdown
+// — free text here turned "Zone 2" into three spellings within a week.
+const ZONES = ['Zone 1', 'Zone 2', 'Zone 3', 'Zone 4'];
+
+const EMPTY_FORM = { name: '', address: '', phone: '', lat: null, lng: null, accuracyM: null, zone: '' };
 
 // Empty id, like the filters on Reports — '' reads as "no filter" everywhere.
 const ALL_PEOPLE = { id: '', name: 'All sales people' };
@@ -81,6 +85,8 @@ export default function Stores() {
   const [search, setSearch] = useState('');
   // Admin only, and a string: SearchSelect hands back the option's own id.
   const [salesId, setSalesId] = useState('');
+  // '' for "any", like the salesperson filter.
+  const [zoneFilter, setZoneFilter] = useState('');
   const [geo, setGeo] = useState({ busy: false, error: '', note: '' });
   const [searchParams, setSearchParams] = useSearchParams();
   // Which form has its map open — 'new' for the add form, or a store id. Not a
@@ -124,9 +130,10 @@ export default function Stores() {
     return stores.filter(
       (s) =>
         (!q || s.name.toLowerCase().includes(q) || (s.address || '').toLowerCase().includes(q)) &&
-        (!salesId || (s.salesUsers || []).some((u) => String(u.id) === salesId))
+        (!salesId || (s.salesUsers || []).some((u) => String(u.id) === salesId)) &&
+        (!zoneFilter || s.zone === zoneFilter)
     );
-  }, [stores, search, salesId]);
+  }, [stores, search, salesId, zoneFilter]);
 
   async function load() {
     setLoading(true);
@@ -263,7 +270,15 @@ export default function Stores() {
   function startEdit(s) {
     setGeo({ busy: false, error: '', note: '' });
     setEditingId(s.id);
-    setEditForm({ name: s.name, address: s.address || '', phone: s.phone || '', lat: s.lat, lng: s.lng, accuracyM: s.accuracyM });
+    setEditForm({
+      name: s.name,
+      address: s.address || '',
+      phone: s.phone || '',
+      lat: s.lat,
+      lng: s.lng,
+      accuracyM: s.accuracyM,
+      zone: s.zone || '',
+    });
   }
 
   async function handleSaveEdit(id) {
@@ -407,6 +422,20 @@ export default function Stores() {
   const applyToForm = (patch) => setForm((f) => ({ ...f, ...patch }));
   const applyToEdit = (patch) => setEditForm((f) => ({ ...f, ...patch }));
 
+  // The zone dropdown, shared by the add form and the row editor.
+  function zoneField(values, apply, className) {
+    return (
+      <select className={className} aria-label="Zone" value={values.zone || ''} onChange={(e) => apply({ zone: e.target.value })}>
+        <option value="">Zone — none</option>
+        {ZONES.map((z) => (
+          <option key={z} value={z}>
+            {z}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
   return (
     <div className="page">
       <div className="page-header">
@@ -500,6 +529,7 @@ export default function Stores() {
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
+              {zoneField(form, applyToForm)}
               <button type="submit" className="btn-primary" disabled={creating}>
                 {creating ? 'Adding…' : 'Add Store'}
               </button>
@@ -527,6 +557,19 @@ export default function Stores() {
                 placeholder="Filter by salesperson"
               />
             )}
+            <select
+              className="role-select"
+              aria-label="Filter by zone"
+              value={zoneFilter}
+              onChange={(e) => setZoneFilter(e.target.value)}
+            >
+              <option value="">All zones</option>
+              {ZONES.map((z) => (
+                <option key={z} value={z}>
+                  {z}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       )}
@@ -579,6 +622,7 @@ export default function Stores() {
                             value={editForm.phone}
                             onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                           />
+                          {zoneField(editForm, applyToEdit, 'line-input')}
                           {geo.error && <div className="form-warning">{geo.error}</div>}
                           {coordFields(editForm, applyToEdit, s.id)}
                         </td>
@@ -594,7 +638,12 @@ export default function Stores() {
                       </>
                     ) : (
                       <>
-                        <td className="cell-strong">{s.name}</td>
+                        <td className="cell-strong">
+                          {s.name}
+                          {/* A line here rather than a fourth column: the
+                              table already fights for width on a phone. */}
+                          {s.zone && <div className="cell-muted store-zones">{s.zone}</div>}
+                        </td>
                         <td>
                           {s.address || '—'}
                           {s.phone && <div className="cell-muted">{s.phone}</div>}

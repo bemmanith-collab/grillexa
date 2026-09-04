@@ -17,6 +17,7 @@ const mapUsage = require('../lib/mapUsage');
 const { notifyOthers, notifyPinWatcher } = require('../lib/push');
 const { assertStoreAccess } = require('../lib/scope');
 const { shouldSavePin, sourceFor } = require('../lib/storePin');
+const { readZone } = require('../lib/storeZones');
 
 const router = express.Router();
 
@@ -215,10 +216,20 @@ router.post('/', async (req, res) => {
   if (!name) return res.status(400).json({ error: 'name is required' });
   const coords = readCoords(req.body);
   if (!coords.ok) return res.status(400).json({ error: coords.error });
+  const zone = readZone(req.body);
+  if (!zone.ok) return res.status(400).json({ error: zone.error });
   let store;
   try {
     store = await prisma.store.create({
-      data: { name, address, phone, ...coords.data, pinSource: sourceFor(coords.data), createdById: req.user.id },
+      data: {
+        name,
+        address,
+        phone,
+        ...coords.data,
+        ...zone.data,
+        pinSource: sourceFor(coords.data),
+        createdById: req.user.id,
+      },
     });
   } catch (err) {
     if (err.code === 'P2002') {
@@ -302,6 +313,8 @@ router.patch('/:id', requireRole('ADMIN'), async (req, res) => {
   const { name, address, phone } = req.body;
   const coords = readCoords(req.body);
   if (!coords.ok) return res.status(400).json({ error: coords.error });
+  const zone = readZone(req.body);
+  if (!zone.ok) return res.status(400).json({ error: zone.error });
   try {
     const store = await prisma.store.update({
       where: { id },
@@ -310,6 +323,7 @@ router.patch('/:id', requireRole('ADMIN'), async (req, res) => {
         ...(address !== undefined && { address }),
         ...(phone !== undefined && { phone }),
         ...coords.data,
+        ...zone.data,
         // Only when this request actually carried a pin — a rename must not
         // relabel the source of a pin it never touched.
         ...('lat' in coords.data && { pinSource: sourceFor(coords.data) }),
