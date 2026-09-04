@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import client from '../api/client';
@@ -88,6 +88,11 @@ export default function Stores() {
   // '' for "any", like the salesperson filter.
   const [zoneFilter, setZoneFilter] = useState('');
   const [geo, setGeo] = useState({ busy: false, error: '', note: '' });
+  // The running GPS capture, so it can be stopped. Leaving the page — or
+  // tapping Locate again — must power the chip down, not leave a 25s watch
+  // running for a promise that will set state on an unmounted component.
+  const locateCtrl = useRef(null);
+  useEffect(() => () => locateCtrl.current?.abort(), []);
   const [searchParams, setSearchParams] = useSearchParams();
   // Which form has its map open — 'new' for the add form, or a store id. Not a
   // boolean: the add form and a row editor can be open at once, and one shared
@@ -192,34 +197,40 @@ export default function Stores() {
   // even attempted. Nominatim being slow or down must not cost the fix — that
   // is the part that can't be typed back in later.
   function locate(apply) {
-    setGeo({ busy: true, error: '', note: 'Locating… hold still for a few seconds.' });
+    locateCtrl.current?.abort();
+    const ctrl = new AbortController();
+    locateCtrl.current = ctrl;
+    setGeo({ busy: true, error: '', note: 'Locating… hold still, hunting for a 5m fix.' });
     captureFix({
+      signal: ctrl.signal,
       onProgress: (accuracy) =>
-        setGeo({ busy: true, error: '', note: `Locating… best so far ${formatAccuracy(accuracy)}` }),
-    }).then(finish, (err) => setGeo({ busy: false, error: err.message, note: '' }));
+        setGeo({ busy: true, error: '', note: `Locating… best so far ${formatAccuracy(accuracy)}, waiting for 5m` }),
+    }).then(finish, (err) => {
+      // Cancelled by an unmount or a second tap: nothing to show, and on an
+      // unmount nothing to show it on.
+      if (err.name === 'AbortError') return;
+      setGeo({ busy: false, error: err.message, note: '' });
+    });
 
-    async function finish({ lat, lng, accuracyM: accuracy }) {
+    async function finish({ lat, lng, accuracyM: accuracy, locked }) {
       const tier = accuracyTier(accuracy);
       // The pin lands first, always — it is the part that cannot be typed back
       // in later, and the address lookup may fail or be slow.
       apply({ lat, lng, accuracyM: accuracy });
 
-      // A fix this coarse would reverse-geocode to a confidently wrong street.
-      // Filling that in is worse than leaving it blank: it looks authoritative
-      // and someone has to notice it is wrong. Keep the pin, skip the address.
-      //
-      // Only perfect and good earn the lookup. A fair fix usually does land on
-      // the right road — but "usually" is the problem: nobody can tell the
-      // times it didn't from the times it did, and an address nobody checks is
-      // an address nobody trusts.
-      if (tier === 'fair' || tier === 'poor') {
+      // Only a perfect lock earns the address lookup. Anything else is the
+      // timeout fallback — the best the phone managed in 25s — and reverse
+      // geocoding a point that is "probably on the right road" fills in an
+      // address that looks authoritative and that nobody checks. The pin is
+      // kept; the street is left for a person to type.
+      if (!locked) {
         setGeo({
           busy: false,
           note: '',
           error:
             tier === 'poor'
               ? `📍 ${accuracyLabel(accuracy)}. Your phone used wifi or the mobile network, not GPS — that happens indoors and between tall buildings. Step outside and try again, or open Google Maps below and paste the exact coordinates.`
-              : `📍 ${accuracyLabel(accuracy)}. Close, but not close enough to name the street — type the address below, or step outside and try again for a tighter pin.`,
+              : `📍 ${accuracyLabel(accuracy)}. No 5m lock in 25s — the pin is saved, but the address was not looked up from it. Type the address below, or step into the open and try again for a tighter pin.`,
         });
         return;
       }
