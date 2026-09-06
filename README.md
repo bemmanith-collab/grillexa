@@ -537,6 +537,18 @@ node scripts/crosstab-to-csv.js sheet.csv --store "MG Road Store" --payment UPI 
 
 It reads a CSV export (not `.xlsx` — no spreadsheet library), recognises `YYYY-MM-DD`, `DD/MM/YYYY` and `DD-MM-YYYY` in column headers along with a metric word (sold/qty/units, waste/wastage/damage, revenue/amount/total), copes with `₹`, thousands separators and `-` for nil, and drops the Total row. The sheet has no store column, so `--store` is required; run it once per store. **If a sheet is shaped differently, only `readCrosstab()` needs changing** — everything downstream works off the flat records it yields.
 
+## The mascot wallpaper
+
+The Grillexa robot stands bottom-centre behind every screen, login included, at just over half strength. It is one background layer on `body::before` in `frontend/src/index.css`, painted with the petrol gradient it sits on, so it costs no element and no script.
+
+**The opacity is baked into the image, not set in CSS.** A background layer has no opacity of its own, and wrapping the page in an element just to fade one layer would put a stacking context between the ground and the login form. So `frontend/src/assets/mascot.webp` carries its alpha already multiplied down; swapping the strength means regenerating the file, which is deliberate — the image is a design decision, not a runtime knob.
+
+**Cut from a render on a flat colour, never on white.** The first render came on white with a soft floor shadow, and no threshold separates that shadow from the boots: too tight and a grey smear stays between the feet, too loose and it eats the toe caps. A render on a flat petrol ground cuts cleanly with one flood fill, keeps its own dark contact shadow (which reads as a real shadow on the dark app), and the generator's sparkle watermark falls out as a stray island. The file is 63 KB; the source PNG is not in the repo.
+
+**The login page used to paint its own gradient over this**, which is why the wallpaper never showed there. That duplicate ground is gone; signing in and using the app now share one backdrop, as the comment above it always claimed.
+
+Vite hashes the filename on build, so a redesigned mascot never fights a browser cache in production. In `npm run dev` it does — hard-refresh after replacing the file.
+
 ## Sessions & browser hardening
 
 The session is a JWT in an **httpOnly cookie** (`grillexa_session`), not a Bearer token in `localStorage` — no script on the page can read it, the app's own or one injected through an XSS. `sameSite: strict` is the CSRF defence; `secure` is set in production only, because local dev has no TLS. `POST /api/auth/logout` clears it server-side: a browser cannot delete a cookie it cannot read, so logout used to be a claim the client made about itself.

@@ -98,8 +98,13 @@ body::after {
   pointer-events: none;
 }
 
+/* The mascot sits bottom-centre behind everything, at wallpaper strength: the
+   image itself carries the opacity (baked into the alpha), since a background
+   layer has no opacity of its own. On phones it shrinks with the viewport so
+   it stays a corner, not a ground. */
 body::before {
   background:
+    url('./assets/mascot.webp') no-repeat center bottom / min(56vh, 72vw) auto,
     radial-gradient(1100px 620px at 78% -12%, rgba(26, 168, 190, 0.32), transparent 62%),
     linear-gradient(158deg, var(--deep) 0%, #073a46 46%, var(--deep-2) 100%);
 }
@@ -1208,20 +1213,9 @@ button:disabled {
   justify-content: center;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #061426 0%, #0a2b45 30%, #0d5c63 68%, #14b8a6 100%);
+  /* No ground of its own: body paints the gradient, grid and mascot, and
+     painting a second gradient here hid all three on the login screen. */
   padding: 20px;
-}
-
-.auth-page::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle at 18% 15%, rgba(45, 212, 191, 0.28), transparent 42%),
-    radial-gradient(circle at 85% 85%, rgba(79, 70, 229, 0.25), transparent 45%),
-    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-  background-size: auto, auto, 44px 44px, 44px 44px;
-  pointer-events: none;
 }
 
 .auth-shell {
