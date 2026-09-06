@@ -19,6 +19,13 @@ This is the core of the app. Everything else supports it.
 
 **Sold and returned come out of the same pile, and the settle form says so per row.** Each input caps at that item's remaining quantity on its own, which let 5 sold + 5 returned through against 5 remaining — the server rejected it, correctly, but only after a round trip. The form now flags the offending row in the **Remaining** column ("5 · over by 5") and disables the submit button. Per row rather than in the error banner at the top: on a phone the banner sits off-screen above a long list of products, so the only place the message is certain to be read is next to the fields that caused it. The server check stays where it was — it is the one that matters, and the client cannot be trusted to have run.
 
+**Settling a backlog in one go: `backend/scripts/bulk-settle.js`.** Hundreds of old consignments nobody settled are still "awaiting settlement" forever, and the Settle screen does one at a time. The script settles every outstanding consignment delivered *strictly before* a day, all remaining quantity as sold or all as returned, through the same `applySettlement` the route uses — one transaction per consignment, so each comes out exactly as a hand settlement would, ledger and Sale and Return rows included. `--as` has no default because sold recognises revenue and returned does not, and that is nobody's call but the owner's. Dry run by default; it prints the count, units, value and per-store breakdown, and `--apply` writes. It has to be run on the Fly machine, where the database is:
+
+```
+flyctl ssh console -a grillexa -C "node scripts/bulk-settle.js --before=2026-08-31 --as=sold"
+flyctl ssh console -a grillexa -C "node scripts/bulk-settle.js --before=2026-08-31 --as=sold --apply"
+```
+
 `Dispatches` is the pre-consignment HQ→store transfer flow. It is read-only history; new deliveries go through Deliver to Store.
 
 ## How the ledger works, and what it is not
