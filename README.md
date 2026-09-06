@@ -551,6 +551,10 @@ In the installed app on a phone the bottom tab bar is fixed over the page, so th
 
 Vite hashes the filename on build, so a redesigned mascot never fights a browser cache in production. In `npm run dev` it does — hard-refresh after replacing the file.
 
+### The watermark on top
+
+The mascot lives behind the cards, so a screen full of data hides it. The bot icon is therefore also painted **over** the page, fixed and centred at 6% opacity, as a `#root::after` layer between the content and the fixed chrome. It cannot be interacted with and cannot cover anything that matters at that strength; it is there so the brand is faintly present on every screen, not only the empty ones. Behind the content it would just have been a second thing hidden by the cards.
+
 ## Sessions & browser hardening
 
 The session is a JWT in an **httpOnly cookie** (`grillexa_session`), not a Bearer token in `localStorage` — no script on the page can read it, the app's own or one injected through an XSS. `sameSite: strict` is the CSRF defence; `secure` is set in production only, because local dev has no TLS. `POST /api/auth/logout` clears it server-side: a browser cannot delete a cookie it cannot read, so logout used to be a claim the client made about itself.
