@@ -553,7 +553,7 @@ Vite hashes the filename on build, so a redesigned mascot never fights a browser
 
 ### The watermark on top
 
-The mascot lives behind the cards, so a screen full of data hides it. The bot icon is therefore also painted **over** the page, fixed and centred at 6% opacity, as a `#root::after` layer between the content and the fixed chrome. It cannot be interacted with and cannot cover anything that matters at that strength; it is there so the brand is faintly present on every screen, not only the empty ones. Behind the content it would just have been a second thing hidden by the cards.
+The mascot lives behind the cards, so a screen full of data hides it. The bot icon is therefore also painted **over** the page, fixed and centred at 12% opacity, as a `#root::after` layer between the content and the fixed chrome. It cannot be interacted with and cannot cover anything that matters at that strength; it is there so the brand is faintly present on every screen, not only the empty ones. Behind the content it would just have been a second thing hidden by the cards.
 
 ## Sessions & browser hardening
 
