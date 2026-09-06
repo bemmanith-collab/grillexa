@@ -547,6 +547,8 @@ The Grillexa robot stands bottom-centre behind every screen, login included, at 
 
 **The login page used to paint its own gradient over this**, which is why the wallpaper never showed there. That duplicate ground is gone; signing in and using the app now share one backdrop, as the comment above it always claimed.
 
+In the installed app on a phone the bottom tab bar is fixed over the page, so there the mascot is lifted by the bar's height plus the home-indicator inset; in a browser tab there is no bar and it sits on the bottom edge.
+
 Vite hashes the filename on build, so a redesigned mascot never fights a browser cache in production. In `npm run dev` it does — hard-refresh after replacing the file.
 
 ## Sessions & browser hardening
