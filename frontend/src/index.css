@@ -2382,9 +2382,10 @@ button:disabled {
   }
 
   /* The tab bar would stand on the mascot's feet: lift it by the bar's height
-     (56px items plus the 1px border) and the home-indicator inset. */
+     (56px items plus the 1px border), a little breathing room, and the
+     home-indicator inset. */
   body::before {
-    background-position: center bottom calc(57px + env(safe-area-inset-bottom)), 0 0, 0 0;
+    background-position: center bottom calc(80px + env(safe-area-inset-bottom)), 0 0, 0 0;
   }
 }
 
