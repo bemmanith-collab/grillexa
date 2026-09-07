@@ -445,7 +445,9 @@ A sales account is normally given a list of shops. With eighty-odd of them that 
 
 Turning it on clears the explicit list, because two answers to "which shops" is how they drift apart. `lib/scope.js:resolveStoreIds` is the rule, kept pure so `test/scope.js` can check it without a database — including the case that matters: the same account, asked twice, with a new store in between.
 
-One consequence worth knowing: this resolves through `req.user.storeIds`, which every store-scoped query already filters on, so nothing else needed changing. The cost is one extra id-only query per request, and only for accounts carrying the flag.
+One consequence worth knowing: this resolves through `req.user.storeIds`, which every store-scoped query already filters on, so the API side needed nothing else. The cost is one extra id-only query per request, and only for accounts carrying the flag.
+
+The browser is the other half, and it was missed at first. Login and `GET /api/auth/me` send `user.stores`, and the scoped pages (Deliver, Sale, Stock) read that list to decide whether the account has a shop at all. They used to send the explicit list — empty for an all-stores account — so a Sales user set to "all stores" saw "Your account isn't assigned to a store yet" on every page while the API happily accepted their requests. Both responses now resolve the flag through `lib/scope.js:resolveStores`, the `{id, name}` twin of `resolveStoreIds`, so the picker shows every shop and a shop opened later appears on the next reload.
 
 ## Roles & permissions
 

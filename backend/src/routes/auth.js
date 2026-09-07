@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../db');
 const { authenticate, TOKEN_COOKIE, cookieOptions } = require('../middleware/auth');
+const { resolveStores } = require('../lib/scope');
 
 const router = express.Router();
 
@@ -29,9 +30,16 @@ function missingString(fields) {
   return null;
 }
 
-function sanitize(user) {
+// "All stores" is resolved here the same way middleware/auth.js does for
+// req.user.storeIds: the account carries a flag, not a list, so the list the
+// browser gets is built fresh from whatever shops exist right now. Sending the
+// (empty) explicit list instead told every scoped page the account had no shop.
+async function sanitize(user) {
   const { passwordHash, stores, ...rest } = user;
-  return { ...rest, stores: (stores || []).map((s) => ({ id: s.id, name: s.name })) };
+  const every = user.allStores
+    ? await prisma.store.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } })
+    : [];
+  return { ...rest, stores: resolveStores(user, every).map((s) => ({ id: s.id, name: s.name })) };
 }
 
 // Public signup was removed. It was unauthenticated and linked from the login
@@ -58,7 +66,7 @@ router.post('/login', async (req, res) => {
     ...cookieOptions(),
     maxAge: EIGHT_HOURS_MS,
   });
-  res.json({ user: sanitize(user) });
+  res.json({ user: await sanitize(user) });
 });
 
 // Clearing an httpOnly cookie has to happen server-side — the browser will not
@@ -72,7 +80,7 @@ router.post('/logout', (req, res) => {
 router.get('/me', authenticate, async (req, res) => {
   const user = await prisma.user.findUnique({ where: { id: req.user.id }, include: { stores: true } });
   if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ user: sanitize(user) });
+  res.json({ user: await sanitize(user) });
 });
 
 router.post('/change-password', authenticate, async (req, res) => {

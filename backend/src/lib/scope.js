@@ -30,4 +30,13 @@ function resolveStoreIds(user, everyStoreId) {
   return (user.stores || []).map((s) => s.id);
 }
 
-module.exports = { assertStoreAccess, resolveStoreIds };
+// Same rule, but the {id, name} rows the browser needs. Login and /me send
+// this as user.stores — the list the scoped pages read to decide whether the
+// account has a shop at all.
+function resolveStores(user, everyStore) {
+  if (!user) return [];
+  if (user.allStores) return everyStore;
+  return user.stores || [];
+}
+
+module.exports = { assertStoreAccess, resolveStoreIds, resolveStores };

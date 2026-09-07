@@ -7,7 +7,7 @@
 //
 // Run: npm test (from backend/). No database.
 const assert = require('assert');
-const { assertStoreAccess, resolveStoreIds } = require('../src/lib/scope');
+const { assertStoreAccess, resolveStoreIds, resolveStores } = require('../src/lib/scope');
 
 const EVERY = [1, 2, 3, 4, 5];
 
@@ -57,6 +57,14 @@ const tests = {
     // shops" is how they drift apart.
     const user = { allStores: true, stores: [{ id: 2 }] };
     assert.deepStrictEqual(resolveStoreIds(user, EVERY), EVERY);
+  },
+
+  'all-stores hands the app the real shop list, not an empty one': () => {
+    // What login and /me send the browser. The scoped pages read user.stores,
+    // so an all-stores account given [] was told it had no store at all.
+    const every = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+    assert.deepStrictEqual(resolveStores({ allStores: true, stores: [] }, every), every);
+    assert.deepStrictEqual(resolveStores({ allStores: false, stores: [every[1]] }, every), [every[1]]);
   },
 
   'no session covers nothing': () => {
