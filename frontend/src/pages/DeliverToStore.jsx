@@ -8,6 +8,7 @@ import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import DatePager, { useDatePages } from '../components/DatePager';
+import DateRange from '../components/DateRange';
 import Toast from '../components/Toast';
 import { TruckIcon, RefreshIcon } from '../components/icons';
 import { filterToCatalog, describeDropped } from '../lib/reorder';
@@ -43,6 +44,11 @@ export default function DeliverToStore() {
   const [stores, setStores] = useState(isScoped ? myStores : []);
   const [products, setProducts] = useState([]);
   const [consignments, setConsignments] = useState([]);
+  // Same as Direct Sale: the delivery history is the newest 200 consignments,
+  // so it stops a few days back unless a window is asked for.
+  const [historyFrom, setHistoryFrom] = useState('');
+  const [historyTo, setHistoryTo] = useState('');
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -85,7 +91,10 @@ export default function DeliverToStore() {
     setLoading(true);
     setError('');
     try {
-      const requests = [client.get('/products'), client.get('/consignments')];
+      const listParams = {};
+      if (historyFrom) listParams.from = historyFrom;
+      if (historyTo) listParams.to = historyTo;
+      const requests = [client.get('/products'), client.get('/consignments', { params: listParams })];
       if (!isScoped) requests.unshift(client.get('/stores'));
       const results = await Promise.all(requests);
       const [productsRes, consignmentsRes] = isScoped ? results : results.slice(1);
@@ -103,10 +112,12 @@ export default function DeliverToStore() {
     }
   }
 
+  // Refetching products alongside the list on a date change is a few KB of
+  // waste for one code path instead of two. Revisit only if it ever shows.
   useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [historyFrom, historyTo]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -323,6 +334,17 @@ export default function DeliverToStore() {
             />
           </div>
         </div>
+      )}
+
+      {!loading && (
+        <DateRange
+          label="Delivered from"
+          from={historyFrom}
+          to={historyTo}
+          onFrom={setHistoryFrom}
+          onTo={setHistoryTo}
+          onClear={() => { setHistoryFrom(''); setHistoryTo(''); }}
+        />
       )}
 
       {!loading && !searching && <DatePager pager={pager} noun="delivery" plural="deliveries" />}

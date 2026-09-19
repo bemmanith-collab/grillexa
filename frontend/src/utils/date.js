@@ -32,6 +32,13 @@ export function todayStr() {
   return businessDayStr(Date.now());
 }
 
+// The earliest day any of these lists can meaningfully reach. Used as the
+// `min` on every date filter so the platform calendar opens on a bounded
+// range rather than the year 1900. The first real record is 11 July 2026;
+// this sits deliberately before it, so it stays correct if older data is
+// ever imported rather than having to be nudged.
+export const PROJECT_START = '2026-06-01';
+
 export function daysAgoStr(n) {
   return businessDayStr(Date.now() - n * 86400000);
 }

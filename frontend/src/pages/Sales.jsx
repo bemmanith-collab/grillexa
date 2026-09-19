@@ -5,6 +5,7 @@ import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import DatePager, { useDatePages } from '../components/DatePager';
+import DateRange from '../components/DateRange';
 import { ReceiptIcon } from '../components/icons';
 import { formatCurrency } from '../lib/format';
 import { formatDate } from '../utils/date';
@@ -17,14 +18,19 @@ export default function Sales() {
   const [sales, setSales] = useState([]);
   const [error, setError] = useState('');
   const [detail, setDetail] = useState(null);
-  const [dateFilter, setDateFilter] = useState('');
+  // A window, not a single day: the unfiltered list is the newest 200 bills,
+  // which is one day once a settlement run writes a few hundred at once.
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [salesLoading, setSalesLoading] = useState(true);
 
   async function loadSales() {
     setSalesLoading(true);
     setError('');
     try {
-      const params = dateFilter ? { date: dateFilter } : {};
+      const params = {};
+      if (from) params.from = from;
+      if (to) params.to = to;
       const res = await client.get('/sales', { params });
       setSales(res.data.sales);
     } catch (err) {
@@ -36,7 +42,7 @@ export default function Sales() {
 
   useEffect(() => {
     loadSales();
-  }, [dateFilter]);
+  }, [from, to]);
 
   async function openDetail(id) {
     const res = await client.get(`/sales/${id}`);
@@ -66,12 +72,13 @@ export default function Sales() {
       <div className="page-header">
         <h2 className="section-title" style={{ margin: 0 }}>Bill History</h2>
         <div className="inline-form">
-          <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} />
-          {dateFilter && (
-            <button type="button" className="btn-secondary btn-sm" onClick={() => setDateFilter('')}>
-              All dates
-            </button>
-          )}
+          <DateRange
+            from={from}
+            to={to}
+            onFrom={setFrom}
+            onTo={setTo}
+            onClear={() => { setFrom(''); setTo(''); }}
+          />
         </div>
       </div>
 
@@ -113,7 +120,7 @@ export default function Sales() {
                   <td colSpan={isScoped ? 5 : 6}>
                     <EmptyState
                       icon={ReceiptIcon}
-                      message={dateFilter ? 'No sales on this date.' : 'No sales recorded yet.'}
+                      message={from || to ? 'No sales in this date range.' : 'No sales recorded yet.'}
                     />
                   </td>
                 </tr>

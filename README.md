@@ -38,6 +38,12 @@ The undo is itself not undoable: the Sale and Settlement rows are deleted outrig
 
 Note that **Awaiting settlement was never capped** and never paged — it shows every outstanding consignment however old, which is what that view is for. Anyone hunting an old unsettled delivery wants that view, not a date window on history.
 
+**Every date-paged list takes a From/To window, because none of them could reach their own history.** Reported twice, as a date-picker problem both times, and it was never the picker. `DatePager` builds its day list from the rows it was handed, and each of these routes returns only its newest few hundred by date, so the picker can only ever offer the days that survived the cap. Measured on live data: Direct Sale's newest 200 bills spanned 11 days, and the Sales page's newest 200 spanned **one** — a bulk settlement writes a few hundred bills on a single date, and they fill the entire allowance. Direct Sale sent no date parameter at all, so there was no way to ask for anything older.
+
+`GET /sales` now takes `date`, or `from`/`to`; `GET /consignments` already did. Any request carrying one is uncapped, for the same reason a status-filtered one is: the window bounds the answer, and returning the newest 200 *of a chosen range* with nothing saying rows were dropped is the original bug with a filter drawn on top. `to` includes the day it names. The query building moved out of the route into `salesQuery`, mirroring `listQuery`, so both are unit-tested without a database — see `test/sales-list.js` and `test/consignment-list.js`, which exist because this class of bug renders perfectly and just shows less than the truth.
+
+The shared control is `components/DateRange.jsx`, on Settle Consignment, Direct Sale, Sales and Deliver to Store. It is a native `<input type="date">` on purpose rather than a picker library: it opens the platform's own calendar with month and year navigation, the phone's date wheel on Android and iOS, and a keyboard path, with nothing to ship or keep accessible. `min` is `PROJECT_START` and `max` is today, so the calendar opens on a bounded range instead of the year 1900. The first real record is 11 July 2026; `PROJECT_START` sits before it deliberately, so imported history would not need it nudged.
+
 `Dispatches` is the pre-consignment HQ→store transfer flow. It is read-only history; new deliveries go through Deliver to Store.
 
 ## How the ledger works, and what it is not

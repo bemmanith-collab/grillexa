@@ -8,6 +8,7 @@ import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import DatePager, { useDatePages } from '../components/DatePager';
+import DateRange from '../components/DateRange';
 import Toast from '../components/Toast';
 import { ReceiptIcon, RefreshIcon } from '../components/icons';
 import { formatCurrency } from '../lib/format';
@@ -48,6 +49,11 @@ export default function DirectSale() {
   const [stores, setStores] = useState(isScoped ? myStores : []);
   const [products, setProducts] = useState([]);
   const [sales, setSales] = useState([]);
+  // The bill history below the form is the newest 200 rows, so without a
+  // window it stops about ten days back and looks like that is all there is.
+  const [historyFrom, setHistoryFrom] = useState('');
+  const [historyTo, setHistoryTo] = useState('');
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -106,7 +112,10 @@ export default function DirectSale() {
     setLoading(true);
     setError('');
     try {
-      const requests = [client.get('/products'), client.get('/sales', { params: { direct: true } })];
+      const salesParams = { direct: true };
+      if (historyFrom) salesParams.from = historyFrom;
+      if (historyTo) salesParams.to = historyTo;
+      const requests = [client.get('/products'), client.get('/sales', { params: salesParams })];
       if (!isScoped) requests.unshift(client.get('/stores'));
       const results = await Promise.all(requests);
       const [productsRes, salesRes] = isScoped ? results : results.slice(1);
@@ -124,10 +133,12 @@ export default function DirectSale() {
     }
   }
 
+  // Refetching products alongside the list on a date change is a few KB of
+  // waste for one code path instead of two. Revisit only if it ever shows.
   useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [historyFrom, historyTo]);
 
   function resetForm() {
     setEditingId(null);
@@ -407,6 +418,17 @@ export default function DirectSale() {
             />
           </div>
         </div>
+      )}
+
+      {!loading && (
+        <DateRange
+          label="Billed from"
+          from={historyFrom}
+          to={historyTo}
+          onFrom={setHistoryFrom}
+          onTo={setHistoryTo}
+          onClear={() => { setHistoryFrom(''); setHistoryTo(''); }}
+        />
       )}
 
       {!loading && !searching && <DatePager pager={pager} noun="bill" />}

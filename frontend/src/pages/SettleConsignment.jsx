@@ -7,6 +7,7 @@ import BillDetailModal from '../components/BillDetailModal';
 import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import DatePager, { useDatePages } from '../components/DatePager';
+import DateRange from '../components/DateRange';
 import { ReceiptIcon } from '../components/icons';
 
 function asSaleBill(settlement, consignment) {
@@ -325,21 +326,14 @@ export default function SettleConsignment() {
               All, including settled
             </button>
           </div>
-          <div className="date-range">
-            <label>
-              <span>From</span>
-              <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
-            </label>
-            <label>
-              <span>To</span>
-              <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
-            </label>
-            {(from || to) && (
-              <button type="button" className="btn-secondary btn-sm" onClick={() => { setFrom(''); setTo(''); }}>
-                Clear dates
-              </button>
-            )}
-          </div>
+          <DateRange
+            label="Delivered from"
+            from={from}
+            to={to}
+            onFrom={setFrom}
+            onTo={setTo}
+            onClear={() => { setFrom(''); setTo(''); }}
+          />
 
           {view === 'all' && !from && !to && consignments.length >= HISTORY_LIMIT && (
             <p className="form-hint">
