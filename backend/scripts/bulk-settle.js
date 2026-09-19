@@ -12,6 +12,7 @@
 //   --as=sold|returned   what the remaining quantity becomes (required)
 //   --date=YYYY-MM-DD    settlement/sale date (default: today, as the Settle screen does)
 //   --user=email         who the settlements are recorded by (default: first ADMIN)
+//   --verbose            log every consignment as it is settled, not every 50th
 //   --apply              actually write; without it only the summary prints
 //
 // Sold recognises revenue (a Sale per consignment); returned recognises none.
@@ -23,6 +24,7 @@ const { applySettlement } = require('../src/routes/consignments');
 
 const arg = (name) => (process.argv.find((a) => a.startsWith(`--${name}=`)) || '').split('=')[1];
 const APPLY = process.argv.includes('--apply');
+const VERBOSE = process.argv.includes('--verbose');
 const before = arg('before');
 const as = arg('as');
 if (!before || !['sold', 'returned'].includes(as)) {
@@ -80,6 +82,10 @@ async function main() {
       })
     );
     done += 1;
+    if (VERBOSE) {
+      const units = preparedLines.reduce((t, l) => t + l.soldQty + l.returnedQty, 0);
+      console.log(`  ${consignment.consignmentNo}  ${consignment.deliveredAt.toISOString().slice(0, 10)}  ${units} units  ${consignment.store.name}`);
+    }
     if (done % 50 === 0 || done === plan.length) console.log(`  settled ${done}/${plan.length}`);
   }
 }
