@@ -10,7 +10,7 @@
 //
 //   --before=YYYY-MM-DD  consignments delivered strictly before this day (required)
 //   --as=sold|returned   what the remaining quantity becomes (required)
-//   --date=YYYY-MM-DD    settlement/sale date (default: --before)
+//   --date=YYYY-MM-DD    settlement/sale date (default: today, as the Settle screen does)
 //   --user=email         who the settlements are recorded by (default: first ADMIN)
 //   --apply              actually write; without it only the summary prints
 //
@@ -18,7 +18,7 @@
 // That is a business decision, which is why --as has no default.
 require('dotenv').config();
 const prisma = require('../src/db');
-const { normalizeDate } = require('../src/lib/stock');
+const { normalizeDate, todayStr } = require('../src/lib/stock');
 const { applySettlement } = require('../src/routes/consignments');
 
 const arg = (name) => (process.argv.find((a) => a.startsWith(`--${name}=`)) || '').split('=')[1];
@@ -30,7 +30,7 @@ if (!before || !['sold', 'returned'].includes(as)) {
   process.exit(2);
 }
 const cutoff = normalizeDate(before);
-const settleDate = normalizeDate(arg('date') || before);
+const settleDate = normalizeDate(arg('date') || todayStr());
 const inr = (n) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 async function main() {
