@@ -12,7 +12,7 @@
 //   --as=sold|returned   what the remaining quantity becomes (required)
 //   --date=YYYY-MM-DD    settlement/sale date (default: today, as the Settle screen does)
 //   --user=email         who the settlements are recorded by (default: first ADMIN)
-//   --verbose            log every consignment as it is settled, not every 50th
+//   --verbose            list every consignment, in a dry run and as it is settled
 //   --apply              actually write; without it only the summary prints
 //
 // Sold recognises revenue (a Sale per consignment); returned recognises none.
@@ -33,6 +33,10 @@ if (!before || !['sold', 'returned'].includes(as)) {
 }
 const cutoff = normalizeDate(before);
 const settleDate = normalizeDate(arg('date') || todayStr());
+const describe = ({ consignment, preparedLines }) => {
+  const units = preparedLines.reduce((t, l) => t + l.soldQty + l.returnedQty, 0);
+  return `  ${consignment.consignmentNo}  ${consignment.deliveredAt.toISOString().slice(0, 10)}  ${String(units).padStart(4)} units  ${consignment.store.name}`;
+};
 const inr = (n) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 async function main() {
@@ -70,6 +74,9 @@ async function main() {
   console.log(`  settlement date ${settleDate.toISOString().slice(0, 10)}, recorded by ${user.email}`);
   if (consignments.length !== plan.length) console.log(`  ${consignments.length - plan.length} outstanding consignments have nothing remaining and are skipped`);
   for (const [name, n] of [...byStore].sort((a, b) => b[1] - a[1])) console.log(`  ${String(n).padStart(4)}  ${name}`);
+  // A dry run that only totals things answers "how much", never "which ones".
+  // --verbose is what makes it an actual preview of the rows about to change.
+  if (VERBOSE) for (const entry of plan) console.log(describe(entry));
   if (!APPLY) return;
 
   let done = 0;
@@ -82,10 +89,6 @@ async function main() {
       })
     );
     done += 1;
-    if (VERBOSE) {
-      const units = preparedLines.reduce((t, l) => t + l.soldQty + l.returnedQty, 0);
-      console.log(`  ${consignment.consignmentNo}  ${consignment.deliveredAt.toISOString().slice(0, 10)}  ${units} units  ${consignment.store.name}`);
-    }
     if (done % 50 === 0 || done === plan.length) console.log(`  settled ${done}/${plan.length}`);
   }
 }
