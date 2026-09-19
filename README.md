@@ -26,6 +26,14 @@ flyctl ssh console -a grillexa -C "node scripts/bulk-settle.js --before=2026-08-
 flyctl ssh console -a grillexa -C "node scripts/bulk-settle.js --before=2026-08-31 --as=sold --apply"
 ```
 
+**Undoing a bulk run: `backend/scripts/unbulk-settle.js`.** Settling in bulk is easy to get wrong in a way you only notice afterwards, so the run is undoable. Pass it the *same* `--before` and `--as` the settle used: those rebuild the exact note `bulk-settle` wrote, which is how the run is identified, so only that run is touched and a hand settlement with a real note can never be caught by accident. It reverses each settlement through the route's own `reverseSettlement` — stock, the `CONSIGNMENT_UNSOLD` returns, the quantities added to each item — then deletes the Sale and Settlement rows and recomputes each consignment's status, so one that had earlier settlements goes back to `PARTIAL_SETTLED` rather than `DELIVERED`. Dry run by default, `--apply` writes.
+
+```
+flyctl ssh console -a grillexa -C "node scripts/unbulk-settle.js --before=2026-08-31 --as=sold --apply"
+```
+
+The undo is itself not undoable: the Sale and Settlement rows are deleted outright, so their `SL-`/`ST-` numbers are gone and the sequence keeps counting from where it was. Run the dry run and check the count, units and value against the settle run before applying.
+
 `Dispatches` is the pre-consignment HQ→store transfer flow. It is read-only history; new deliveries go through Deliver to Store.
 
 ## How the ledger works, and what it is not

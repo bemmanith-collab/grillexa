@@ -811,3 +811,4 @@ module.exports.listQuery = listQuery;
 module.exports.HISTORY_LIMIT = HISTORY_LIMIT;
 // scripts/bulk-settle.js settles through the same code path as the route.
 module.exports.applySettlement = applySettlement;
+module.exports.reverseSettlement = reverseSettlement;
