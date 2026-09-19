@@ -34,6 +34,10 @@ flyctl ssh console -a grillexa -C "node scripts/unbulk-settle.js --before=2026-0
 
 The undo is itself not undoable: the Sale and Settlement rows are deleted outright, so their `SL-`/`ST-` numbers are gone and the sequence keeps counting from where it was. Run the dry run and check the count, units and value against the settle run before applying.
 
+**The Settle page's history view is capped, so it takes a date window.** A manager reported the date picker only offering the last five days and asked for a calendar. The picker was not the limit: `DatePager` builds its pages from the rows it was handed, and the unfiltered list returns the newest `HISTORY_LIMIT` (200) by delivery date — which across these stores is exactly five days. The older consignments were never sent to the browser, so no picker could have reached them. `GET /consignments` now takes `from` and `to` on delivery date, and a request carrying either is uncapped for the same reason a status-filtered one is: the window already bounds the answer, and handing back the newest 200 *of a chosen week* with nothing saying rows were dropped is the original bug wearing a different hat. `to` includes the day it names — "up to 10 September" that quietly excluded the 10th is the off-by-one nobody catches until a month comes up short. The page gains From/To inputs (native `<input type="date">`, which also enforces from ≤ to), and the unfiltered history view now says out loud that it is showing the newest 200 only.
+
+Note that **Awaiting settlement was never capped** and never paged — it shows every outstanding consignment however old, which is what that view is for. Anyone hunting an old unsettled delivery wants that view, not a date window on history.
+
 `Dispatches` is the pre-consignment HQ→store transfer flow. It is read-only history; new deliveries go through Deliver to Store.
 
 ## How the ledger works, and what it is not

@@ -23,6 +23,12 @@ function previousDay(date) {
   return prev;
 }
 
+function nextDay(date) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next;
+}
+
 // The business's calendar day, as YYYY-MM-DD. A bare toISOString() would give
 // the server's UTC day, which rolls over at 05:30 IST and files an
 // early-morning delivery under yesterday — so shift by the offset first.
@@ -144,4 +150,4 @@ async function processReturn(tx, { storeId, productId, date, quantity }) {
   return adjustStock(tx, { storeId, productId, date, soldDelta: -soldReduction, receivedDelta: overflow });
 }
 
-module.exports = { badRequest, normalizeDate, previousDay, todayStr, rechain, getOrCreateDailyEntry, adjustStock, processReturn };
+module.exports = { badRequest, normalizeDate, previousDay, nextDay, todayStr, rechain, getOrCreateDailyEntry, adjustStock, processReturn };

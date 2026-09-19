@@ -2,7 +2,7 @@ const express = require('express');
 const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
-const { normalizeDate, todayStr, adjustStock } = require('../lib/stock');
+const { normalizeDate, nextDay, todayStr, adjustStock } = require('../lib/stock');
 const { resolveLines } = require('../lib/pricing');
 const { assertStoreAccess } = require('../lib/scope');
 const { ensureStoreCoordinates } = require('../lib/storeGeocode');
@@ -320,12 +320,28 @@ function listQuery(user, query) {
     if (statuses.length) where.status = statuses.length > 1 ? { in: statuses } : statuses[0];
   }
 
+  // A delivery-date window. `to` is inclusive of the day it names: comparing
+  // `lt` against the following midnight is right whether deliveredAt is stored
+  // at UTC midnight (it is) or ever carries a real time. A `to` that quietly
+  // excluded its own day is the off-by-one nobody notices until a month comes
+  // up a day short.
+  if (query.from || query.to) {
+    where.deliveredAt = {};
+    if (query.from) where.deliveredAt.gte = normalizeDate(String(query.from));
+    if (query.to) where.deliveredAt.lt = nextDay(normalizeDate(String(query.to)));
+  }
+
   // A status filter is the Settle page asking "what is still outstanding?".
   // Capping that answer hides the consignment nobody has settled in three
   // weeks — precisely the one being looked for, and the oldest, so it sorts
   // last and falls off the end first. Outstanding work is bounded by the
   // business closing it out; history is not, so history keeps the cap.
-  return { where, take: where.status ? undefined : HISTORY_LIMIT };
+  //
+  // A date window bounds it the same way, and earns the same exemption. Asking
+  // for one week and being handed the newest 200 of it, with nothing saying
+  // rows were dropped, is exactly the failure the cap already caused on the
+  // unfiltered list. Only a request with neither is genuinely open-ended.
+  return { where, take: where.status || where.deliveredAt ? undefined : HISTORY_LIMIT };
 }
 
 router.get('/', async (req, res) => {

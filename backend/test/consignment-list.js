@@ -88,4 +88,47 @@ check('an explicit storeId still narrows the list for a manager', () => {
   assert.deepStrictEqual(listQuery(MANAGER, { storeId: '12' }).where, { storeId: 12 });
 });
 
+// The date window, added after a manager reported the Settle page's history
+// view showing only the newest five days. The cap was doing that, not the date
+// picker: the older rows were never sent to the browser, so no picker could
+// reach them. A window therefore has to BOTH narrow the query and lift the
+// cap — narrowing alone just truncates a smaller list and reproduces the same
+// bug somewhere quieter.
+check('a from date sets a lower bound on delivery date', () => {
+  const { where } = listQuery(MANAGER, { from: '2026-09-01' });
+  assert.strictEqual(where.deliveredAt.gte.toISOString(), '2026-09-01T00:00:00.000Z');
+});
+
+// The reported case exactly: "up to 10 September" has to include the 10th.
+// deliveredAt sits at UTC midnight, so lte on the same midnight would happen
+// to work — lt on the next day stays right if a row ever carries a real time.
+check('a to date includes the day it names', () => {
+  const { where } = listQuery(MANAGER, { to: '2026-09-10' });
+  assert.strictEqual(where.deliveredAt.lt.toISOString(), '2026-09-11T00:00:00.000Z');
+});
+
+check('a date window lifts the history cap', () => {
+  assert.strictEqual(
+    listQuery(MANAGER, { from: '2026-09-01', to: '2026-09-10' }).take,
+    undefined,
+    'a bounded window must return every match, or the oldest silently drop again'
+  );
+  assert.strictEqual(listQuery(MANAGER, { to: '2026-09-10' }).take, undefined);
+});
+
+check('no window and no status is still capped', () => {
+  assert.strictEqual(listQuery(MANAGER, {}).take, HISTORY_LIMIT);
+  assert.strictEqual(
+    listQuery(MANAGER, {}).where.deliveredAt,
+    undefined,
+    'an absent window must not build an empty deliveredAt filter'
+  );
+});
+
+check('a window composes with store scoping rather than replacing it', () => {
+  const { where } = listQuery(SALES, { from: '2026-09-01' });
+  assert.deepStrictEqual(where.storeId, { in: [7, 9] }, 'a SALES account stays scoped');
+  assert.ok(where.deliveredAt.gte, 'and still gets the window');
+});
+
 if (!process.exitCode) console.log('\nall checks passed');

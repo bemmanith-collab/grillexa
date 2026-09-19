@@ -207,6 +207,11 @@ function SettleForm({ consignment, existingSettlement, onClose, onSettled }) {
   );
 }
 
+// Mirrors HISTORY_LIMIT in backend/src/routes/consignments.js. Only used to
+// decide whether to warn that the unfiltered list was truncated, so drifting
+// apart costs a missing notice, never wrong data.
+const HISTORY_LIMIT = 200;
+
 export default function SettleConsignment() {
   const [consignments, setConsignments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -220,6 +225,10 @@ export default function SettleConsignment() {
   // can be corrected, and is the only view that pages by date: history is
   // endless, outstanding work is not.
   const [view, setView] = useState('open');
+  // A delivery-date window, sent to the server rather than applied here: the
+  // rows outside it are the ones that were never loaded in the first place.
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
   const filteredConsignments = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -242,6 +251,8 @@ export default function SettleConsignment() {
       // days of history — fine for correcting a recent settlement, useless
       // for finding an old one that was never settled at all.
       const params = view === 'open' ? { status: 'DELIVERED,PARTIAL_SETTLED' } : {};
+      if (from) params.from = from;
+      if (to) params.to = to;
       const res = await client.get('/consignments', { params });
       setConsignments(res.data.consignments);
     } catch (err) {
@@ -253,7 +264,7 @@ export default function SettleConsignment() {
 
   useEffect(() => {
     load();
-  }, [view]);
+  }, [view, from, to]);
 
   function handleSettled(data) {
     setSettling(null);
@@ -314,6 +325,29 @@ export default function SettleConsignment() {
               All, including settled
             </button>
           </div>
+          <div className="date-range">
+            <label>
+              <span>From</span>
+              <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
+            </label>
+            <label>
+              <span>To</span>
+              <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
+            </label>
+            {(from || to) && (
+              <button type="button" className="btn-secondary btn-sm" onClick={() => { setFrom(''); setTo(''); }}>
+                Clear dates
+              </button>
+            )}
+          </div>
+
+          {view === 'all' && !from && !to && consignments.length >= HISTORY_LIMIT && (
+            <p className="form-hint">
+              Showing the {consignments.length} most recent deliveries only. Older ones were never
+              loaded — set a From date to reach them.
+            </p>
+          )}
+
           <div className="search-input">
             <Search size={16} />
             <input
