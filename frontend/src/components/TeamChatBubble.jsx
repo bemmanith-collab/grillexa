@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MessageCircle, X, Send, Maximize2 } from 'lucide-react';
 import client from '../api/client';
 import { useTeamChatUnread, clearUnread, refreshUnread } from '../lib/teamChatUnread';
+import { isIdle } from '../lib/userIdle';
 
 // The chat, reachable from the dashboard without leaving it.
 //
@@ -138,7 +139,7 @@ export default function TeamChatBubble() {
   useEffect(() => {
     if (!open) return undefined;
     load(false);
-    const tick = () => { if (document.visibilityState === 'visible') load(true); };
+    const tick = () => { if (document.visibilityState === 'visible' && !isIdle()) load(true); };
     const id = setInterval(tick, POLL_MS);
     return () => clearInterval(id);
   }, [open, load]);

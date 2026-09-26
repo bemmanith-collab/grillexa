@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import client from '../api/client';
+import { isIdle } from './userIdle';
 
 // The unread count behind the sidebar badge.
 //
@@ -28,6 +29,9 @@ async function fetchNow() {
   // this is most of the day. The visibility listener below catches up the
   // moment it comes forward, so the badge is never stale when it is looked at.
   if (document.visibilityState !== 'visible') return;
+  // Nor while the app is open but untouched — this badge renders on every
+  // screen, so it is the poll most likely to be left running at nobody.
+  if (isIdle()) return;
   try {
     const res = await client.get('/team-chat/unread');
     count = res.data.unread ?? 0;

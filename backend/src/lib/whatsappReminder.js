@@ -17,6 +17,36 @@ const { buildSuggestions } = require('./whatsappSuggestions');
 const CHECK_EVERY_MS = 5 * 60 * 1000;
 const DEFAULT_HOUR = 7;
 
+// Which business day has already been dealt with.
+//
+// The timer below fires every five minutes from 07:00 IST to midnight, and
+// every one of those ticks used to run three queries — to re-discover a
+// decision that cannot change again today. That is ~200 queries a day to send
+// one notification, and it is not the query count that costs: the database
+// sleeps after five minutes idle and bills by the hour it is awake, so a poll
+// on a five-minute timer holds it open for seventeen hours a day. Remembering
+// the answer is what lets it sleep.
+//
+// In memory on purpose. It is an optimisation, not a lock — the unique
+// constraint on WhatsAppReminder.sentFor is still the only thing that stops two
+// machines sending twice, and a restart simply re-checks the day once.
+let settledFor = null;
+
+function daySettled(today) {
+  return settledFor === today;
+}
+
+// Records the day and passes the reason straight through, so a terminal branch
+// stays one line and cannot mark the day without also returning.
+function markSettled(today, reason) {
+  settledFor = today;
+  return reason;
+}
+
+function resetSettled() {
+  settledFor = null;
+}
+
 // Same +5:30 as the rest of the app. The reminder is for people in India;
 // the server's idea of morning is irrelevant.
 const BUSINESS_UTC_OFFSET_MINUTES = 330;
@@ -103,15 +133,19 @@ async function runReminderCheck(now = Date.now()) {
   const ist = businessNow(now);
   const today = ist.toISOString().slice(0, 10);
 
+  // Everything below this line touches the database. Once today is settled
+  // there is nothing left for it to find, so the check stops here.
+  if (daySettled(today)) return 'settled-today';
+
   const recipients = await authorIds();
-  if (!recipients.length) return 'no-authors';
+  if (!recipients.length) return markSettled(today, 'no-authors');
 
   const [rota, clock] = await Promise.all([loadRota(), loadClock()]);
   const due = rota.postForToday(now);
   const alreadyWritten = await prisma.whatsAppPost.count({
     where: { postDate: today, type: due.type },
   });
-  if (alreadyWritten > 0) return 'already-written';
+  if (alreadyWritten > 0) return markSettled(today, 'already-written');
 
   const posts = await prisma.whatsAppPost.findMany({
     orderBy: { postDate: 'desc' },
@@ -126,7 +160,7 @@ async function runReminderCheck(now = Date.now()) {
     dueToday: due,
     today: clock.businessDateStr(now),
   });
-  if (!top) return 'nothing-to-suggest';
+  if (!top) return markSettled(today, 'nothing-to-suggest');
 
   // The race between machines is settled here: whoever inserts the row first
   // sends, and the others fail the unique constraint and return quietly.
@@ -135,7 +169,7 @@ async function runReminderCheck(now = Date.now()) {
       data: { sentFor: today, recipients: recipients.length },
     });
   } catch {
-    return 'already-sent';
+    return markSettled(today, 'already-sent');
   }
 
   await sendToUsers(recipients, {
@@ -147,7 +181,7 @@ async function runReminderCheck(now = Date.now()) {
     tag: `whatsapp-${today}`,
   });
 
-  return 'sent';
+  return markSettled(today, 'sent');
 }
 
 // The rota, the options registry and the clock live in the ESM subproject, so
@@ -183,4 +217,12 @@ function startReminderSchedule() {
   return timer;
 }
 
-module.exports = { decideReminder, runReminderCheck, startReminderSchedule, reminderHour };
+module.exports = {
+  decideReminder,
+  runReminderCheck,
+  startReminderSchedule,
+  reminderHour,
+  daySettled,
+  markSettled,
+  resetSettled,
+};

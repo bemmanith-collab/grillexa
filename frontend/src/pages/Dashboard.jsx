@@ -21,6 +21,7 @@ import ShiftWastageModal from '../components/ShiftWastageModal';
 import Toast from '../components/Toast';
 import { formatCurrency } from '../lib/format';
 import { daysAgoStr, todayStr } from '../utils/date';
+import { isIdle } from '../lib/userIdle';
 
 // Long enough that the page is never the reason a phone's battery dies between
 // two shops, short enough that the figure you glance at on the way out of one
@@ -72,7 +73,7 @@ export default function Dashboard() {
   // the number matters.
   useEffect(() => {
     const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') load();
+      if (document.visibilityState === 'visible' && !isIdle()) load();
     }, REFRESH_MS);
     const onVisible = () => {
       if (document.visibilityState === 'visible') load();

@@ -4,6 +4,7 @@ import client from '../api/client';
 import Spinner from '../components/Spinner';
 import TeamChatMembers from '../components/TeamChatMembers';
 import { clearUnread, refreshUnread } from '../lib/teamChatUnread';
+import { isIdle } from '../lib/userIdle';
 
 // One room, the whole staff in it. A WhatsApp group, not a support desk.
 //
@@ -90,6 +91,9 @@ export default function TeamChat() {
   useEffect(() => {
     const tick = () => {
       if (document.visibilityState !== 'visible') return;
+      // A thread left open and untouched polls twelve times a minute, which on
+      // its own is enough to keep the database awake all day.
+      if (isIdle()) return;
       load({ incremental: true }).then(markRead);
     };
     const id = setInterval(tick, POLL_MS);

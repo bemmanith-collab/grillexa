@@ -7,7 +7,13 @@
 //
 // Run: npm test (from backend/). No database, no network.
 const assert = require('assert');
-const { decideReminder, reminderHour } = require('../src/lib/whatsappReminder');
+const {
+  decideReminder,
+  reminderHour,
+  daySettled,
+  markSettled,
+  resetSettled,
+} = require('../src/lib/whatsappReminder');
 
 // 2026-08-21 is a Friday. Times are given in IST and converted back to an
 // instant, so the test reads in the timezone the feature is written for.
@@ -85,8 +91,32 @@ const tests = {
       else process.env.WHATSAPP_REMINDER_HOUR = saved;
     }
   },
-};
 
+  // The day cache is what stops the five-minute timer running queries from
+  // 07:00 to midnight. Getting it wrong in the other direction is worse than
+  // the cost it saves: a cache that never lets go means the reminder stops
+  // arriving and nobody finds out for days.
+  'a settled day is not checked again': () => {
+    resetSettled();
+    assert.strictEqual(daySettled('2026-09-26'), false);
+    assert.strictEqual(markSettled('2026-09-26', 'sent'), 'sent');
+    assert.strictEqual(daySettled('2026-09-26'), true);
+  },
+
+  'tomorrow is always checked again': () => {
+    resetSettled();
+    markSettled('2026-09-26', 'sent');
+    // The one that matters. If this ever returns true the reminder is dead.
+    assert.strictEqual(daySettled('2026-09-27'), false);
+  },
+
+  'a restart clears it': () => {
+    resetSettled();
+    markSettled('2026-09-26', 'already-written');
+    resetSettled();
+    assert.strictEqual(daySettled('2026-09-26'), false);
+  },
+};
 let failed = 0;
 for (const [name, fn] of Object.entries(tests)) {
   try {
