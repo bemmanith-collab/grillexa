@@ -108,7 +108,7 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy, d
                   <td>
                     {l.product}
                     {isReturn && <span className="badge badge-critical" style={{ marginLeft: 8 }}>Return</span>}
-                    {isReturn && <div className="cell-muted">{REASON_LABEL[l.reason] || l.reason}</div>}
+                    {isReturn && <div className="cell-muted line-reason">{REASON_LABEL[l.reason] || l.reason}</div>}
                   </td>
                   <td>{l.quantity}</td>
                   <td>₹{l.unitPrice.toFixed(2)}</td>

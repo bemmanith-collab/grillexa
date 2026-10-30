@@ -649,6 +649,14 @@ select {
   color: var(--text-muted);
 }
 
+/* A return's reason under its product name. Sized here rather than inherited:
+   on a phone that cell is the card title, and the reason came out as large as
+   the product it describes. */
+.line-reason {
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
 .line-return {
   background: var(--danger-soft);
 }
