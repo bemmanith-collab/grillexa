@@ -30,6 +30,7 @@ function line(opts) {
     quantity: opts.quantity ?? 1,
     amount: opts.amount ?? 100,
     type: opts.type || 'SALE',
+    costPrice: opts.lineCost,
     product: { name: opts.name || 'Green sprouts', costPrice: opts.costPrice ?? 60 },
     sale: {
       id: opts.saleId ?? 1,
@@ -41,6 +42,20 @@ function line(opts) {
 }
 
 const tests = {
+  'profit uses the cost saved on the line, not the product cost today': () => {
+    // Billed when a unit cost 60; the product has since been re-costed to 90.
+    const [row] = productPerformance([line({ quantity: 10, amount: 1000, lineCost: 60, costPrice: 90 })], []);
+    assert.strictEqual(row.cost, 600, 'a cost change rewrote the margin on an old bill');
+    assert.strictEqual(row.profit, 400);
+  },
+
+  'a negotiated price is the revenue, whatever the catalogue says': () => {
+    // 10 units at an agreed 8 against a catalogue 10: revenue is the saved 80.
+    const [row] = productPerformance([line({ quantity: 10, amount: 80, lineCost: 5 })], []);
+    assert.strictEqual(row.revenue, 80);
+    assert.strictEqual(row.profit, 30);
+  },
+
   'a day with no sales is a zero on the line, not a gap': () => {
     const trend = salesTrend([line({ date: '2026-08-03', amount: 500 })], day('2026-08-01'), day('2026-08-05'));
     assert.strictEqual(trend.length, 5);

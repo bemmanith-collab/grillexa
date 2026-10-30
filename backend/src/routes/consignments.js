@@ -3,7 +3,7 @@ const prisma = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
 const { normalizeDate, nextDay, todayStr, adjustStock } = require('../lib/stock');
-const { resolveLines } = require('../lib/pricing');
+const { resolveLines, billedPricesOf } = require('../lib/pricing');
 const { assertStoreAccess } = require('../lib/scope');
 const { ensureStoreCoordinates } = require('../lib/storeGeocode');
 
@@ -100,11 +100,11 @@ const DETAIL_INCLUDE = {
 // Validates and normalizes the delivery-line shape shared by create and edit.
 // Prices come from the catalogue via resolveLines, never from the request —
 // see lib/pricing.js for why trusting the client zeroed out real revenue.
-async function parseDeliveryLines(tx, lines, role) {
+async function parseDeliveryLines(tx, lines, role, billedPrices) {
   if (!Array.isArray(lines) || lines.length === 0) {
     throw httpError(400, 'At least one line is required');
   }
-  const resolved = await resolveLines(tx, lines, role);
+  const resolved = await resolveLines(tx, lines, role, billedPrices);
   return resolved.map((l) => ({
     productId: l.productId,
     deliveredQty: l.quantity,
@@ -536,7 +536,12 @@ router.patch('/:id', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) 
   }
   let preparedItems;
   try {
-    preparedItems = await parseDeliveryLines(prisma, lines, req.user.role);
+    // An edit keeps the price the stock went out at, as a Direct Sale edit
+    // does. Without this a SALES edit (whose price override the server
+    // ignores) repriced every line at today's catalogue, and the bill that
+    // settlement later generated charged that instead of what was agreed.
+    const billed = billedPricesOf(consignment.items.map((i) => ({ productId: i.productId, unitPrice: i.pricePerUnit })));
+    preparedItems = await parseDeliveryLines(prisma, lines, req.user.role, billed);
   } catch (err) {
     return res.status(err.status || 400).json({ error: err.message });
   }

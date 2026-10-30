@@ -24,7 +24,9 @@ function center(text, width) {
 function lineItemRow(l) {
   const isReturn = l.type === 'RETURN';
   const amt = formatCurrency(isReturn ? -l.amount : l.amount);
-  return `${l.quantity}x ${l.product}${isReturn ? ' (Return)' : ''} — ${amt}`;
+  // The rate printed is the one saved on the bill, so a negotiated price
+  // shows on the customer's copy rather than leaving them to divide.
+  return `${l.quantity}x ${l.product}${isReturn ? ' (Return)' : ''} @ ${formatCurrency(l.unitPrice)} — ${amt}`;
 }
 
 // bandLabel/numberLabel/footerMessage let a non-billing document (e.g. a
@@ -176,7 +178,7 @@ export async function buildInvoicePdf(
     const isReturn = l.type === 'RETURN';
     doc.setTextColor(isReturn ? 200 : 30, isReturn ? 40 : 30, isReturn ? 40 : 30);
     const amt = formatCurrencyPdf(isReturn ? -l.amount : l.amount);
-    const label = `${l.quantity}x ${l.product}${isReturn ? ' (Return)' : ''}`;
+    const label = `${l.quantity}x ${l.product}${isReturn ? ' (Return)' : ''} @ ${formatCurrencyPdf(l.unitPrice)}`;
     doc.text(label, margin, y, { maxWidth: innerWidth * 0.65 });
     doc.text(amt, pageWidth - margin, y, { align: 'right' });
     y += 6;

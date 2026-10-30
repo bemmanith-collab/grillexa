@@ -95,6 +95,15 @@ const tests = {
     );
   },
 
+  'a consignment edit keeps the price the stock went out at': async () => {
+    // Delivered at an agreed 8 (pricePerUnit); catalogue says 100. The edit
+    // route maps its items into billedPricesOf exactly like this.
+    const items = [{ productId: 1, pricePerUnit: 8 }];
+    const billed = billedPricesOf(items.map((i) => ({ productId: i.productId, unitPrice: i.pricePerUnit })));
+    const [line] = await resolveLines(tx, [{ productId: 1, quantity: 4 }], 'SALES', billed);
+    assert.strictEqual(line.unitPrice, 8, 'the edit repriced the delivery to the catalogue');
+  },
+
   'billedPricesOf takes the first line when a product appears twice': () => {
     const billed = billedPricesOf([
       { productId: 1, unitPrice: 90 },

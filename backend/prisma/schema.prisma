@@ -344,6 +344,10 @@ model SaleLine {
   quantity  Int
   unitPrice Float
   amount    Float
+  // Product.costPrice as it stood when the line was written, filled by a
+  // database trigger (migration sale_line_cost_snapshot). Profit reads this,
+  // never the live product, so a cost change cannot rewrite old margins.
+  costPrice Float?
   type      String  @default("SALE")
   reason    String?
 

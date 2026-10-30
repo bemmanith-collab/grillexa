@@ -21,8 +21,8 @@ const BILL = {
   createdBy: 'Vijay',
   totalAmount: 1240.5,
   lines: [
-    { quantity: 20, product: 'Sprouts 200g', amount: 900, type: 'SALE' },
-    { quantity: 4, product: 'Fruit Bowl', amount: 340.5, type: 'SALE' },
+    { quantity: 20, product: 'Sprouts 200g', unitPrice: 45, amount: 900, type: 'SALE' },
+    { quantity: 4, product: 'Fruit Bowl', unitPrice: 85.125, amount: 340.5, type: 'SALE' },
   ],
 };
 
@@ -52,6 +52,19 @@ function check(name, fn) {
 }
 
 const tests = [
+  // The bill went out at an agreed 8 against a catalogue 10. Both copies the
+  // customer can be handed must print 8 and the 16 it adds up to; nothing in
+  // the renderers can see the catalogue, and this keeps it that way.
+  check('a negotiated price is what the shared text and the PDF print', async () => {
+    const bill = { ...BILL, totalAmount: 16, lines: [{ quantity: 2, product: 'Green sprouts', unitPrice: 8, amount: 16, type: 'SALE' }] };
+    const text = buildInvoiceShareText('Sale', bill, false);
+    assert.match(text, /2x Green sprouts @ ₹8\.00 — ₹16\.00/);
+    assert.doesNotMatch(text, /₹10\.00|₹20\.00/);
+    const pdf = Buffer.from((await buildInvoicePdf('Sale', bill, false)).output('arraybuffer')).toString('latin1');
+    assert.match(pdf, /2x Green sprouts @ Rs\.8\.00/);
+    assert.match(pdf, /Rs\.16\.00/);
+    assert.doesNotMatch(pdf, /Rs\.10\.00|Rs\.20\.00/);
+  }),
   check('a bill with no options is still an OFFICIAL INVOICE', () => {
     const text = buildInvoiceShareText('Sale', BILL, false);
     assert.match(text, /OFFICIAL INVOICE/);

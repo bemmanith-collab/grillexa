@@ -173,3 +173,34 @@ WHERE c.status IN ('DELIVERED', 'PARTIAL_SETTLED')
 GROUP BY c.id, c."deliveredAt", c."consignmentNo", st.name, c.status
 HAVING SUM((ci."deliveredQty" - ci."soldQty" - ci."returnedQty") * ci."pricePerUnit") > 0
 ORDER BY delivered, store;
+
+
+-- ---------------------------------------------------------------------------
+-- 6. Billed price against today's catalogue, last 30 days
+-- ---------------------------------------------------------------------------
+-- A difference here is NOT by itself a bug: every negotiated price and every
+-- catalogue change since the bill shows up, and that is the point of saving
+-- the price on the line. What it answers is "which bills did not charge list
+-- price, and by how much". The bug checks are the last two columns: the lines
+-- must add up to their own amounts, and the amounts to the bill total. Either
+-- one non-zero means a bill was written inconsistently.
+SELECT s.number,
+       s.date::date,
+       st.name AS store,
+       s."totalAmount"                                                         AS billed_total,
+       ROUND(SUM(CASE WHEN sl.type = 'RETURN' THEN -1 ELSE 1 END
+                 * sl.quantity * p.price)::numeric, 2)                         AS at_catalogue_today,
+       ROUND((s."totalAmount" - SUM(CASE WHEN sl.type = 'RETURN' THEN -1 ELSE 1 END
+                 * sl.quantity * p.price))::numeric, 2)                        AS difference,
+       ROUND(SUM(ABS(sl.amount - sl.quantity * sl."unitPrice"))::numeric, 2)  AS line_math_error,
+       ROUND((s."totalAmount" - SUM(CASE WHEN sl.type = 'RETURN' THEN -sl.amount ELSE sl.amount END))::numeric, 2) AS total_error
+FROM "Sale" s
+JOIN "Store" st     ON st.id = s."storeId"
+JOIN "SaleLine" sl  ON sl."saleId" = s.id
+JOIN "Product" p    ON p.id = sl."productId"
+WHERE s.date >= CURRENT_DATE - INTERVAL '30 days'
+GROUP BY s.id, s.number, s.date, st.name, s."totalAmount"
+HAVING ABS(s."totalAmount" - SUM(CASE WHEN sl.type = 'RETURN' THEN -1 ELSE 1 END * sl.quantity * p.price)) > 0.005
+    OR SUM(ABS(sl.amount - sl.quantity * sl."unitPrice")) > 0.005
+    OR ABS(s."totalAmount" - SUM(CASE WHEN sl.type = 'RETURN' THEN -sl.amount ELSE sl.amount END)) > 0.005
+ORDER BY ABS(s."totalAmount" - SUM(CASE WHEN sl.type = 'RETURN' THEN -1 ELSE 1 END * sl.quantity * p.price)) DESC;

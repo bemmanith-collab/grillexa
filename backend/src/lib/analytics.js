@@ -134,7 +134,9 @@ function productPerformance(lines, wastage) {
     const row = bucket(line.productId, line.product.name);
     row.units += lineQty(line);
     row.revenue += lineValue(line);
-    row.cost += lineQty(line) * (line.product.costPrice || 0);
+    // The cost saved on the line; the live product only for a row read
+    // before the snapshot column existed.
+    row.cost += lineQty(line) * (line.costPrice ?? line.product.costPrice ?? 0);
   }
   for (const entry of wastage) {
     const row = bucket(entry.productId, entry.product.name);

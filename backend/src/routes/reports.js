@@ -77,6 +77,7 @@ async function loadCore({ from, to, storeId, productId, userId }) {
         productId: true,
         quantity: true,
         amount: true,
+        costPrice: true,
         type: true,
         product: { select: { name: true, costPrice: true } },
         sale: { select: { id: true, date: true, storeId: true, createdById: true } },
@@ -398,7 +399,7 @@ router.get('/pnl', async (req, res) => {
   for (const line of saleLines) {
     const sign = line.type === 'RETURN' ? -1 : 1;
     const revenue = sign * line.amount;
-    const cogs = sign * (line.product?.costPrice || 0) * line.quantity;
+    const cogs = sign * (line.costPrice ?? line.product?.costPrice ?? 0) * line.quantity;
     overallRevenue += revenue;
     overallCogs += cogs;
     const b = bucket(line.sale.storeId);
