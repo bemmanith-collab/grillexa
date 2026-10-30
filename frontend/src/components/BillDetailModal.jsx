@@ -14,7 +14,6 @@ const REASON_LABEL = Object.fromEntries(ALL_RETURN_REASON_LABELS.map((r) => [r.v
 // print/share UI without visually claiming to be a paid invoice. Omit it
 // for anything that's actually a bill (Sales, Dispatches, Settlement).
 export default function BillDetailModal({ title, bill, onClose, hideCreatedBy, documentOptions }) {
-  const hasReturns = bill.lines.some((l) => l.type === 'RETURN');
   const [copied, setCopied] = useState(false);
   const b = BUSINESS_INFO;
   const bandLabel = documentOptions?.bandLabel || 'OFFICIAL INVOICE';
@@ -94,7 +93,6 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy, d
               <th>Product</th>
               <th>Quantity</th>
               <th>Unit Price</th>
-              {hasReturns && <th>Reason</th>}
               <th>Amount</th>
             </tr>
           </thead>
@@ -103,10 +101,17 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy, d
               const isReturn = l.type === 'RETURN';
               return (
                 <tr key={l.id} className={isReturn ? 'line-return' : undefined}>
-                  <td>{l.product}{isReturn && <span className="badge badge-critical" style={{ marginLeft: 8 }}>Return</span>}</td>
+                  {/* The reason sits under the product rather than in its own
+                      column: a fifth column made the table wider than the
+                      modal and scrolled Amount out of sight, so a return's
+                      credit vanished from the bill on screen. */}
+                  <td>
+                    {l.product}
+                    {isReturn && <span className="badge badge-critical" style={{ marginLeft: 8 }}>Return</span>}
+                    {isReturn && <div className="cell-muted">{REASON_LABEL[l.reason] || l.reason}</div>}
+                  </td>
                   <td>{l.quantity}</td>
                   <td>₹{l.unitPrice.toFixed(2)}</td>
-                  {hasReturns && <td>{isReturn ? REASON_LABEL[l.reason] || l.reason : <span className="cell-muted">—</span>}</td>}
                   <td className={isReturn ? 'text-danger' : undefined}>{formatCurrency(isReturn ? -l.amount : l.amount)}</td>
                 </tr>
               );
