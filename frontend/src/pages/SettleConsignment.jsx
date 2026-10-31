@@ -19,19 +19,38 @@ function asSaleBill(settlement, consignment) {
       const item = consignment.items.find((i) => i.id === l.consignmentItemId);
       return sum + l.soldQty * (item?.pricePerUnit || 0);
     }, 0),
-    lines: settlement.lines
-      .filter((l) => l.soldQty > 0)
-      .map((l) => {
-        const item = consignment.items.find((i) => i.id === l.consignmentItemId);
-        return {
-          id: l.id,
-          product: l.product,
-          quantity: l.soldQty,
-          unitPrice: item?.pricePerUnit || 0,
-          amount: l.soldQty * (item?.pricePerUnit || 0),
-          type: 'SALE',
-        };
-      }),
+    lines: [
+      ...settlement.lines
+        .filter((l) => l.soldQty > 0)
+        .map((l) => {
+          const item = consignment.items.find((i) => i.id === l.consignmentItemId);
+          return {
+            id: l.id,
+            product: l.product,
+            quantity: l.soldQty,
+            unitPrice: item?.pricePerUnit || 0,
+            amount: l.soldQty * (item?.pricePerUnit || 0),
+            type: 'SALE',
+          };
+        }),
+      // What the store handed back unsold: on the bill so both sides can
+      // check it, at zero because nobody is charged for it. Same shape as
+      // GET /sales/:id gives a settlement bill, so the Sales page matches.
+      ...settlement.lines
+        .filter((l) => l.returnedQty > 0)
+        .map((l) => {
+          const item = consignment.items.find((i) => i.id === l.consignmentItemId);
+          return {
+            id: `unsold-${l.id}`,
+            product: l.product,
+            quantity: l.returnedQty,
+            unitPrice: item?.pricePerUnit || 0,
+            amount: 0,
+            type: 'RETURN',
+            reason: 'CONSIGNMENT_UNSOLD',
+          };
+        }),
+    ],
   };
 }
 

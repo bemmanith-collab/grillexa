@@ -149,10 +149,35 @@ router.get('/latest/:storeId', async (req, res) => {
   res.json({ sale: shapeSale(latest) });
 });
 
+// A settlement bill charges only what sold, but the store also handed back
+// what did not, and the bill is the paper both sides check that against. So
+// the unsold quantities ride along as RETURN lines at zero: shown, never
+// charged, never stored as SaleLines (they would count as sales returns in
+// every report). Display only — the total stays the saved totalAmount.
+function unsoldReturnLines(settlement) {
+  return (settlement?.lines || [])
+    .filter((l) => l.returnedQty > 0)
+    .map((l) => ({
+      id: `unsold-${l.id}`,
+      productId: l.consignmentItem.productId,
+      product: l.consignmentItem.product?.name,
+      quantity: l.returnedQty,
+      unitPrice: l.consignmentItem.pricePerUnit,
+      amount: 0,
+      type: 'RETURN',
+      reason: 'CONSIGNMENT_UNSOLD',
+    }));
+}
+
 router.get('/:id', async (req, res) => {
   const sale = await prisma.sale.findUnique({
     where: { id: Number(req.params.id) },
-    include: { store: true, createdBy: true, lines: { include: { product: true } } },
+    include: {
+      store: true,
+      createdBy: true,
+      lines: { include: { product: true } },
+      settlement: { include: { lines: { include: { consignmentItem: { include: { product: true } } } } } },
+    },
   });
   if (!sale) return res.status(404).json({ error: 'Sale not found' });
   if (req.user.role === 'SALES') {
@@ -162,7 +187,9 @@ router.get('/:id', async (req, res) => {
       return res.status(err.status || 403).json({ error: err.message });
     }
   }
-  res.json({ sale: shapeSale(sale) });
+  const shaped = shapeSale(sale);
+  shaped.lines.push(...unsoldReturnLines(sale.settlement));
+  res.json({ sale: shaped });
 });
 
 // Create a retail sales bill. Sales staff always bill against their own
