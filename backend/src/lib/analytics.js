@@ -16,8 +16,12 @@ function lineValue(line) {
   return line.type === 'RETURN' ? -line.amount : line.amount;
 }
 
+// A return only takes units off when it also took money off — the older
+// bills that credited the customer. Returns now charge nothing and leave the
+// sale alone, units included.
 function lineQty(line) {
-  return line.type === 'RETURN' ? -line.quantity : line.quantity;
+  if (line.type !== 'RETURN') return line.quantity;
+  return line.amount ? -line.quantity : 0;
 }
 
 function isoDay(date) {

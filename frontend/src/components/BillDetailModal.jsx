@@ -111,8 +111,12 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy, d
                     {isReturn && <div className="cell-muted line-reason">{REASON_LABEL[l.reason] || l.reason}</div>}
                   </td>
                   <td>{l.quantity}</td>
-                  <td>₹{l.unitPrice.toFixed(2)}</td>
-                  <td className={isReturn ? 'text-danger' : undefined}>{formatCurrency(isReturn ? -l.amount : l.amount)}</td>
+                  {/* A return charges nothing, so it shows its quantity and no
+                      money. Older bills that credited the return still show it. */}
+                  <td>{isReturn && !l.amount ? '—' : `₹${l.unitPrice.toFixed(2)}`}</td>
+                  <td className={isReturn ? (l.amount ? 'text-danger' : 'cell-muted') : undefined}>
+                    {isReturn ? (l.amount ? formatCurrency(-l.amount) : '—') : formatCurrency(l.amount)}
+                  </td>
                 </tr>
               );
             })}

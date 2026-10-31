@@ -60,7 +60,8 @@ function topProducts(sales, limit = 3) {
         quantity: 0,
       };
       agg.amount += sign * line.amount;
-      agg.quantity += sign * line.quantity;
+      // A zero-amount return (every return billed now) leaves units alone too.
+      if (line.type !== 'RETURN' || line.amount) agg.quantity += sign * line.quantity;
       byProduct.set(line.productId, agg);
     }
   }

@@ -399,7 +399,10 @@ router.get('/pnl', async (req, res) => {
   for (const line of saleLines) {
     const sign = line.type === 'RETURN' ? -1 : 1;
     const revenue = sign * line.amount;
-    const cogs = sign * (line.costPrice ?? line.product?.costPrice ?? 0) * line.quantity;
+    // A return that refunded nothing (every return billed now) took no sale
+    // back, so it gives no cost back either.
+    const refunded = line.type !== 'RETURN' || line.amount;
+    const cogs = refunded ? sign * (line.costPrice ?? line.product?.costPrice ?? 0) * line.quantity : 0;
     overallRevenue += revenue;
     overallCogs += cogs;
     const b = bucket(line.sale.storeId);

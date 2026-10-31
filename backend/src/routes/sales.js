@@ -239,11 +239,13 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
         productId: l.productId,
         quantity: l.quantity,
         unitPrice: l.unitPrice,
-        amount: l.quantity * l.unitPrice,
+        // A return is goods coming back, not money going out: it is listed on
+        // the bill with its quantity and charges nothing, so the bill total is
+        // what sold. Bills saved before this carry a negative-credited amount.
+        amount: l.type === 'RETURN' ? 0 : l.quantity * l.unitPrice,
         type: l.type === 'RETURN' ? 'RETURN' : 'SALE',
         reason: l.type === 'RETURN' ? l.reason : null,
       }));
-      // A RETURN line credits the customer back, so it subtracts from the bill total.
       const totalAmount = preparedLines.reduce((sum, l) => sum + (l.type === 'RETURN' ? -l.amount : l.amount), 0);
 
       // Apply stock movement for every line before writing anything: sale
@@ -414,7 +416,10 @@ router.patch('/:id', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) 
         productId: l.productId,
         quantity: l.quantity,
         unitPrice: l.unitPrice,
-        amount: l.quantity * l.unitPrice,
+        // A return is goods coming back, not money going out: it is listed on
+        // the bill with its quantity and charges nothing, so the bill total is
+        // what sold. Bills saved before this carry a negative-credited amount.
+        amount: l.type === 'RETURN' ? 0 : l.quantity * l.unitPrice,
         type: l.type === 'RETURN' ? 'RETURN' : 'SALE',
         reason: l.type === 'RETURN' ? l.reason : null,
       }));

@@ -65,6 +65,19 @@ const tests = [
     assert.match(pdf, /Rs\.16\.00/);
     assert.doesNotMatch(pdf, /Rs\.10\.00|Rs\.20\.00/);
   }),
+  check('a return is listed by quantity and charges nothing', async () => {
+    const bill = { ...BILL, totalAmount: 50, lines: [
+      { quantity: 2, product: 'Sprouts', unitPrice: 25, amount: 50, type: 'SALE' },
+      { quantity: 3, product: 'Fruit Bowl', unitPrice: 40, amount: 0, type: 'RETURN' },
+    ] };
+    const text = buildInvoiceShareText('Sale', bill, false);
+    assert.match(text, /3x Fruit Bowl \(Return\)\n/);
+    assert.doesNotMatch(text, /₹40|-₹/);
+    const pdf = Buffer.from((await buildInvoicePdf('Sale', bill, false)).output('arraybuffer')).toString('latin1');
+    assert.match(pdf, /\(3x Fruit Bowl \\\(Return\\\)\) Tj/);
+    assert.doesNotMatch(pdf, /Rs\.40/);
+    assert.match(pdf, /TOTAL: Rs\.50\.00/);
+  }),
   check('a bill with no options is still an OFFICIAL INVOICE', () => {
     const text = buildInvoiceShareText('Sale', BILL, false);
     assert.match(text, /OFFICIAL INVOICE/);

@@ -44,7 +44,7 @@ This is **not a sale yet**. The stock is at the shop but still yours.
 2. Pick the store, add products and quantities, enter the customer's name/phone if you have it.
 3. Save. That's a bill, paid now.
 
-A customer returning goods: add the item as a **RETURN** line on the bill — it credits them and comes off the total.
+A customer returning goods: add the item as a **RETURN** line on the bill — it shows the quantity coming back and charges nothing, so the bill total is only what sold.
 
 ### When a shop pays you — Settle Consignment
 

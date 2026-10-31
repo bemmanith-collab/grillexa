@@ -42,7 +42,8 @@ export default function LineItemsForm({ products, lines, setLines, allowReturns 
 
   const total = lines.reduce((sum, l) => {
     const amount = (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0);
-    return sum + (l.type === 'RETURN' ? -amount : amount);
+    // Returns are listed, not charged or credited: the total is what sold.
+    return sum + (l.type === 'RETURN' ? 0 : amount);
   }, 0);
 
   return (
@@ -119,7 +120,7 @@ export default function LineItemsForm({ products, lines, setLines, allowReturns 
                     )}
                   </td>
                 )}
-                <td className={isReturn ? 'text-danger' : undefined}>{formatCurrency(isReturn ? -amount : amount)}</td>
+                <td className={isReturn ? 'cell-muted' : undefined}>{isReturn ? '—' : formatCurrency(amount)}</td>
                 <td>
                   <button type="button" className="btn-danger btn-sm" onClick={() => removeLine(i)} disabled={lines.length === 1}>
                     Remove

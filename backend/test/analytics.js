@@ -90,6 +90,16 @@ const tests = {
     assert.deepStrictEqual(rows.map((r) => [r.label, r.amount]), [['Store 2', 900], ['Store 1', 400]]);
   },
 
+  'a return that charged nothing leaves the sale alone, units included': () => {
+    const [row] = sumLinesBy(
+      [line({ quantity: 10, amount: 1000 }), line({ quantity: 2, amount: 0, type: 'RETURN' })],
+      (l) => l.productId,
+      (l) => l.product.name
+    );
+    assert.strictEqual(row.quantity, 10);
+    assert.strictEqual(row.amount, 1000);
+  },
+
   'a return subtracts units as well as money': () => {
     const [row] = sumLinesBy(
       [line({ quantity: 10, amount: 1000 }), line({ quantity: 2, amount: 200, type: 'RETURN' })],

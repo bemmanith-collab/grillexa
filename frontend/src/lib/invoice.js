@@ -23,6 +23,8 @@ function center(text, width) {
 
 function lineItemRow(l) {
   const isReturn = l.type === 'RETURN';
+  // A return that charged nothing is listed by quantity alone.
+  if (isReturn && !l.amount) return `${l.quantity}x ${l.product} (Return)`;
   const amt = formatCurrency(isReturn ? -l.amount : l.amount);
   // The rate printed is the one saved on the bill, so a negotiated price
   // shows on the customer's copy rather than leaving them to divide.
@@ -177,8 +179,9 @@ export async function buildInvoicePdf(
   bill.lines.forEach((l) => {
     const isReturn = l.type === 'RETURN';
     doc.setTextColor(isReturn ? 200 : 30, isReturn ? 40 : 30, isReturn ? 40 : 30);
-    const amt = formatCurrencyPdf(isReturn ? -l.amount : l.amount);
-    const label = `${l.quantity}x ${l.product}${isReturn ? ' (Return)' : ''} @ ${formatCurrencyPdf(l.unitPrice)}`;
+    const listed = isReturn && !l.amount;
+    const amt = listed ? '-' : formatCurrencyPdf(isReturn ? -l.amount : l.amount);
+    const label = `${l.quantity}x ${l.product}${isReturn ? ' (Return)' : ''}${listed ? '' : ` @ ${formatCurrencyPdf(l.unitPrice)}`}`;
     doc.text(label, margin, y, { maxWidth: innerWidth * 0.65 });
     doc.text(amt, pageWidth - margin, y, { align: 'right' });
     y += 6;
