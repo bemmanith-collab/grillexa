@@ -288,6 +288,17 @@ export default function DirectSale() {
     }
   }
 
+  async function deleteSale(s) {
+    if (!window.confirm(`Delete bill ${s.number}? Its stock goes back. This cannot be undone.`)) return;
+    setError('');
+    try {
+      await client.delete(`/sales/${s.id}`);
+      loadAll();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete that bill.');
+    }
+  }
+
   async function openDetail(id) {
     const res = await client.get(`/sales/${id}`);
     setDetail(res.data.sale);
@@ -470,6 +481,11 @@ export default function DirectSale() {
                     <button className="btn-secondary btn-sm" onClick={() => openDetail(s.id)}>
                       View
                     </button>
+                    {user.role === 'ADMIN' && !s.consignmentId && (
+                      <button className="btn-danger btn-sm" onClick={() => deleteSale(s)}>
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

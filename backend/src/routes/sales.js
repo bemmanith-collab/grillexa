@@ -319,6 +319,40 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
   }
 });
 
+// Undo a direct bill's effect on stock and the Return ledger, and drop its
+// lines — what both an edit (before re-applying) and a delete need.
+async function reverseSale(tx, existing) {
+  // Reverse the original at its original store and date, so a bill moved
+  // to a different day or store leaves nothing behind on the old one.
+  for (const line of existing.lines) {
+    if (line.type === 'RETURN') {
+      // ponytail: reverses the closing balance exactly, but not the
+      // sold/received split processReturn chose at the time — that split
+      // depended on how much had sold that day and isn't recorded. Store
+      // the split on SaleLine if "Units Sold Today" ever has to be exact
+      // across an edited return.
+      await adjustStock(tx, {
+        storeId: existing.storeId,
+        productId: line.productId,
+        date: existing.date,
+        receivedDelta: -line.quantity,
+      });
+    } else {
+      await adjustStock(tx, {
+        storeId: existing.storeId,
+        productId: line.productId,
+        date: existing.date,
+        soldDelta: -line.quantity,
+      });
+    }
+  }
+
+  await tx.saleLine.deleteMany({ where: { saleId: existing.id } });
+  // The audit rows were written against this bill's number; an edit
+  // writes them again from the corrected lines.
+  await tx.return.deleteMany({ where: { reference: existing.number } });
+}
+
 // Correct a bill that was keyed wrong. Reverses the original's stock effect,
 // replaces the lines, then applies the new one — the same reverse-then-reapply
 // shape as PATCH /consignments/:id. The bill keeps its number, so a customer
@@ -378,35 +412,7 @@ router.patch('/:id', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) 
 
   try {
     const sale = await prisma.$transaction(async (tx) => {
-      // Reverse the original at its original store and date, so a bill moved
-      // to a different day or store leaves nothing behind on the old one.
-      for (const line of existing.lines) {
-        if (line.type === 'RETURN') {
-          // ponytail: reverses the closing balance exactly, but not the
-          // sold/received split processReturn chose at the time — that split
-          // depended on how much had sold that day and isn't recorded. Store
-          // the split on SaleLine if "Units Sold Today" ever has to be exact
-          // across an edited return.
-          await adjustStock(tx, {
-            storeId: existing.storeId,
-            productId: line.productId,
-            date: existing.date,
-            receivedDelta: -line.quantity,
-          });
-        } else {
-          await adjustStock(tx, {
-            storeId: existing.storeId,
-            productId: line.productId,
-            date: existing.date,
-            soldDelta: -line.quantity,
-          });
-        }
-      }
-
-      await tx.saleLine.deleteMany({ where: { saleId: id } });
-      // The audit rows were written against this bill's number; they're
-      // rebuilt below from whatever the corrected lines turn out to be.
-      await tx.return.deleteMany({ where: { reference: existing.number } });
+      await reverseSale(tx, existing);
 
       // Keep charging what this bill already charged — the customer's printed
       // copy carries the same number and has to keep matching it.
@@ -468,6 +474,29 @@ router.patch('/:id', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) 
     res.status(err.status || 500).json({
         error: err.status ? err.message : 'Failed to update sale',
       });
+  }
+});
+
+// Admin only: a bill keyed by mistake. Stock goes back and the bill's
+// return rows go with it. Settlement bills are refused for the same reason
+// an edit is — the settlement owns them.
+router.delete('/:id', requireRole('ADMIN'), async (req, res) => {
+  const id = Number(req.params.id);
+  const existing = await prisma.sale.findUnique({ where: { id }, include: { lines: true, settlement: true } });
+  if (!existing) return res.status(404).json({ error: 'Sale not found' });
+  if (existing.consignmentId || existing.settlement) {
+    return res.status(409).json({
+      error: 'This bill came from settling a consignment. Undo it from Settle Consignment instead.',
+    });
+  }
+  try {
+    await prisma.$transaction(async (tx) => {
+      await reverseSale(tx, existing);
+      await tx.sale.delete({ where: { id } });
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to delete sale' });
   }
 });
 
