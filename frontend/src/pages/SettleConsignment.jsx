@@ -289,20 +289,21 @@ export default function SettleConsignment() {
   function handleSettled(data) {
     setSettling(null);
     setEditingSettlement(null);
-    if (data.settlement.saleId) {
-      setResult({ settlement: data.settlement, consignment: data.consignment });
-    }
+    // Always show the bill, even when everything came back unsold: it is the
+    // paper both sides check the returned quantities against.
+    setResult({ settlement: data.settlement, consignment: data.consignment });
     load();
   }
 
-  async function openEditSettlement(c) {
+  // The consignment with its most recent settlement, for editing or viewing.
+  async function loadLastSettlement(c, then) {
     setError('');
     try {
       const res = await client.get(`/consignments/${c.id}`);
       const consignment = res.data.consignment;
       const settlement = consignment.settlements?.[0];
       if (!settlement) return;
-      setEditingSettlement({ consignment, settlement });
+      then({ consignment, settlement });
     } catch (err) {
       setError('Failed to load settlement detail.');
     }
@@ -424,9 +425,14 @@ export default function SettleConsignment() {
                       </button>
                     )}
                     {c.status !== 'DELIVERED' && (
-                      <button className="btn-secondary btn-sm" onClick={() => openEditSettlement(c)}>
-                        Edit Last Settlement
-                      </button>
+                      <>
+                        <button className="btn-secondary btn-sm" onClick={() => loadLastSettlement(c, setResult)}>
+                          View Bill
+                        </button>
+                        <button className="btn-secondary btn-sm" onClick={() => loadLastSettlement(c, setEditingSettlement)}>
+                          Edit Last Settlement
+                        </button>
+                      </>
                     )}
                   </td>
                 </tr>
