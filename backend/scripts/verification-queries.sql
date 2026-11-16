@@ -61,7 +61,7 @@ ORDER BY st.name, day;
 -- was ever brought back.
 SELECT p.name AS product,
        p.sku,
-       SUM(CASE WHEN sl.type = 'RETURN' THEN -sl.quantity ELSE sl.quantity END) AS net_units,
+       SUM(CASE WHEN sl.type = 'RETURN' THEN -sl.quantity WHEN sl.type = 'EXCHANGE' THEN 0 ELSE sl.quantity END) AS net_units,
        ROUND(SUM(CASE WHEN sl.type = 'RETURN' THEN -sl.amount ELSE sl.amount END)::numeric, 2) AS net_revenue,
        SUM(CASE WHEN sl.type = 'RETURN' THEN sl.quantity ELSE 0 END) AS units_returned
 FROM "SaleLine" sl

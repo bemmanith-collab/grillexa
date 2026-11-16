@@ -187,6 +187,8 @@ async function checkZeroPrice(from, to) {
     prisma.saleLine.findMany({
       where: {
         quantity: { gt: 0 },
+        // Returns and exchanges charge nothing by design.
+        type: 'SALE',
         OR: [{ unitPrice: { lte: 0 } }, { amount: { lte: 0 } }],
         sale: { date: { gte: from, lte: to } },
       },
@@ -205,9 +207,9 @@ async function checkZeroPrice(from, to) {
     add('ERROR', 'zero-price-lines', `${lines.length} sale lines are priced at zero or less.`,
       lines.map((l) => `${iso(l.sale.date)}  ${l.sale.number}  ${l.sale.store.name}  ${l.product.name}  qty=${l.quantity} unit=${l.unitPrice} amount=${l.amount}  by ${l.sale.createdBy.name}`));
   }
-  // An all-RETURN bill is legitimately zero or negative, so those are called
-  // out separately rather than as an error.
-  const suspicious = bills.filter((b) => b.lines.some((l) => l.type !== 'RETURN'));
+  // A bill of only returns/exchanges is legitimately zero or negative, so
+  // those are called out separately rather than as an error.
+  const suspicious = bills.filter((b) => b.lines.some((l) => l.type === 'SALE'));
   if (suspicious.length) {
     add('ERROR', 'zero-total-bills', `${suspicious.length} bills total zero or less while containing non-return lines.`,
       suspicious.map((b) => `${iso(b.date)}  ${b.number}  ${b.store.name}  total=${b.totalAmount}  by ${b.createdBy.name}`));

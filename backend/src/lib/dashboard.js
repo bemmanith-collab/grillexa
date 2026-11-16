@@ -61,7 +61,8 @@ function topProducts(sales, limit = 3) {
       };
       agg.amount += sign * line.amount;
       // A zero-amount return (every return billed now) leaves units alone too.
-      if (line.type !== 'RETURN' || line.amount) agg.quantity += sign * line.quantity;
+      // An exchange swapped one for one, so it sold nothing either.
+      if (line.type === 'SALE' || (line.type === 'RETURN' && line.amount)) agg.quantity += sign * line.quantity;
       byProduct.set(line.productId, agg);
     }
   }

@@ -100,6 +100,15 @@ const tests = {
     assert.strictEqual(row.amount, 1000);
   },
 
+  'an exchange sells nothing and costs nothing': () => {
+    const lines = [line({ quantity: 10, amount: 1000 }), line({ quantity: 3, amount: 0, type: 'EXCHANGE' })];
+    const [row] = sumLinesBy(lines, (l) => l.productId, (l) => l.product.name);
+    assert.strictEqual(row.quantity, 10);
+    assert.strictEqual(row.amount, 1000);
+    const [perf] = productPerformance(lines, []);
+    assert.strictEqual(perf.cost, 600);
+  },
+
   'a return subtracts units as well as money': () => {
     const [row] = sumLinesBy(
       [line({ quantity: 10, amount: 1000 }), line({ quantity: 2, amount: 200, type: 'RETURN' })],

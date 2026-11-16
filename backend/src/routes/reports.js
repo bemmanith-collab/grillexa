@@ -401,7 +401,8 @@ router.get('/pnl', async (req, res) => {
     const revenue = sign * line.amount;
     // A return that refunded nothing (every return billed now) took no sale
     // back, so it gives no cost back either.
-    const refunded = line.type !== 'RETURN' || line.amount;
+    // An exchange swapped one for one, so it costs nothing either.
+    const refunded = line.type === 'SALE' || (line.type === 'RETURN' && line.amount);
     const cogs = refunded ? sign * (line.costPrice ?? line.product?.costPrice ?? 0) * line.quantity : 0;
     overallRevenue += revenue;
     overallCogs += cogs;

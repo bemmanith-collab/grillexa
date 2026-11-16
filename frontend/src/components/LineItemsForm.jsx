@@ -42,8 +42,8 @@ export default function LineItemsForm({ products, lines, setLines, allowReturns 
 
   const total = lines.reduce((sum, l) => {
     const amount = (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0);
-    // Returns are listed, not charged or credited: the total is what sold.
-    return sum + (l.type === 'RETURN' ? 0 : amount);
+    // Returns and exchanges are listed, not charged or credited: the total is what sold.
+    return sum + (l.type === 'RETURN' || l.type === 'EXCHANGE' ? 0 : amount);
   }, 0);
 
   return (
@@ -64,6 +64,7 @@ export default function LineItemsForm({ products, lines, setLines, allowReturns 
         <tbody>
           {lines.map((line, i) => {
             const isReturn = allowReturns && line.type === 'RETURN';
+            const unpriced = isReturn || (allowReturns && line.type === 'EXCHANGE');
             const amount = (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0);
             return (
               <tr key={i} className={isReturn ? 'line-return' : undefined}>
@@ -72,6 +73,7 @@ export default function LineItemsForm({ products, lines, setLines, allowReturns 
                     <select value={line.type || 'SALE'} onChange={(e) => handleTypeChange(i, e.target.value)}>
                       <option value="SALE">Sale</option>
                       <option value="RETURN">Return</option>
+                      <option value="EXCHANGE">Exchange</option>
                     </select>
                   </td>
                 )}
@@ -120,7 +122,7 @@ export default function LineItemsForm({ products, lines, setLines, allowReturns 
                     )}
                   </td>
                 )}
-                <td className={isReturn ? 'cell-muted' : undefined}>{isReturn ? '—' : formatCurrency(amount)}</td>
+                <td className={unpriced ? 'cell-muted' : undefined}>{unpriced ? '—' : formatCurrency(amount)}</td>
                 <td>
                   <button type="button" className="btn-danger btn-sm" onClick={() => removeLine(i)} disabled={lines.length === 1}>
                     Remove

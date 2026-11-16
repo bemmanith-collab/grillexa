@@ -78,6 +78,16 @@ const tests = [
     assert.doesNotMatch(pdf, /Rs\.40/);
     assert.match(pdf, /TOTAL: Rs\.50\.00/);
   }),
+  check('an exchange is listed by quantity and charges nothing', async () => {
+    const bill = { ...BILL, totalAmount: 0, lines: [
+      { quantity: 2, product: 'Banana', unitPrice: 5, amount: 0, type: 'EXCHANGE' },
+    ] };
+    const text = buildInvoiceShareText('Sale', bill, false);
+    assert.match(text, /2x Banana \(Exchange\)\n/);
+    assert.doesNotMatch(text, /₹5/);
+    const pdf = Buffer.from((await buildInvoicePdf('Sale', bill, false)).output('arraybuffer')).toString('latin1');
+    assert.match(pdf, /\(2x Banana \\\(Exchange\\\)\) Tj/);
+  }),
   check('a bill with no options is still an OFFICIAL INVOICE', () => {
     const text = buildInvoiceShareText('Sale', BILL, false);
     assert.match(text, /OFFICIAL INVOICE/);

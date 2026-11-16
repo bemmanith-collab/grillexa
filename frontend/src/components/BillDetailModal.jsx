@@ -98,6 +98,19 @@ export default function BillDetailModal({ title, bill, onClose, hideCreatedBy, d
           </thead>
           <tbody>
             {bill.lines.map((l) => {
+              if (l.type === 'EXCHANGE') {
+                return (
+                  <tr key={l.id}>
+                    <td>
+                      {l.product}
+                      <span className="badge" style={{ marginLeft: 8 }}>Exchange</span>
+                    </td>
+                    <td>{l.quantity}</td>
+                    <td>—</td>
+                    <td className="cell-muted">—</td>
+                  </tr>
+                );
+              }
               const isReturn = l.type === 'RETURN';
               return (
                 <tr key={l.id} className={isReturn ? 'line-return' : undefined}>

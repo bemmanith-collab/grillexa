@@ -22,6 +22,7 @@ function center(text, width) {
 }
 
 function lineItemRow(l) {
+  if (l.type === 'EXCHANGE') return `${l.quantity}x ${l.product} (Exchange)`;
   const isReturn = l.type === 'RETURN';
   // A return that charged nothing is listed by quantity alone.
   if (isReturn && !l.amount) return `${l.quantity}x ${l.product} (Return)`;
@@ -178,10 +179,12 @@ export async function buildInvoicePdf(
   doc.setFontSize(9.5);
   bill.lines.forEach((l) => {
     const isReturn = l.type === 'RETURN';
+    const isExchange = l.type === 'EXCHANGE';
     doc.setTextColor(isReturn ? 200 : 30, isReturn ? 40 : 30, isReturn ? 40 : 30);
-    const listed = isReturn && !l.amount;
+    const listed = isExchange || (isReturn && !l.amount);
     const amt = listed ? '-' : formatCurrencyPdf(isReturn ? -l.amount : l.amount);
-    const label = `${l.quantity}x ${l.product}${isReturn ? ' (Return)' : ''}${listed ? '' : ` @ ${formatCurrencyPdf(l.unitPrice)}`}`;
+    const tag = isReturn ? ' (Return)' : isExchange ? ' (Exchange)' : '';
+    const label = `${l.quantity}x ${l.product}${tag}${listed ? '' : ` @ ${formatCurrencyPdf(l.unitPrice)}`}`;
     doc.text(label, margin, y, { maxWidth: innerWidth * 0.65 });
     doc.text(amt, pageWidth - margin, y, { align: 'right' });
     y += 6;

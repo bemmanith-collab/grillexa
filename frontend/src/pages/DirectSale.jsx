@@ -171,15 +171,15 @@ export default function DirectSale() {
       const res = await client.get(`/sales/latest/${storeId}`, { params: { direct: true } });
       const last = res.data.sale;
       // A RETURN line credited the customer who brought that item back —
-      // repeating it here would credit an unrelated walk-in.
-      const saleLines = last.lines.filter((l) => l.type !== 'RETURN');
+      // repeating it here would credit an unrelated walk-in. Same for an exchange.
+      const saleLines = last.lines.filter((l) => l.type === 'SALE');
       const returnCount = last.lines.length - saleLines.length;
       const { lines: reordered, dropped } = filterToCatalog(saleLines, products);
 
       const caveats = [];
       if (dropped.length > 0) caveats.push(`skipped ${describeDropped(dropped)}`);
       if (returnCount > 0) {
-        caveats.push(`left out ${returnCount} return ${returnCount === 1 ? 'line' : 'lines'}`);
+        caveats.push(`left out ${returnCount} return/exchange ${returnCount === 1 ? 'line' : 'lines'}`);
       }
 
       if (reordered.length === 0) {
@@ -221,7 +221,7 @@ export default function DirectSale() {
         // omitted rather than sent as 0 — the server treats an explicit 0
         // as a deliberate override and would save the bill at zero.
         ...(l.unitPrice === '' || l.unitPrice == null ? {} : { unitPrice: Number(l.unitPrice) }),
-        type: l.type === 'RETURN' ? 'RETURN' : 'SALE',
+        type: l.type === 'RETURN' || l.type === 'EXCHANGE' ? l.type : 'SALE',
         reason: l.type === 'RETURN' ? l.reason : undefined,
       }));
     if (!storeId || cleanLines.length === 0) {

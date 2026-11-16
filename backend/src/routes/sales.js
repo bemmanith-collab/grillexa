@@ -14,6 +14,23 @@ router.use(authenticate);
 
 const RETURN_REASONS = ['CUSTOMER_RETURN', 'DAMAGED', 'EXCHANGE', 'OTHER'];
 
+// One bill line as stored. A RETURN is goods coming back, not money going
+// out: listed with its quantity, charging nothing, so the bill total is what
+// sold (bills saved before this carry a negative-credited amount). An
+// EXCHANGE is a same-product swap — one comes back, the same one goes out —
+// so it charges nothing and moves no stock either.
+function prepareLine(l) {
+  const type = l.type === 'RETURN' || l.type === 'EXCHANGE' ? l.type : 'SALE';
+  return {
+    productId: l.productId,
+    quantity: l.quantity,
+    unitPrice: l.unitPrice,
+    amount: type === 'SALE' ? l.quantity * l.unitPrice : 0,
+    type,
+    reason: type === 'RETURN' ? l.reason : null,
+  };
+}
+
 function shapeSale(sale) {
   return {
     id: sale.id,
@@ -235,22 +252,13 @@ router.post('/', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) => {
 
   try {
     const sale = await prisma.$transaction(async (tx) => {
-      const preparedLines = (await resolveLines(tx, lines, req.user.role)).map((l) => ({
-        productId: l.productId,
-        quantity: l.quantity,
-        unitPrice: l.unitPrice,
-        // A return is goods coming back, not money going out: it is listed on
-        // the bill with its quantity and charges nothing, so the bill total is
-        // what sold. Bills saved before this carry a negative-credited amount.
-        amount: l.type === 'RETURN' ? 0 : l.quantity * l.unitPrice,
-        type: l.type === 'RETURN' ? 'RETURN' : 'SALE',
-        reason: l.type === 'RETURN' ? l.reason : null,
-      }));
+      const preparedLines = (await resolveLines(tx, lines, req.user.role)).map(prepareLine);
       const totalAmount = preparedLines.reduce((sum, l) => sum + (l.type === 'RETURN' ? -l.amount : l.amount), 0);
 
       // Apply stock movement for every line before writing anything: sale
       // lines deduct, return lines credit back (also validates availability).
       for (const line of preparedLines) {
+        if (line.type === 'EXCHANGE') continue;
         if (line.type === 'RETURN') {
           await processReturn(tx, { storeId, productId: line.productId, date: normalizedDate, quantity: line.quantity });
         } else {
@@ -325,6 +333,7 @@ async function reverseSale(tx, existing) {
   // Reverse the original at its original store and date, so a bill moved
   // to a different day or store leaves nothing behind on the old one.
   for (const line of existing.lines) {
+    if (line.type === 'EXCHANGE') continue;
     if (line.type === 'RETURN') {
       // ponytail: reverses the closing balance exactly, but not the
       // sold/received split processReturn chose at the time — that split
@@ -418,20 +427,11 @@ router.patch('/:id', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) 
       // copy carries the same number and has to keep matching it.
       const preparedLines = (
         await resolveLines(tx, lines, req.user.role, billedPricesOf(existing.lines))
-      ).map((l) => ({
-        productId: l.productId,
-        quantity: l.quantity,
-        unitPrice: l.unitPrice,
-        // A return is goods coming back, not money going out: it is listed on
-        // the bill with its quantity and charges nothing, so the bill total is
-        // what sold. Bills saved before this carry a negative-credited amount.
-        amount: l.type === 'RETURN' ? 0 : l.quantity * l.unitPrice,
-        type: l.type === 'RETURN' ? 'RETURN' : 'SALE',
-        reason: l.type === 'RETURN' ? l.reason : null,
-      }));
+      ).map(prepareLine);
       const totalAmount = preparedLines.reduce((sum, l) => sum + (l.type === 'RETURN' ? -l.amount : l.amount), 0);
 
       for (const line of preparedLines) {
+        if (line.type === 'EXCHANGE') continue;
         if (line.type === 'RETURN') {
           await processReturn(tx, { storeId, productId: line.productId, date: normalizedDate, quantity: line.quantity });
         } else {

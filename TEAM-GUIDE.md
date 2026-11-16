@@ -46,6 +46,8 @@ This is **not a sale yet**. The stock is at the shop but still yours.
 
 A customer returning goods: add the item as a **RETURN** line on the bill — it shows the quantity coming back and charges nothing, so the bill total is only what sold.
 
+A customer swapping an item for the same product: add it as an **EXCHANGE** line. It lists the quantity, charges nothing and leaves stock as it was.
+
 ### When a shop pays you — Settle Consignment
 
 This is where the money is actually recognised. Do it on your next visit.

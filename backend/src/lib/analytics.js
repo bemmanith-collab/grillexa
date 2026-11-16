@@ -20,6 +20,8 @@ function lineValue(line) {
 // bills that credited the customer. Returns now charge nothing and leave the
 // sale alone, units included.
 function lineQty(line) {
+  // A same-product exchange swapped one for one: nothing sold.
+  if (line.type === 'EXCHANGE') return 0;
   if (line.type !== 'RETURN') return line.quantity;
   return line.amount ? -line.quantity : 0;
 }

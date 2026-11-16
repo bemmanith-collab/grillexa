@@ -330,7 +330,9 @@ model Sale {
   @@index([date])
 }
 
-// type: "SALE" | "RETURN". A RETURN line credits its quantity back to stock
+// type: "SALE" | "RETURN" | "EXCHANGE". An EXCHANGE line is a same-product
+// swap: amount 0, no stock movement, no Return ledger row.
+// A RETURN line credits its quantity back to stock
 // instead of deducting it, and its amount is subtracted from the sale's
 // totalAmount instead of added — this is what lets one bill cover both a
 // sale and a same-visit return/exchange. reason mirrors Return.reason and
