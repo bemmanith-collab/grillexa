@@ -15,6 +15,7 @@ function asSaleBill(settlement, consignment) {
     number: settlement.saleNumber || settlement.settlementNo,
     date: settlement.settledAt,
     store: consignment.store,
+    createdBy: settlement.createdBy,
     totalAmount: settlement.lines.reduce((sum, l) => {
       const item = consignment.items.find((i) => i.id === l.consignmentItemId);
       return sum + l.soldQty * (item?.pricePerUnit || 0);
