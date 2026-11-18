@@ -34,35 +34,19 @@ function RateChip({ value }) {
 const legend = { plugins: { legend: { display: true, position: 'bottom' } } };
 const PAGE = 25;
 
-// Sold, then returned and exchanged only when there were any; blank when nothing.
-function Qty({ c }) {
-  if (!c || !(c.sold || c.returned || c.exchanged)) return null;
-  return (
-    <span className="qty">
-      {c.sold > 0 && <b>{c.sold}</b>}
-      {c.returned > 0 && <span className="sheet-ret"> ↩{c.returned}</span>}
-      {c.exchanged > 0 && <span className="sheet-exch"> ⇄{c.exchanged}</span>}
-    </span>
-  );
-}
+const pageOf = (list, page) => list.slice(page * PAGE, page * PAGE + PAGE);
 
-// Under the store name: how much went out, and how much still awaits settling —
-// so a row with nothing sold or returned yet still says something.
-function Moved({ r }) {
-  if (r.source !== 'CONSIGNMENT') return null;
+// Pages instead of one long scroll: 25 rows each, Prev / Next.
+function Pager({ page, total, onPage }) {
+  const pages = Math.ceil(total / PAGE);
+  if (pages <= 1) return null;
   return (
-    <span className="sheet-moved">
-      {' '}· {r.delivered} delivered{r.pending > 0 ? `, ${r.pending} pending` : ''}
-    </span>
-  );
-}
-
-function More({ shown, total, onMore }) {
-  if (shown >= total) return null;
-  return (
-    <div className="sheet-more">
-      <span className="cell-muted">Showing {shown} of {total}</span>
-      <button type="button" className="btn-secondary btn-sm" onClick={onMore}>Show {Math.min(PAGE, total - shown)} more</button>
+    <div className="sheet-pager">
+      <button type="button" className="btn-secondary btn-sm" disabled={page === 0} onClick={() => onPage(page - 1)}>‹ Prev</button>
+      <span className="cell-muted">
+        Page {page + 1} of {pages} · {page * PAGE + 1}–{Math.min(total, page * PAGE + PAGE)} of {total}
+      </span>
+      <button type="button" className="btn-secondary btn-sm" disabled={page >= pages - 1} onClick={() => onPage(page + 1)}>Next ›</button>
     </div>
   );
 }
@@ -73,13 +57,19 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
   const [source, setSource] = useState('');
   const [editedOnly, setEditedOnly] = useState(false);
   const [q, setQ] = useState('');
-  const [rowLimit, setRowLimit] = useState(PAGE);
-  const [billLimit, setBillLimit] = useState(PAGE);
+  const [rowPage, setRowPage] = useState(0);
+  const [billPage, setBillPage] = useState(0);
+  const [storePage, setStorePage] = useState(0);
+  const [personPage, setPersonPage] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setData(null);
     setError('');
+    setRowPage(0);
+    setBillPage(0);
+    setStorePage(0);
+    setPersonPage(0);
     client
       .get('/reports/delivery', { params: { from, to, storeId: storeId || undefined, userId: userId || undefined } })
       .then((res) => !cancelled && setData(res.data))
@@ -111,7 +101,8 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
   const colTotal = (pid, f) => rows.reduce((s, r) => s + (r.cells[pid]?.[f] || 0), 0);
   const needle = q.trim().toLowerCase();
   const matchRows = needle ? rows.filter((r) => `${r.store} ${r.person}`.toLowerCase().includes(needle)) : rows;
-  const shownRows = matchRows.slice(0, rowLimit);
+  const hasExch = (p) => colTotal(p.id, 'exchanged') > 0;
+  const n = (v, cls) => <td className={v ? cls : 'sheet-zero'}>{v || 0}</td>;
 
   const topStores = data.stores.slice(0, 10);
   const rated = data.stores
@@ -124,7 +115,7 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
       <div className="delivery-toolbar">
       <div className="filter-group" role="group" aria-label="Bill type">
         {SOURCES.map(([key, label]) => (
-          <button key={key} type="button" className={`filter-chip${source === key ? ' active' : ''}`} onClick={() => setSource(key)}>
+          <button key={key} type="button" className={`filter-chip${source === key ? ' active' : ''}`} onClick={() => { setSource(key); setRowPage(0); setBillPage(0); }}>
             {label}
           </button>
         ))}
@@ -172,9 +163,8 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
       <div className="card">
         <h2 className="card-title">Store sheet</h2>
         <p className="chart-hint">
-          One row per store, per person, per type. Each product shows units sold, then <span className="sheet-ret">↩ returned</span>{' '}
-          and <span className="sheet-exch">⇄ exchanged</span>. Consignments count on the day they were delivered. Loss is what came
-          back, at cost price.
+          One row per store, per person, per type. Consignments are counted on the day they were delivered, with how they
+          settled. Blank means zero. Made is the money taken. Loss is what came back, at cost price.
         </p>
         {rows.length === 0 ? (
           <EmptyState icon={AlertIcon} message="Nothing delivered or sold in this range." />
@@ -185,91 +175,86 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
               className="sheet-search"
               placeholder="Search store or person…"
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => { setQ(e.target.value); setRowPage(0); }}
               aria-label="Search the store sheet"
             />
-            {/* Website: one column per product, store column pinned while it scrolls. */}
-            <div className="table-scroll sheet-wide">
+            <div className="table-scroll">
               <table className="sheet-table">
                 <thead>
                   <tr>
-                    <th className="l sheet-pin">Store</th>
+                    <th rowSpan={2}>Sl</th>
+                    <th rowSpan={2} className="l">Store</th>
+                    <th rowSpan={2} className="l">Person</th>
+                    <th rowSpan={2} className="l">Type</th>
                     {products.map((p) => (
-                      <th key={p.id} className="sheet-product">{p.name}</th>
+                      <th key={p.id} colSpan={hasExch(p) ? 3 : 2} className="sheet-product">{p.name}</th>
                     ))}
-                    <th>Made</th>
-                    <th>Loss</th>
+                    <th rowSpan={2}>Delivered</th>
+                    <th rowSpan={2}>Made</th>
+                    <th rowSpan={2}>Loss</th>
+                  </tr>
+                  <tr>
+                    {products.map((p) => (
+                      <React.Fragment key={p.id}>
+                        <th>Sold</th>
+                        <th>Ret</th>
+                        {hasExch(p) && <th>Exch</th>}
+                      </React.Fragment>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {shownRows.map((r) => (
+                  {pageOf(matchRows, rowPage).map((r, i) => (
                     <tr key={r.key}>
-                      <td className="l sheet-pin">
-                        <div className="cell-strong">{r.store}</div>
-                        <div className="sheet-who">{r.person} · <SourceBadge source={r.source} /><Moved r={r} /></div>
-                      </td>
-                      {products.map((p) => (
-                        <td key={p.id}><Qty c={r.cells[p.id]} /></td>
-                      ))}
+                      <td>{rowPage * PAGE + i + 1}</td>
+                      <td className="l cell-strong">{r.store}</td>
+                      <td className="l">{r.person}</td>
+                      <td className="l"><SourceBadge source={r.source} /></td>
+                      {products.map((p) => {
+                        const c = r.cells[p.id] || {};
+                        return (
+                          <React.Fragment key={p.id}>
+                            {n(c.sold)}
+                            {n(c.returned, 'sheet-ret')}
+                            {hasExch(p) && n(c.exchanged, 'sheet-exch')}
+                          </React.Fragment>
+                        );
+                      })}
+                      <td>{r.delivered}</td>
                       <td>{formatCurrency(r.revenue)}</td>
                       <td className={r.loss ? 'sheet-ret' : 'cell-muted'}>{r.loss ? formatCurrency(r.loss) : '—'}</td>
                     </tr>
                   ))}
                   <tr className="sheet-total">
-                    <td className="l sheet-pin">TOTAL</td>
+                    <td />
+                    <td className="l" colSpan={3}>TOTAL</td>
                     {products.map((p) => (
-                      <td key={p.id}><Qty c={{ sold: colTotal(p.id, 'sold'), returned: colTotal(p.id, 'returned'), exchanged: colTotal(p.id, 'exchanged') }} /></td>
+                      <React.Fragment key={p.id}>
+                        <td>{colTotal(p.id, 'sold')}</td>
+                        <td>{colTotal(p.id, 'returned')}</td>
+                        {hasExch(p) && <td>{colTotal(p.id, 'exchanged')}</td>}
+                      </React.Fragment>
                     ))}
+                    <td>{t.delivered}</td>
                     <td>{formatCurrency(t.revenue)}</td>
                     <td>{formatCurrency(t.loss)}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            {/* Phone: a card per row, products as chips — nothing to scroll sideways. */}
-            <ul className="sheet-cards">
-              {shownRows.map((r) => (
-                <li key={r.key}>
-                  <div className="sheet-card-head">
-                    <span className="cell-strong">{r.store}</span>
-                    <span className="cell-strong">{formatCurrency(r.revenue)}</span>
-                  </div>
-                  <div className="sheet-card-head sheet-who">
-                    <span>{r.person} · <SourceBadge source={r.source} /><Moved r={r} /></span>
-                    {r.loss > 0 && <span className="sheet-ret">lost {formatCurrency(r.loss)}</span>}
-                  </div>
-                  <div className="sheet-chips">
-                    {products.filter((p) => r.cells[p.id]).map((p) => (
-                      <span key={p.id} className="sheet-chip">{p.name} <Qty c={r.cells[p.id]} /></span>
-                    ))}
-                  </div>
-                </li>
-              ))}
-              <li className="sheet-total">
-                <div className="sheet-card-head">
-                  <span>TOTAL</span>
-                  <span>{formatCurrency(t.revenue)}</span>
-                </div>
-                <div className="sheet-chips">
-                  {products.map((p) => (
-                    <span key={p.id} className="sheet-chip">{p.name} <Qty c={{ sold: colTotal(p.id, 'sold'), returned: colTotal(p.id, 'returned'), exchanged: colTotal(p.id, 'exchanged') }} /></span>
-                  ))}
-                </div>
-              </li>
-            </ul>
-            <More shown={shownRows.length} total={matchRows.length} onMore={() => setRowLimit((n) => n + PAGE)} />
+            <Pager page={rowPage} total={matchRows.length} onPage={setRowPage} />
           </>
         )}
       </div>
 
-      <details className="card fold">
-        <summary className="card-title">Bills <span className="cell-muted">({bills.length})</span></summary>
+      <div className="card">
+        <h2 className="card-title">Bills</h2>
         <p className="chart-hint">
           When each bill was generated and last edited. Edits made before 18/11/2026 were not recorded, so those bills show
           only when they were generated.
         </p>
         <div className="filter-group">
-          <button type="button" className={`filter-chip${editedOnly ? ' active' : ''}`} onClick={() => setEditedOnly((v) => !v)}>
+          <button type="button" className={`filter-chip${editedOnly ? ' active' : ''}`} onClick={() => { setEditedOnly((v) => !v); setBillPage(0); }}>
             Edited bills only
           </button>
         </div>
@@ -290,7 +275,7 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
                 </tr>
               </thead>
               <tbody>
-                {bills.slice(0, billLimit).map((b) => (
+                {pageOf(bills, billPage).map((b) => (
                   <tr key={`${b.source}-${b.number}`}>
                     <td className="cell-mono">{b.number}</td>
                     <td className="cell-strong">{b.store}</td>
@@ -305,8 +290,8 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
             </table>
           </div>
         )}
-        <More shown={Math.min(billLimit, bills.length)} total={bills.length} onMore={() => setBillLimit((n) => n + PAGE)} />
-      </details>
+        <Pager page={billPage} total={bills.length} onPage={setBillPage} />
+      </div>
 
       {(data.advice.grow.length > 0 || data.advice.cut.length > 0) && (
         <div className="chart-grid">
@@ -409,8 +394,8 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
         </div>
       )}
 
-      <details className="card fold">
-        <summary className="card-title">Each store <span className="cell-muted">({data.stores.length})</span></summary>
+      <div className="card">
+        <h2 className="card-title">Each store</h2>
         <p className="chart-hint">Pending is delivered but not settled yet. Profit is made, minus the cost of what sold, minus the loss.</p>
         <div className="table-scroll">
           <table className="data-table">
@@ -421,7 +406,7 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
               </tr>
             </thead>
             <tbody>
-              {data.stores.map((s) => (
+              {pageOf(data.stores, storePage).map((s) => (
                 <tr key={s.id}>
                   <td className="cell-strong">{s.label}</td>
                   <td>{s.delivered}</td><td>{s.sold}</td><td>{s.returned}</td><td>{s.exchanged}</td><td>{s.pending}</td>
@@ -434,10 +419,11 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
             </tbody>
           </table>
         </div>
-      </details>
+        <Pager page={storePage} total={data.stores.length} onPage={setStorePage} />
+      </div>
 
-      <details className="card fold">
-        <summary className="card-title">Each person <span className="cell-muted">({data.people.length})</span></summary>
+      <div className="card">
+        <h2 className="card-title">Each person</h2>
         <div className="table-scroll">
           <table className="data-table">
             <thead>
@@ -447,7 +433,7 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
               </tr>
             </thead>
             <tbody>
-              {data.people.map((p) => (
+              {pageOf(data.people, personPage).map((p) => (
                 <tr key={p.id}>
                   <td className="cell-strong">{p.label}</td>
                   <td>{p.delivered}</td><td>{p.sold}</td><td>{p.returned}</td><td>{p.exchanged}</td>
@@ -460,7 +446,8 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
             </tbody>
           </table>
         </div>
-      </details>
+        <Pager page={personPage} total={data.people.length} onPage={setPersonPage} />
+      </div>
 
       <div className="card">
         <h2 className="card-title">Suggestions</h2>
