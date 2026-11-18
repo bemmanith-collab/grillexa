@@ -600,6 +600,8 @@ Vite hashes the filename on build, so a redesigned mascot never fights a browser
 
 ## Sessions & browser hardening
 
+**Caching.** `nginx.conf` marks a hashed file under `/assets/` immutable for a year only when it was actually served (200/304); a 404 for an asset is `no-store`. Fly deploys one machine at a time, so for a moment a page from the new machine can ask the old one for a chunk it does not have. That 404 used to be cached for a year, leaving the browser on "Grillexa didn't start" until its cache was cleared (seen 18/11/2026); now Try again recovers as soon as both machines run the same build.
+
 The session is a JWT in an **httpOnly cookie** (`grillexa_session`), not a Bearer token in `localStorage` — no script on the page can read it, the app's own or one injected through an XSS. `sameSite: strict` is the CSRF defence; `secure` is set in production only, because local dev has no TLS. `POST /api/auth/logout` clears it server-side: a browser cannot delete a cookie it cannot read, so logout used to be a claim the client made about itself.
 
 `/api/auth` is rate-limited to 30 requests per 15 minutes, **counting failures only** — a whole shop shares one connection, and staff signing in successfully must never eat the budget that stops someone guessing passwords. `trust proxy` is set so the limiter sees the real client via Nginx's `X-Forwarded-For` instead of counting everyone as `127.0.0.1`.

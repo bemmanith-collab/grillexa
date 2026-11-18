@@ -41,7 +41,7 @@ function Pager({ page, total, onPage }) {
   const pages = Math.ceil(total / PAGE);
   if (pages <= 1) return null;
   return (
-    <div className="sheet-pager">
+    <div className="sheet-pager" role="navigation" aria-label="Pages">
       <button type="button" className="btn-secondary btn-sm" disabled={page === 0} onClick={() => onPage(page - 1)}>‹ Prev</button>
       <span className="cell-muted">
         Page {page + 1} of {pages} · {page * PAGE + 1}–{Math.min(total, page * PAGE + PAGE)} of {total}
