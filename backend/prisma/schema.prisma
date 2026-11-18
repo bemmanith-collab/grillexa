@@ -439,6 +439,8 @@ model Wastage {
 // charge GST until the store reports what actually sold — see Settlement.
 // status: "DELIVERED" | "PARTIAL_SETTLED" | "SETTLED" | "RETURNED"
 // (RETURNED is a fully-settled consignment where nothing sold at all.)
+// "CLOSED": taken off the waiting list without settling what was left
+// (scripts/close-consignments.js) — stock and money untouched.
 model Consignment {
   id            Int      @id @default(autoincrement())
   consignmentNo String   @unique

@@ -425,7 +425,8 @@ export default function SettleConsignment() {
                         Settle
                       </button>
                     )}
-                    {c.status !== 'DELIVERED' && (
+                    {/* A closed consignment may never have been settled: no bill to show. */}
+                    {c.status !== 'DELIVERED' && c.settledBy && (
                       <>
                         <button className="btn-secondary btn-sm" onClick={() => loadLastSettlement(c, setResult)}>
                           View Bill

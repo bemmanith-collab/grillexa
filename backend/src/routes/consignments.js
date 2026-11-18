@@ -253,6 +253,10 @@ async function applySettlement(tx, { consignment, preparedLines, normalizedDate,
   let status = 'PARTIAL_SETTLED';
   if (totalSettled === 0) status = 'DELIVERED';
   else if (totalSettled >= totalDelivered) status = totalSold === 0 ? 'RETURNED' : 'SETTLED';
+  // A consignment closed off the waiting list (scripts/close-consignments.js)
+  // stays closed when an old settlement on it is corrected, unless the
+  // correction settles it in full.
+  if (consignment.status === 'CLOSED' && (status === 'DELIVERED' || status === 'PARTIAL_SETTLED')) status = 'CLOSED';
 
   await tx.consignment.update({
     where: { id: consignment.id },

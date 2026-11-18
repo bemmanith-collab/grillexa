@@ -519,7 +519,7 @@ async function loadDelivery(query) {
       where: { consignment: { deliveredAt: { gte: from, lte: to }, ...scope('createdById') } },
       include: {
         product,
-        consignment: { select: { storeId: true, createdById: true, store: { select: { name: true } }, createdBy: person } },
+        consignment: { select: { storeId: true, createdById: true, status: true, store: { select: { name: true } }, createdBy: person } },
       },
     }),
     prisma.saleLine.findMany({

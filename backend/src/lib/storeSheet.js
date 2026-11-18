@@ -58,7 +58,8 @@ function buildStoreSheet({ consignmentItems = [], directLines = [] }) {
         sold: it.soldQty,
         returned: it.returnedQty,
         exchanged: 0,
-        pending: it.deliveredQty - it.soldQty - it.returnedQty,
+        // A closed consignment is no longer waiting on anything.
+        pending: c.status === 'CLOSED' ? 0 : it.deliveredQty - it.soldQty - it.returnedQty,
         revenue: it.soldQty * it.pricePerUnit,
         cost: it.soldQty * unitCost,
         loss: it.returnedQty * unitCost,
