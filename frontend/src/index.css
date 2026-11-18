@@ -3920,3 +3920,36 @@ body.chat-open {
   overflow-y: auto;
 }
 .modal-assign .modal-actions { flex: 0 0 auto; margin-top: var(--space-2); }
+
+/* ---- Delivery report (Reports → Delivery report) ---- */
+.report-tabs { margin-bottom: 12px; }
+.delivery-report { display: grid; gap: 14px; }
+.delivery-report > * { min-width: 0; }
+.stat-hint { font-size: 12px; margin-top: 2px; }
+/* The store sheet stays a real grid on every screen, like the spreadsheet it
+   replaces — it scrolls sideways inside its card instead of becoming cards. */
+.sheet-table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 13px; }
+.sheet-table th, .sheet-table td { border: 1px solid var(--border-soft); padding: 6px 8px; text-align: right; white-space: nowrap; }
+.sheet-table th { background: var(--bg); color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.sheet-table .l { text-align: left; }
+.sheet-table th.sheet-product { color: var(--text); font-size: 12px; letter-spacing: .02em; }
+.sheet-zero { color: transparent; }
+.sheet-ret { color: var(--warn); font-weight: 600; }
+.sheet-exch { color: var(--teal); font-weight: 600; }
+.sheet-total td { background: #fff6c2; color: #3d3200; font-weight: 700; }
+.src-badge { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.src-CONSIGNMENT { background: var(--teal-soft); color: var(--teal); }
+.src-DIRECT { background: var(--primary-soft); color: var(--primary); }
+.rate-chip { display: inline-block; min-width: 48px; border-radius: 6px; padding: 1px 6px; font-weight: 600; }
+.rate-high { background: var(--warn-soft); color: var(--warn); }
+.rate-low { background: var(--teal-soft); color: var(--teal); }
+.edited-badge { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 600; background: var(--warn-soft); color: var(--warn); }
+.advice-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.advice-list li { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; border: 1px solid var(--border-soft); border-radius: 8px; padding: 8px 10px; }
+.suggestion-list { margin: 0; padding-left: 22px; display: grid; gap: 12px; }
+.suggestion-list li { padding-left: 4px; }
+.suggestion-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.suggestion-impact { color: var(--teal); font-weight: 700; font-variant-numeric: tabular-nums; }
+.delivery-report .card { padding: 16px; }
+.delivery-report .card > .chart-hint:last-child { margin-bottom: 0; }
+.delivery-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }

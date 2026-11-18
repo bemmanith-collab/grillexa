@@ -16,6 +16,8 @@ const {
   isoDay,
 } = require('../lib/analytics');
 const { buildWorkbook } = require('../lib/excelReport');
+const { buildStoreSheet } = require('../lib/storeSheet');
+const { buildDeliveryWorkbook } = require('../lib/deliveryWorkbook');
 
 const router = express.Router();
 
@@ -497,6 +499,103 @@ router.get('/product-sales', async (req, res) => {
     to: to.toISOString().slice(0, 10),
     stores: result,
   });
+});
+
+// The delivery report: per store, per person, consignment vs direct — what
+// went out, what sold, what came back, what we made and lost — plus every bill
+// with when it was generated and last edited, and suggestions. Consignments
+// count by delivery date (with their outcome so far), direct bills by bill
+// date. See lib/storeSheet.js.
+async function loadDelivery(query) {
+  const { from, to } = parseRange(query);
+  const storeId = optionalId(query.storeId);
+  const userId = optionalId(query.userId);
+  const scope = (field) => ({ ...(storeId ? { storeId } : {}), ...(userId ? { [field]: userId } : {}) });
+  const product = { select: { name: true, costPrice: true, sortOrder: true } };
+  const person = { select: { name: true } };
+
+  const [items, directLines, settlements, directBills, people] = await Promise.all([
+    prisma.consignmentItem.findMany({
+      where: { consignment: { deliveredAt: { gte: from, lte: to }, ...scope('createdById') } },
+      include: {
+        product,
+        consignment: { select: { storeId: true, createdById: true, store: { select: { name: true } }, createdBy: person } },
+      },
+    }),
+    prisma.saleLine.findMany({
+      where: { sale: { consignmentId: null, date: { gte: from, lte: to }, ...scope('createdById') } },
+      include: {
+        product,
+        sale: { select: { storeId: true, createdById: true, store: { select: { name: true } }, createdBy: person } },
+      },
+    }),
+    prisma.settlement.findMany({
+      where: { consignment: { deliveredAt: { gte: from, lte: to }, ...scope('createdById') } },
+      include: {
+        createdBy: person,
+        sale: { select: { number: true, totalAmount: true } },
+        consignment: { select: { consignmentNo: true, store: { select: { name: true } } } },
+      },
+    }),
+    prisma.sale.findMany({
+      where: { consignmentId: null, date: { gte: from, lte: to }, ...scope('createdById') },
+      select: { number: true, totalAmount: true, createdAt: true, editedAt: true, store: { select: { name: true } }, createdBy: person },
+    }),
+    prisma.user.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+  ]);
+
+  const bills = [
+    ...settlements.map((s) => ({
+      number: s.sale?.number || s.settlementNo,
+      consignmentNo: s.consignment.consignmentNo,
+      store: s.consignment.store.name,
+      person: s.createdBy?.name || 'Unknown',
+      source: 'CONSIGNMENT',
+      amount: s.sale?.totalAmount || 0,
+      generatedAt: s.createdAt,
+      editedAt: s.editedAt,
+    })),
+    ...directBills.map((b) => ({
+      number: b.number,
+      store: b.store.name,
+      person: b.createdBy?.name || 'Unknown',
+      source: 'DIRECT',
+      amount: b.totalAmount,
+      generatedAt: b.createdAt,
+      editedAt: b.editedAt,
+    })),
+  ].sort((a, b) => b.generatedAt - a.generatedAt);
+
+  return {
+    from: isoDay(from),
+    to: isoDay(to),
+    ...buildStoreSheet({ consignmentItems: items, directLines }),
+    bills,
+    filters: { people },
+  };
+}
+
+router.get('/delivery', async (req, res) => {
+  try {
+    res.json(await loadDelivery(req.query));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to load the delivery report' });
+  }
+});
+
+// The same report as a workbook, for the Download Excel button on the tab.
+router.get('/delivery/excel', async (req, res) => {
+  let report;
+  try {
+    report = await loadDelivery(req.query);
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to build the workbook' });
+  }
+  const filename = `Grillexa-delivery-${report.from}-to-${report.to}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  await buildDeliveryWorkbook(report).xlsx.write(res);
+  res.end();
 });
 
 module.exports = router;

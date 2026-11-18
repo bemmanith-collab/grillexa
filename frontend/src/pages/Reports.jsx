@@ -9,6 +9,7 @@ import { formatDate, todayStr, startOfWeekStr, startOfMonthStr } from '../utils/
 import Chart, { lineData, barData, doughnutData, TEAL, FLAME, WARN, money } from '../components/Chart';
 import SearchSelect, { RECENT_STORES } from '../components/SearchSelect';
 import { buildReportPdf, reportFileName } from '../lib/reportPdf';
+import DeliveryReport from '../components/DeliveryReport';
 
 // Empty id, not 'all': every filter here already treats '' as "no filter".
 const ALL_STORES = { id: '', name: 'All stores' };
@@ -27,6 +28,7 @@ const RANGES = {
 };
 
 export default function Reports() {
+  const [tab, setTab] = useState('overview');
   const [range, setRange] = useState('month');
   const [custom, setCustom] = useState({ from: startOfMonthStr(), to: todayStr() });
   const [storeId, setStoreId] = useState('');
@@ -152,7 +154,7 @@ export default function Reports() {
             {formatDate(from)} – {formatDate(to)} · {summary.storesReporting} stores reporting today
           </p>
         </div>
-        <div className="page-header-actions">
+        {tab === 'overview' && (<div className="page-header-actions">
           {/* Two exports, two jobs. Excel is the raw rows for whoever wants to
               work on them; the PDF is the written version somebody forwards. */}
           <button
@@ -167,7 +169,22 @@ export default function Reports() {
           <a className="btn-primary btn-sm" href={excelUrl} download>
             <Download size={15} /> Download Excel
           </a>
-        </div>
+        </div>)}
+      </div>
+
+      <div className="filter-group report-tabs" role="tablist" aria-label="Report">
+        {[['overview', 'Overview'], ['delivery', 'Delivery report']].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className={`filter-chip${tab === key ? ' active' : ''}`}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="filter-bar">
@@ -219,12 +236,14 @@ export default function Reports() {
             onChange={(id) => setStoreId(String(id))}
             recentKey={RECENT_STORES}
           />
-          <SearchSelect
-            options={analytics.filters.products}
-            value={productId}
-            firstOption={ALL_PRODUCTS}
-            onChange={(id) => setProductId(String(id))}
-          />
+          {tab === 'overview' && (
+            <SearchSelect
+              options={analytics.filters.products}
+              value={productId}
+              firstOption={ALL_PRODUCTS}
+              onChange={(id) => setProductId(String(id))}
+            />
+          )}
           <SearchSelect
             options={analytics.filters.people}
             value={userId}
@@ -240,7 +259,7 @@ export default function Reports() {
                 {storeName || 'Store'} <X size={13} />
               </button>
             )}
-            {productId && (
+            {productId && tab === 'overview' && (
               <button type="button" className="filter-chip active" onClick={() => setProductId('')}>
                 {productName || 'Product'} <X size={13} />
               </button>
@@ -254,6 +273,9 @@ export default function Reports() {
         )}
       </div>
 
+      {tab === 'delivery' ? (
+        <DeliveryReport from={from} to={to} storeId={storeId} userId={userId} />
+      ) : (<>
       {userId && (
         <p className="chart-hint">
           The Excel export covers the store and date range, not the sales person — every person's
@@ -459,6 +481,7 @@ export default function Reports() {
           </details>
         ))}
       </div>
+      </>)}
     </div>
   );
 }

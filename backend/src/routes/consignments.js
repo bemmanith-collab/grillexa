@@ -159,7 +159,7 @@ async function applySettlement(tx, { consignment, preparedLines, normalizedDate,
       await tx.saleLine.deleteMany({ where: { saleId: existingSaleId } });
       await tx.sale.update({
         where: { id: existingSaleId },
-        data: { date: normalizedDate, totalAmount, lines: { create: saleLineData } },
+        data: { date: normalizedDate, totalAmount, editedAt: new Date(), lines: { create: saleLineData } },
       });
     } else {
       const createdSale = await tx.sale.create({
@@ -200,6 +200,7 @@ async function applySettlement(tx, { consignment, preparedLines, normalizedDate,
         settledAt: normalizedDate,
         notes: notes?.trim() || null,
         saleId,
+        editedAt: new Date(),
         lines: { create: settlementLineData },
       },
     });

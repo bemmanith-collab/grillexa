@@ -48,6 +48,7 @@ function shapeSale(sale) {
     paymentMethod: sale.paymentMethod,
     consignmentId: sale.consignmentId,
     createdAt: sale.createdAt,
+    editedAt: sale.editedAt,
     lines: sale.lines?.map((l) => ({
       id: l.id,
       productId: l.productId,
@@ -460,6 +461,7 @@ router.patch('/:id', requireRole('ADMIN', 'MANAGER', 'SALES'), async (req, res) 
           date: normalizedDate,
           storeId,
           totalAmount,
+          editedAt: new Date(),
           customerName: customerName?.trim() || null,
           customerPhone: customerPhone?.trim() || null,
           customerGstin: customerGstin?.trim() || null,

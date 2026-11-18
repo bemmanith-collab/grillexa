@@ -439,6 +439,20 @@ Three columns that were asked for are **not** in the workbook, because the data 
 
 Ranges are capped at 366 days: the window drives how many rows every query reads, and "all time" on a phone is a request nobody meant to make.
 
+### Delivery report
+
+**Reports → Delivery report** is the store sheet the team used to keep in Excel, built from the app's own records (`GET /api/reports/delivery`, arithmetic in `backend/src/lib/storeSheet.js`, tested in `test/storeSheet.js`). It follows the page's date, store and sales person filters, plus a Settled consignment / Direct sale switch.
+
+- **Store sheet:** one row per store, per person, per type, with Sold / Ret (and Exch) per product, delivered, made and loss, and a TOTAL row. Consignments count on the day they were **delivered**, credited to whoever delivered them, carrying how they settled so far; direct bills count on their bill date, credited to whoever rang them up.
+- **Money:** made is what was charged (settled quantity × the consignment's price, or the direct bill line). Cost is what sold at cost price. **Loss** is everything that came back, returned or exchanged, at cost price, on the assumption that goods back from a shop are not resold. Profit = made − cost − loss. Consignment cost uses the live product cost (a consignment item has no cost snapshot). With no cost prices set, cost and loss read ₹0 and the page says so.
+- **Bills:** every bill in the range with when it was **generated** and **last edited**. `Sale.editedAt` and `Settlement.editedAt` (migration `bill_edited_at`) are stamped by `PATCH /sales/:id` and by a settlement edit; edits before 18/11/2026 were never recorded, so those bills show only their generated time. Shown only in Reports, never on the customer's bill.
+- **Each store / each person:** delivered, sold, returned, exchanged, pending, made, cost, loss, profit and return rate (returned ÷ settled).
+- **Download Excel** (on the tab, `GET /api/reports/delivery/excel`, built by `lib/deliveryWorkbook.js` from the same object): a Store sheet laid out like the hand-kept one (product heading over SALES / RETURNS / EXCHANGES, zero as an empty cell, yellow TOTAL row), then Bills (times in India time), Each store, Each person and Suggestions. It follows the date, store and person filters; the Settled consignment / Direct sale switch is screen-only, and the Type column carries the same split.
+- **Charts:** made vs lost by store, return rate by store, sold vs returned by product, each person's consignment vs direct sales.
+- **Suggestions (always last):** worked out from the report's own numbers, biggest rupee impact first — deliver less where 30%+ comes back, try more where 5% or less does (stores with 5+ settled units), the product that comes back most, exchanges, a person well above the team's return rate, the cost of returns, sales concentrated in three stores, and units still to settle. A rule only speaks when the data backs it; it makes no rupee claim when cost prices are missing.
+
+Editing a direct bill saved before returns stopped being credited re-applies today's rule, so its return no longer takes money off and the total rises by the old credit.
+
 ## End-of-shift wastage
 
 **Unsold is not wasted.** Stock a store did not sell comes back to HQ when the consignment is settled — a `Return` with reason `CONSIGNMENT_UNSOLD`, booked as a negative receipt against that store. It is still good stock and it goes out again to another store tomorrow. Nothing about a return says anything was lost.

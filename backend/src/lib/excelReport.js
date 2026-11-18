@@ -204,4 +204,4 @@ function buildWorkbook(report) {
   return workbook;
 }
 
-module.exports = { buildWorkbook, MONEY, PERCENT, DATE, INT };
+module.exports = { buildWorkbook, addSheet, MONEY, PERCENT, DATE, INT };
