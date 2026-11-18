@@ -3,6 +3,7 @@
 import { formatCurrency } from './format.js';
 import { formatDate } from '../utils/date.js';
 import { BUSINESS_INFO } from './businessInfo.js';
+import { billGreeting } from './festive.js';
 
 // Keep the boxed header narrow — WhatsApp's mobile app wraps (or in some
 // clients, horizontally clips) monospace lines that don't fit the message
@@ -71,6 +72,9 @@ export function buildInvoiceShareText(
     ...(b.addressLines.length ? b.addressLines : []),
     '',
     footerMessage,
+    // Christmas Eve, Christmas Day, New Year's Eve, New Year's Day — by the
+    // bill's own date, so a reprint months later still matches the original.
+    ...(billGreeting(bill.date) ? [billGreeting(bill.date)] : []),
     ...(b.tagline ? [b.tagline] : []),
     '',
     'This is a system-generated document.',
@@ -218,6 +222,13 @@ export async function buildInvoicePdf(
   doc.setTextColor(230, 90, 30);
   doc.text(footerMessage, center, y, { align: 'center' });
   y += 5;
+
+  // The PDF's built-in fonts have no emoji, so the plain wording here.
+  const greeting = billGreeting(bill.date, { plain: true });
+  if (greeting) {
+    doc.text(greeting, center, y, { align: 'center' });
+    y += 5;
+  }
 
   if (b.tagline) {
     doc.setFont('courier', 'normal');

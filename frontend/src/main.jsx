@@ -4,6 +4,12 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import './index.css';
+import './festive.css';
+import { applyFestive } from './components/FestiveLayer.jsx';
+import { festiveToday } from './lib/festive.js';
+
+// Before the first paint, so a festive day never flashes the ordinary look.
+applyFestive(festiveToday());
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

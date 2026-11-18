@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/grillexa-logo.png';
+import { useFestiveCopy } from './FestiveLayer';
 
 const GREETING_MS = 3000;
 
@@ -10,6 +11,7 @@ const GREETING_MS = 3000;
 // already loading, so the greeting costs nobody three seconds.
 export default function GreetingOverlay() {
   const { greeting, clearGreeting } = useAuth();
+  const festive = useFestiveCopy();
 
   // Cleared on unmount too, so a timer cannot fire against a page that is
   // already gone.
@@ -28,7 +30,7 @@ export default function GreetingOverlay() {
       <div className="modal greeting-modal" role="status">
         <img src={logo} alt="" className="greeting-logo" />
         <h2>{greeting}</h2>
-        <p>Greetings from Grillexa 🥗</p>
+        <p>{festive ? festive.greet : 'Greetings from Grillexa 🥗'}</p>
       </div>
     </div>
   );

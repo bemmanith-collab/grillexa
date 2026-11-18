@@ -17,6 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
 import Chart, { lineData, TEAL } from '../components/Chart';
 import DailyWisdom from '../components/DailyWisdom';
+import { FestiveBanner } from '../components/FestiveLayer';
 import ShiftWastageModal from '../components/ShiftWastageModal';
 import Toast from '../components/Toast';
 import { formatCurrency } from '../lib/format';
@@ -187,6 +188,9 @@ export default function Dashboard() {
               )}
             </div>
           </div>
+
+          {/* Christmas Eve, Christmas Day, New Year's Eve, New Year's Day. */}
+          <FestiveBanner />
 
           {rank && rank.rank && (
             <div className={`rank-banner${rank.rank === 1 ? ' rank-banner-top' : ''}`}>

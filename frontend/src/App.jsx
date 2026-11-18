@@ -8,6 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 import Spinner from './components/Spinner';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
+import FestiveLayer, { useFestive } from './components/FestiveLayer';
 
 const Login = lazy(() => import('./pages/Login'));
 const TeamChat = lazy(() => import('./pages/TeamChat'));
@@ -74,6 +75,8 @@ export default function App() {
   // filling in — and those screens already have the sidebar entry.
   const showChatBubble = Boolean(user) && location.pathname === '/';
 
+  const festiveDay = useFestive();
+
   if (loading) return <Spinner />;
 
   return (
@@ -93,6 +96,7 @@ export default function App() {
           },
         }}
       />
+      <FestiveLayer day={festiveDay} />
       <GreetingOverlay />
       {user && <Sidebar />}
       {showChatBubble && <TeamChatBubble />}

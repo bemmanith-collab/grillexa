@@ -598,6 +598,23 @@ In the installed app on a phone the bottom tab bar is fixed over the page, so th
 
 Vite hashes the filename on build, so a redesigned mascot never fights a browser cache in production. In `npm run dev` it does — hard-refresh after replacing the file.
 
+## Festive days
+
+Four days get their own look, switched on by itself at midnight India time and off at the next midnight (`frontend/src/lib/festive.js`, tested in `test/festive.js`). Nothing about the data changes.
+
+| Day | Look | Button | Bill greeting |
+|---|---|---|---|
+| Christmas Eve, 24 Dec | night sky with a warm glow, twinkling lights, gentle snow, Santa hat, snow on the logo, green and gold banner | holly green, gold edge | 🎄 Happy Christmas Eve from Grillexa! |
+| Christmas Day, 25 Dec | brighter sky, heavier snow, snow on the stat cards, Santa hat, red ribbon banner | orange candy stripe | 🎄 Merry Christmas from Grillexa! |
+| New Year's Eve, 31 Dec | midnight sky and sidebar, fireworks, party hat, "Thank you for a great year" with the new year | midnight blue with a gold sparkler shimmer | ✨ Thank you for this year. See you in {next year}! |
+| New Year's Day, 1 Jan | a sunrise: teal lifting into peach and gold, rising specks of light, warmed sidebar, "A new day, a new beginning" | morning-sky teal pill with a gold top line (not orange, which the brand already is) | 🌅 Happy New Year {year}! A new day, a new beginning. |
+
+- **How:** `main.jsx` sets `<html data-festive="xmas-eve|xmas|nye|ny">` before the first paint; `components/FestiveLayer.jsx` re-checks every minute and draws what CSS cannot — the mascot's hat, the string of lights, and snow / fireworks / sunrise light on a canvas — into `<body>` through a portal, beside the wallpaper. Everything else is `src/festive.css`, keyed off the attribute.
+- **Never in the way:** every festive layer ignores the pointer; the lights sit above the phone top bar (z 32) and below every popup (50+). The wallpaper swaps `background-image` only, so the installed app's lift of the mascot above the tab bar still applies. The canvas stops while the app is in the background, draws one still frame for reduced motion, and is hidden in print.
+- **Where it shows:** every page and the login screen; a banner on My Dashboard; the login line and the sign-in greeting popup carry the day's words.
+- **Bills:** the greeting follows the bill's own date (`billGreeting` in `lib/invoice.js`), so a bill dated 25 December carries it when reprinted later and a bill from any other day never does. The PDF prints it without the emoji, which its built-in fonts cannot draw.
+- **Preview a day early:** add `?festive=xmas-eve` (or `xmas`, `nye`, `ny`) to any URL; it lasts for that browser tab. `?festive=off` clears it. A preview of New Year's Day shows next year's number.
+
 ## Sessions & browser hardening
 
 **Caching.** `nginx.conf` marks a hashed file under `/assets/` immutable for a year only when it was actually served (200/304); a 404 for an asset is `no-store`. Fly deploys one machine at a time, so for a moment a page from the new machine can ask the old one for a chunk it does not have. That 404 used to be cached for a year, leaving the browser on "Grillexa didn't start" until its cache was cleared (seen 18/11/2026); now Try again recovers as soon as both machines run the same build.

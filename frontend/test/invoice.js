@@ -88,6 +88,20 @@ const tests = [
     const pdf = Buffer.from((await buildInvoicePdf('Sale', bill, false)).output('arraybuffer')).toString('latin1');
     assert.match(pdf, /\(2x Banana \\\(Exchange\\\)\) Tj/);
   }),
+  check('a Christmas Day bill ends with the greeting; an ordinary one does not', async () => {
+    const xmas = { ...BILL, date: '2026-12-25' };
+    const text = buildInvoiceShareText('Sale', xmas, false);
+    assert.match(text, /Thank you for shopping with us!\n🎄 Merry Christmas from Grillexa!/);
+    assert.doesNotMatch(buildInvoiceShareText('Sale', BILL, false), /Christmas|New Year/);
+    const pdf = Buffer.from((await buildInvoicePdf('Sale', xmas, false)).output('arraybuffer')).toString('latin1');
+    assert.match(pdf, /\(Merry Christmas from Grillexa!\) Tj/);
+  }),
+  check('a New Year bill names the year it is', async () => {
+    const text = buildInvoiceShareText('Sale', { ...BILL, date: '2027-01-01' }, false);
+    assert.match(text, /🌅 Happy New Year 2027! A new day, a new beginning\./);
+    const nye = buildInvoiceShareText('Sale', { ...BILL, date: '2026-12-31' }, false);
+    assert.match(nye, /See you in 2027!/);
+  }),
   check('a bill with no options is still an OFFICIAL INVOICE', () => {
     const text = buildInvoiceShareText('Sale', BILL, false);
     assert.match(text, /OFFICIAL INVOICE/);

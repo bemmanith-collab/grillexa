@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import logo from '../assets/grillexa-logo.png';
+import { useFestiveCopy } from '../components/FestiveLayer';
 
 export default function Login() {
   const { login } = useAuth();
+  const festive = useFestiveCopy();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -35,7 +37,7 @@ export default function Login() {
         <form className="auth-form card" onSubmit={handleSubmit}>
           <div>
             <h1>Welcome back</h1>
-            <p className="auth-subtitle">Log in to manage your stores.</p>
+            <p className="auth-subtitle">{festive ? festive.login : 'Log in to manage your stores.'}</p>
           </div>
           <label>
             Email

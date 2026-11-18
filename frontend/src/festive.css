@@ -1,0 +1,397 @@
+/* Festive days — keyed off <html data-festive="…">, set by FestiveLayer.jsx.
+   xmas-eve 24 Dec · xmas 25 Dec · nye 31 Dec · ny 1 Jan (India time).
+
+   The wallpaper only swaps background-IMAGE, never the shorthand: the phone
+   rules in index.css lift the mascot above the tab bar with
+   background-position, and a shorthand here would quietly undo that. Three
+   layers each, mascot first, so they line up with the sizes and positions
+   index.css already set. */
+
+/* ---------- Wallpaper ---------- */
+
+html[data-festive='xmas-eve'] body::before {
+  background-image:
+    url('./assets/mascot.webp'),
+    radial-gradient(700px 420px at 82% 4%, rgba(242, 193, 78, 0.2), transparent 70%),
+    linear-gradient(170deg, #031820 0%, #04232c 50%, #020f14 100%);
+}
+
+html[data-festive='xmas'] body::before {
+  background-image:
+    url('./assets/mascot.webp'),
+    radial-gradient(900px 520px at 20% -10%, rgba(255, 255, 255, 0.16), transparent 60%),
+    linear-gradient(158deg, #0a3d4a 0%, #0c4b58 46%, #052a33 100%);
+}
+
+html[data-festive='nye'] body::before {
+  background-image:
+    url('./assets/mascot.webp'),
+    radial-gradient(760px 420px at 72% 0%, rgba(120, 90, 200, 0.3), transparent 70%),
+    linear-gradient(175deg, #050d1f 0%, #071a2a 55%, #02080f 100%);
+}
+
+/* A sunrise: the app's teal lifting into peach and gold, the sun coming up
+   behind the mascot. */
+html[data-festive='ny'] body::before {
+  background-image:
+    url('./assets/mascot.webp'),
+    radial-gradient(60% 42% at 50% 106%, rgba(255, 214, 150, 0.88) 0%, rgba(255, 170, 110, 0.5) 38%, rgba(255, 140, 100, 0) 72%),
+    linear-gradient(180deg, #0c4553 0%, #1f6a78 38%, #5f8f8e 60%, #d99e7e 84%, #f7c896 100%);
+}
+
+/* The page's own headings are light, written for the petrol ground. Where the
+   sunrise brightens toward the bottom they need a soft shadow to stay
+   readable, wherever they scroll to. */
+html[data-festive='ny'] .page > .page-header h1,
+html[data-festive='ny'] .page > .page-header .page-subtitle,
+html[data-festive='ny'] .page > .section-title {
+  text-shadow: 0 1px 2px rgba(4, 34, 42, 0.65), 0 0 14px rgba(4, 34, 42, 0.4);
+}
+
+/* Section headings are a pale blue-grey on ordinary days; on peach that fades. */
+html[data-festive='ny'] .page > .section-title {
+  color: #fff;
+}
+
+html[data-festive='ny'] body::after {
+  opacity: 0.5;
+}
+
+/* New Year's Eve: the sidebar joins the midnight sky. */
+html[data-festive='nye'] .sidebar {
+  background: linear-gradient(170deg, #050d1f, #0c1a33);
+}
+
+/* The sidebar warms toward the horizon too, so the screen reads as one sunrise. */
+html[data-festive='ny'] .sidebar {
+  background: linear-gradient(180deg, #04222a 0%, #0b3a44 45%, #3d4d4c 75%, #8a5a48 100%);
+}
+
+/* ---------- Snow, fireworks, morning light ---------- */
+
+.festive-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.festive-sky {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Exactly the wallpaper mascot's box (index.css: centre bottom,
+   min(56vh, 72vw) wide, 727 × 900), so a hat placed in percentages lands on
+   its head at every screen size. */
+.festive-mascot {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: min(56vh, 72vw);
+  aspect-ratio: 727 / 900;
+  transform: translateX(-50%);
+}
+
+.festive-hat {
+  position: absolute;
+  /* The wallpaper mascot is drawn faded; a full-strength hat looked pasted on. */
+  opacity: 0.82;
+  filter: drop-shadow(0 5px 4px rgba(0, 0, 0, 0.28));
+}
+
+.festive-hat svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Brim on the helmet, just above the face screen; flames show either side. */
+.festive-hat-santa {
+  left: 25%;
+  top: -9%;
+  width: 64%;
+  transform: rotate(-6deg);
+  transform-origin: 40% 85%;
+}
+
+.festive-hat-party {
+  left: 34%;
+  top: -14%;
+  width: 30%;
+  transform: rotate(10deg);
+}
+
+/* ---------- String of lights (Christmas) ---------- */
+
+.festive-lights {
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+  left: 0;
+  right: 0;
+  height: 22px;
+  /* Above the phone's top bar (30), below every popup and modal (50+). */
+  z-index: 32;
+  pointer-events: none;
+}
+
+.festive-lights svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.festive-bulb {
+  animation: festive-twinkle 2.4s ease-in-out infinite;
+}
+
+@keyframes festive-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ---------- Snow on the logo (Christmas) ---------- */
+
+html[data-festive='xmas-eve'] .sidebar-brand,
+html[data-festive='xmas'] .sidebar-brand {
+  position: relative;
+}
+
+html[data-festive='xmas-eve'] .sidebar-brand::before,
+html[data-festive='xmas'] .sidebar-brand::before {
+  content: '';
+  position: absolute;
+  /* Sidebar: the logo image starts 10px in and 6px down, and its flame a few
+     pixels below that — the cap rests on the flame, not on the empty corner. */
+  left: 11px;
+  top: 3px;
+  width: 28px;
+  height: 10px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 14'%3E%3Cpath d='M2 12 C4 4 10 2 14 6 C17 1 24 1 27 6 C30 2 37 3 38 12 Z' fill='white'/%3E%3C/svg%3E") no-repeat center / contain;
+  pointer-events: none;
+}
+
+/* Phone top bar: the brand has no padding, so the logo starts at 0, 0. */
+html[data-festive='xmas-eve'] .mobile-topbar .sidebar-brand::before,
+html[data-festive='xmas'] .mobile-topbar .sidebar-brand::before {
+  left: -3px;
+  top: 1px;
+}
+
+/* ---------- Snow resting on the stat cards (Christmas Day) ---------- */
+
+html[data-festive='xmas'] .stat-card {
+  position: relative;
+}
+
+html[data-festive='xmas'] .stat-card::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: -7px;
+  height: 12px;
+  background: radial-gradient(circle at 10px 12px, #fff 9px, transparent 10px) repeat-x;
+  background-size: 22px 14px;
+  filter: drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.06));
+  pointer-events: none;
+}
+
+/* ---------- Buttons: each day its own ---------- */
+
+html[data-festive='xmas-eve'] .btn-primary {
+  background: linear-gradient(150deg, #23855a, #145c3e);
+  color: #fff5d6;
+  box-shadow: inset 0 0 0 1px rgba(242, 193, 78, 0.85), 0 0 14px rgba(242, 193, 78, 0.3);
+}
+
+html[data-festive='xmas'] .btn-primary {
+  background: repeating-linear-gradient(135deg, #e2551b 0 10px, #f3743a 10px 20px);
+}
+
+html[data-festive='nye'] .btn-primary {
+  color: #ffe9a8;
+  background: linear-gradient(110deg, #1d2a52 0%, #2c3e78 38%, #d9b45a 50%, #2c3e78 62%, #1d2a52 100%);
+  background-size: 260% 100%;
+  box-shadow: inset 0 0 0 1px rgba(242, 193, 78, 0.75);
+  animation: festive-sparkler 3.2s linear infinite;
+}
+
+@keyframes festive-sparkler {
+  from { background-position: 130% 0; }
+  to { background-position: -130% 0; }
+}
+
+/* Not orange: the brand already is. Morning sky, the first ray of sunrise on top. */
+html[data-festive='ny'] .btn-primary {
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, #0b6676 0%, #1b8ea2 55%, #3fb0c4 100%);
+  box-shadow: inset 0 2px 0 #f6c98a, 0 4px 14px rgba(18, 136, 155, 0.4);
+}
+
+/* ---------- Dashboard banner ---------- */
+
+.festive-banner {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  color: #fff;
+  box-shadow: var(--shadow);
+  animation: fade-in 0.3s ease;
+}
+
+.festive-banner-text {
+  min-width: 0;
+}
+
+.festive-banner-title {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.festive-banner-detail {
+  font-size: 0.86rem;
+  opacity: 0.92;
+  margin-top: 2px;
+}
+
+.festive-banner-mark {
+  flex-shrink: 0;
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.festive-banner-mark svg {
+  display: block;
+  width: 46px;
+  height: 46px;
+}
+
+.festive-banner.xmas-eve {
+  background: linear-gradient(120deg, #0b3b2a, #145c3e);
+  border: 1px solid rgba(242, 193, 78, 0.5);
+}
+
+.festive-banner.xmas-eve .festive-banner-title {
+  color: #f2c14e;
+}
+
+.festive-banner.xmas {
+  background: linear-gradient(120deg, #a81f26, #d23a2c);
+}
+
+/* The ribbon runs top to bottom behind the gift only, so however the title
+   wraps on a narrow phone it can never cross the words. */
+.festive-banner.xmas .festive-banner-mark {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  margin: -14px 0;
+  padding: 0 8px;
+}
+
+.festive-banner.xmas .festive-banner-mark::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 12px;
+  transform: translateX(-50%);
+  background: #f2c14e;
+  opacity: 0.9;
+}
+
+.festive-banner.xmas .festive-banner-mark svg {
+  position: relative;
+}
+
+.festive-banner.nye {
+  background: linear-gradient(120deg, #101a33, #1d2a52);
+  border: 1px solid rgba(242, 193, 78, 0.6);
+}
+
+.festive-banner.nye .festive-banner-title,
+.festive-banner.nye .festive-banner-mark {
+  color: #f2c14e;
+}
+
+.festive-banner.ny {
+  background: linear-gradient(120deg, #fff6ea, #ffe1c4);
+  border: 1px solid #f6c79c;
+  color: #4a2a16;
+}
+
+.festive-banner.ny .festive-banner-title {
+  color: #b8461b;
+}
+
+.festive-banner.ny .festive-banner-mark {
+  color: #e2551b;
+}
+
+@media (max-width: 720px) {
+  .festive-banner {
+    padding: 12px 14px;
+  }
+
+  .festive-banner-title {
+    font-size: 1.08rem;
+  }
+
+  .festive-banner-mark {
+    font-size: 1.5rem;
+  }
+
+  .festive-banner-mark svg {
+    width: 36px;
+    height: 36px;
+  }
+
+  .festive-banner.xmas .festive-banner-mark {
+    margin: -12px 0;
+  }
+}
+
+/* ---------- Installed app on a phone: the mascot stands above the tab bar ---------- */
+
+@media (max-width: 720px) and (display-mode: standalone) {
+  .festive-mascot {
+    bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---------- Calm and print ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .festive-bulb,
+  html[data-festive='nye'] .btn-primary {
+    animation: none;
+  }
+
+  html[data-festive='nye'] .btn-primary {
+    background-position: 50% 0;
+  }
+}
+
+@media print {
+  .festive-layer,
+  .festive-lights {
+    display: none;
+  }
+}
