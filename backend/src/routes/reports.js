@@ -513,13 +513,28 @@ async function loadDelivery(query) {
   const scope = (field) => ({ ...(storeId ? { storeId } : {}), ...(userId ? { [field]: userId } : {}) });
   const product = { select: { name: true, costPrice: true, sortOrder: true } };
   const person = { select: { name: true } };
+  // Settled in the window — whenever the goods went out — by whoever settled.
+  const settledInRange = {
+    settledAt: { gte: from, lte: to },
+    ...(userId ? { createdById: userId } : {}),
+    ...(storeId ? { consignment: { storeId } } : {}),
+  };
 
-  const [items, directLines, settlements, directBills, people] = await Promise.all([
+  const [items, settlementLines, directLines, settlements, directBills, people] = await Promise.all([
     prisma.consignmentItem.findMany({
       where: { consignment: { deliveredAt: { gte: from, lte: to }, ...scope('createdById') } },
       include: {
         product,
         consignment: { select: { storeId: true, createdById: true, status: true, store: { select: { name: true } }, createdBy: person } },
+      },
+    }),
+    prisma.settlementLine.findMany({
+      where: { settlement: settledInRange },
+      include: {
+        settlement: { select: { createdById: true, createdBy: person } },
+        consignmentItem: {
+          include: { product, consignment: { select: { storeId: true, store: { select: { name: true } } } } },
+        },
       },
     }),
     prisma.saleLine.findMany({
@@ -530,7 +545,7 @@ async function loadDelivery(query) {
       },
     }),
     prisma.settlement.findMany({
-      where: { consignment: { deliveredAt: { gte: from, lte: to }, ...scope('createdById') } },
+      where: settledInRange,
       include: {
         createdBy: person,
         sale: { select: { number: true, totalAmount: true } },
@@ -569,7 +584,7 @@ async function loadDelivery(query) {
   return {
     from: isoDay(from),
     to: isoDay(to),
-    ...buildStoreSheet({ consignmentItems: items, directLines }),
+    ...buildStoreSheet({ consignmentItems: items, settlementLines, directLines }),
     bills,
     filters: { people },
   };

@@ -15,6 +15,15 @@ const item = (storeId, productId, product, delivered, sold, returned, price) => 
   pricePerUnit: price,
   consignment: { ...shop(storeId, `Store ${storeId}`), createdById: 1, createdBy: { name: 'Ravi' } },
 });
+// A delivery settled the same day by the same person, as the older tests assume.
+const settled = (it, by = { id: 1, name: 'Ravi' }) => ({
+  soldQty: it.soldQty,
+  returnedQty: it.returnedQty,
+  consignmentItem: it,
+  settlement: { createdById: by.id, createdBy: { name: by.name } },
+});
+const consigned = (...items) => ({ consignmentItems: items, settlementLines: items.map((it) => settled(it)) });
+
 const line = (storeId, productId, product, quantity, amount, type = 'SALE') => ({
   productId,
   product,
@@ -26,7 +35,7 @@ const line = (storeId, productId, product, quantity, amount, type = 'SALE') => (
 
 const tests = {
   'consignment: sold earns, returned is a loss at cost, the rest is pending': () => {
-    const r = buildStoreSheet({ consignmentItems: [item(1, 2, sprouts, 10, 6, 3, 10)] });
+    const r = buildStoreSheet({ ...consigned(item(1, 2, sprouts, 10, 6, 3, 10)) });
     const [row] = r.rows;
     assert.strictEqual(row.source, 'CONSIGNMENT');
     assert.strictEqual(row.person, 'Ravi');
@@ -51,7 +60,7 @@ const tests = {
 
   'a store sums both sources; rows stay split by person and source': () => {
     const r = buildStoreSheet({
-      consignmentItems: [item(1, 2, sprouts, 10, 10, 0, 10)],
+      ...consigned(item(1, 2, sprouts, 10, 10, 0, 10)),
       directLines: [line(1, 1, banana, 4, 20)],
     });
     assert.strictEqual(r.rows.length, 2);
@@ -66,7 +75,7 @@ const tests = {
 
   'advice: heavy returns say deliver less, clean sell-through says deliver more': () => {
     const r = buildStoreSheet({
-      consignmentItems: [item(1, 2, sprouts, 20, 10, 10, 10), item(2, 2, sprouts, 20, 20, 0, 10), item(3, 2, sprouts, 3, 1, 2, 10)],
+      ...consigned(item(1, 2, sprouts, 20, 10, 10, 10), item(2, 2, sprouts, 20, 20, 0, 10), item(3, 2, sprouts, 3, 1, 2, 10)),
     });
     assert.deepStrictEqual(r.advice.cut.map((a) => a.store), ['Store 1']);
     assert.deepStrictEqual(r.advice.grow.map((a) => a.store), ['Store 2']);
@@ -75,7 +84,7 @@ const tests = {
 
 tests['suggestions: biggest saving first, pending listed last'] = () => {
   const r = buildStoreSheet({
-    consignmentItems: [item(1, 2, sprouts, 22, 10, 10, 10), item(2, 2, sprouts, 20, 20, 0, 10)],
+    ...consigned(item(1, 2, sprouts, 22, 10, 10, 10), item(2, 2, sprouts, 20, 20, 0, 10)),
   });
   const [first] = r.suggestions;
   assert.strictEqual(first.title, 'Deliver 10 fewer units to Store 1');
@@ -85,15 +94,30 @@ tests['suggestions: biggest saving first, pending listed last'] = () => {
 };
 
 tests['suggestions: a quiet range says nothing it cannot back up'] = () => {
-  const r = buildStoreSheet({ consignmentItems: [item(1, 2, sprouts, 2, 2, 0, 10)] });
+  const r = buildStoreSheet({ ...consigned(item(1, 2, sprouts, 2, 2, 0, 10)) });
   assert.deepStrictEqual(r.suggestions, []);
 };
 
 tests['suggestions: no rupee claims when products have no cost price'] = () => {
   const free = { name: 'Green sprouts', costPrice: 0, sortOrder: 2 };
-  const r = buildStoreSheet({ consignmentItems: [item(1, 2, free, 20, 10, 10, 10)] });
+  const r = buildStoreSheet({ ...consigned(item(1, 2, free, 20, 10, 10, 10)) });
   assert.ok(r.suggestions.length > 0);
   for (const s of r.suggestions) assert.doesNotMatch(s.detail + s.title, /₹0|0% of what/);
+};
+
+tests['a settlement today of an earlier delivery counts today, for whoever settled'] = () => {
+  // Delivered last week (not in today's window), settled today by Mahesh.
+  const earlier = item(1, 2, sprouts, 10, 6, 3, 10);
+  const r = buildStoreSheet({ settlementLines: [settled(earlier, { id: 2, name: 'Mahesh' })] });
+  const [row] = r.rows;
+  assert.strictEqual(row.person, 'Mahesh');
+  assert.deepStrictEqual([row.delivered, row.sold, row.returned, row.revenue, row.loss], [0, 6, 3, 60, 18]);
+};
+
+tests['a delivery today with nothing settled yet is delivered and pending, not sold'] = () => {
+  const r = buildStoreSheet({ consignmentItems: [item(1, 2, sprouts, 12, 0, 0, 10)] });
+  const [row] = r.rows;
+  assert.deepStrictEqual([row.delivered, row.pending, row.sold, row.revenue], [12, 12, 0, 0]);
 };
 
 let failed = 0;

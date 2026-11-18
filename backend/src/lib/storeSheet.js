@@ -2,9 +2,12 @@
 // consignment vs direct sale, and what each store made and lost. Pure — the
 // route fetches, this adds up; see test/storeSheet.js.
 //
-// Consignments are counted by delivery date and carry their outcome so far
-// (sold, returned, still pending), so a day's sheet answers "what went out
-// that day and what came of it". Direct sales are counted by bill date.
+// Each thing is counted on the day it happened, credited to whoever did it:
+// goods delivered on the delivery day (to whoever delivered them, with what
+// of that delivery is still unsettled as pending); goods sold or returned on
+// the day they were SETTLED (to whoever settled them); direct bills on their
+// bill date. So "today" shows what was actually sold today — counting sales
+// on their delivery day hid every settlement of an earlier delivery.
 //
 // Loss is what came back — returned or exchanged — at cost price, on the
 // assumption that perishable goods back from a shop are not resold.
@@ -26,7 +29,7 @@ function finish(r) {
   return r;
 }
 
-function buildStoreSheet({ consignmentItems = [], directLines = [] }) {
+function buildStoreSheet({ consignmentItems = [], settlementLines = [], directLines = [] }) {
   const rows = new Map(); // store + person + source
   const products = new Map();
 
@@ -42,9 +45,13 @@ function buildStoreSheet({ consignmentItems = [], directLines = [] }) {
     add(row, m);
   }
 
+  // Deliveries made in the window.
   for (const it of consignmentItems) {
-    const unitCost = it.product.costPrice || 0;
     const c = it.consignment;
+    const m = blank();
+    m.delivered = it.deliveredQty;
+    // A closed consignment is no longer waiting on anything.
+    m.pending = c.status === 'CLOSED' ? 0 : it.deliveredQty - it.soldQty - it.returnedQty;
     touch({
       storeId: c.storeId,
       store: c.store.name,
@@ -53,17 +60,31 @@ function buildStoreSheet({ consignmentItems = [], directLines = [] }) {
       source: 'CONSIGNMENT',
       productId: it.productId,
       product: it.product,
-      m: {
-        delivered: it.deliveredQty,
-        sold: it.soldQty,
-        returned: it.returnedQty,
-        exchanged: 0,
-        // A closed consignment is no longer waiting on anything.
-        pending: c.status === 'CLOSED' ? 0 : it.deliveredQty - it.soldQty - it.returnedQty,
-        revenue: it.soldQty * it.pricePerUnit,
-        cost: it.soldQty * unitCost,
-        loss: it.returnedQty * unitCost,
-      },
+      m,
+    });
+  }
+
+  // Settlements made in the window, whenever the goods went out.
+  for (const l of settlementLines) {
+    const it = l.consignmentItem;
+    const c = it.consignment;
+    const st = l.settlement;
+    const unitCost = it.product.costPrice || 0;
+    const m = blank();
+    m.sold = l.soldQty;
+    m.returned = l.returnedQty;
+    m.revenue = l.soldQty * it.pricePerUnit;
+    m.cost = l.soldQty * unitCost;
+    m.loss = l.returnedQty * unitCost;
+    touch({
+      storeId: c.storeId,
+      store: c.store.name,
+      personId: st.createdById,
+      person: st.createdBy?.name || 'Unknown',
+      source: 'CONSIGNMENT',
+      productId: it.productId,
+      product: it.product,
+      m,
     });
   }
 

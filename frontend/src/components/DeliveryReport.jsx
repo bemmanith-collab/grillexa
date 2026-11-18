@@ -163,8 +163,9 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
       <div className="card">
         <h2 className="card-title">Store sheet</h2>
         <p className="chart-hint">
-          One row per store, per person, per type. Consignments are counted on the day they were delivered, with how they
-          settled. Blank means zero. Made is the money taken. Loss is what came back, at cost price.
+          One row per store, per person, per type. Delivered counts on the day goods went out; sold and returned count on
+          the day they were settled, for whoever settled them. Blank means zero. Made is the money taken. Loss is what came
+          back, at cost price.
         </p>
         {rows.length === 0 ? (
           <EmptyState icon={AlertIcon} message="Nothing delivered or sold in this range." />
