@@ -46,6 +46,17 @@ function Qty({ c }) {
   );
 }
 
+// Under the store name: how much went out, and how much still awaits settling —
+// so a row with nothing sold or returned yet still says something.
+function Moved({ r }) {
+  if (r.source !== 'CONSIGNMENT') return null;
+  return (
+    <span className="sheet-moved">
+      {' '}· {r.delivered} delivered{r.pending > 0 ? `, ${r.pending} pending` : ''}
+    </span>
+  );
+}
+
 function More({ shown, total, onMore }) {
   if (shown >= total) return null;
   return (
@@ -195,7 +206,7 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
                     <tr key={r.key}>
                       <td className="l sheet-pin">
                         <div className="cell-strong">{r.store}</div>
-                        <div className="sheet-who">{r.person} · <SourceBadge source={r.source} /></div>
+                        <div className="sheet-who">{r.person} · <SourceBadge source={r.source} /><Moved r={r} /></div>
                       </td>
                       {products.map((p) => (
                         <td key={p.id}><Qty c={r.cells[p.id]} /></td>
@@ -224,7 +235,7 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
                     <span className="cell-strong">{formatCurrency(r.revenue)}</span>
                   </div>
                   <div className="sheet-card-head sheet-who">
-                    <span>{r.person} · <SourceBadge source={r.source} /></span>
+                    <span>{r.person} · <SourceBadge source={r.source} /><Moved r={r} /></span>
                     {r.loss > 0 && <span className="sheet-ret">lost {formatCurrency(r.loss)}</span>}
                   </div>
                   <div className="sheet-chips">

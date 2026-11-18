@@ -3956,7 +3956,7 @@ body.chat-open {
 
 /* Store sheet: compact on the website, cards on a phone. */
 .sheet-search { width: 100%; max-width: 320px; margin-bottom: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
-.sheet-pin { position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 180px; max-width: 260px; white-space: normal !important; box-shadow: 1px 0 0 var(--border-soft); }
+.sheet-pin { position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 150px; max-width: 210px; white-space: normal !important; box-shadow: 1px 0 0 var(--border-soft); }
 .sheet-table thead .sheet-pin { background: var(--bg); }
 .sheet-total .sheet-pin { background: #fff6c2; }
 .sheet-who { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
@@ -3975,3 +3975,5 @@ body.chat-open {
   .sheet-cards { display: grid; }
   .sheet-search { max-width: none; }
 }
+
+.sheet-moved { white-space: nowrap; }
