@@ -34,12 +34,18 @@ function RateChip({ value }) {
 const legend = { plugins: { legend: { display: true, position: 'bottom' } } };
 const PAGE = 25;
 
-const pageOf = (list, page) => list.slice(page * PAGE, page * PAGE + PAGE);
+// A refresh can shorten a list under someone's feet; never show a page past the end.
+const lastPage = (total) => Math.max(0, Math.ceil(total / PAGE) - 1);
+const pageOf = (list, page) => {
+  const p = Math.min(page, lastPage(list.length));
+  return list.slice(p * PAGE, p * PAGE + PAGE);
+};
 
 // Pages instead of one long scroll: 25 rows each, Prev / Next.
-function Pager({ page, total, onPage }) {
+function Pager({ page: asked, total, onPage }) {
   const pages = Math.ceil(total / PAGE);
   if (pages <= 1) return null;
+  const page = Math.min(asked, lastPage(total));
   return (
     <div className="sheet-pager" role="navigation" aria-label="Pages">
       <button type="button" className="btn-secondary btn-sm" disabled={page === 0} onClick={() => onPage(page - 1)}>‹ Prev</button>
@@ -64,6 +70,7 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
 
   useEffect(() => {
     let cancelled = false;
+    const params = { from, to, storeId: storeId || undefined, userId: userId || undefined };
     setData(null);
     setError('');
     setRowPage(0);
@@ -71,11 +78,27 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
     setStorePage(0);
     setPersonPage(0);
     client
-      .get('/reports/delivery', { params: { from, to, storeId: storeId || undefined, userId: userId || undefined } })
+      .get('/reports/delivery', { params })
       .then((res) => !cancelled && setData(res.data))
       .catch((err) => !cancelled && setError(err.response?.data?.error || 'Failed to load the delivery report.'));
+
+    // A bill made while this is open shows up without a reload: refreshed
+    // every minute while the tab is in view, and the moment it comes back
+    // into view. Quietly — no spinner, the page and filters stay put, and a
+    // failed refresh keeps the figures already on screen.
+    function refresh() {
+      if (document.hidden) return;
+      client
+        .get('/reports/delivery', { params })
+        .then((res) => !cancelled && setData(res.data))
+        .catch(() => {});
+    }
+    const timer = setInterval(refresh, 60_000);
+    document.addEventListener('visibilitychange', refresh);
     return () => {
       cancelled = true;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
     };
   }, [from, to, storeId, userId]);
 
@@ -207,7 +230,7 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
                 <tbody>
                   {pageOf(matchRows, rowPage).map((r, i) => (
                     <tr key={r.key}>
-                      <td>{rowPage * PAGE + i + 1}</td>
+                      <td>{Math.min(rowPage, lastPage(matchRows.length)) * PAGE + i + 1}</td>
                       <td className="l cell-strong">{r.store}</td>
                       <td className="l">{r.person}</td>
                       <td className="l"><SourceBadge source={r.source} /></td>
