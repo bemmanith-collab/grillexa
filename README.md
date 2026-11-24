@@ -78,7 +78,7 @@ Unit prices are resolved **server-side from the product catalogue** (`backend/sr
 
 Deliver to Store shows a **Tally** card above the list for the day on screen (or the search results, when searching): number of deliveries, units and ₹ value, with **By product** (qty and value per product) and, for admins and managers, **By person** (deliveries and value per person). It is for checking the day against what left the van.
 
-**Bill by bill** is the delivery bills sheet: one row per bill (bill #, store, delivered by, qty of each product, value) and a TOTAL row, so each bill can be ticked off and the product columns add up to the totals above. **Download Excel (CSV)** saves the same sheet; it opens in Excel with ₹ and Telugu names intact. SALES users get the sheet without the Delivered by column. All statuses count, settled or not. The arithmetic is `frontend/src/lib/tally.js`, tested by `frontend/test/tally.js`.
+**Bill by bill, per person** is the delivery bills sheet, one per person who delivered: each has a row per bill (bill #, store, qty of each product that person delivered, value) and its own TOTAL row, so each rider's bills can be ticked off on their own. **Download <name>** saves that person's sheet as `<name>-delivery-bills-<date>.csv`; it opens in Excel with ₹ and Telugu names intact. A SALES user gets one sheet under their own name. `sheetsByPerson()` in `frontend/src/lib/tally.js`.
 
 ## Product order
 

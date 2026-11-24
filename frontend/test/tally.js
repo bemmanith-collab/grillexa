@@ -25,3 +25,14 @@ assert.equal(toCsv(s).split('\r\n')[1], 'CN-1,"Raja, Kirana",Praveen,1,2,100');
 console.log('ok   billSheet');
 assert.deepEqual(billSheet([], ['Wings'], false).head, ['Bill', 'Store', 'Wings', 'Value']);
 console.log('ok   billSheet without person');
+
+import { sheetsByPerson } from '../src/lib/tally.js';
+const per = sheetsByPerson([
+  { consignmentNo: 'CN-1', store: 'A', createdBy: 'Ravi', totalDeliveredValue: 50, items: [{ product: 'Legs', deliveredQty: 2, totalValue: 50 }] },
+  { consignmentNo: 'CN-2', store: 'B', createdBy: 'Praveen', totalDeliveredValue: 40, items: [{ product: 'Wings', deliveredQty: 1, totalValue: 40 }] },
+  { consignmentNo: 'CN-3', store: 'C', createdBy: 'Ravi', totalDeliveredValue: 30, items: [{ product: 'Legs', deliveredQty: 1, totalValue: 30 }] },
+], ['Wings', 'Legs']);
+assert.deepEqual(per.map((p) => p.person), ['Praveen', 'Ravi']);
+assert.deepEqual(per[1].sheet.head, ['Bill', 'Store', 'Legs', 'Value']);
+assert.deepEqual(per[1].sheet.total, ['TOTAL', '2 bills', 3, 80]);
+console.log('ok   sheetsByPerson');

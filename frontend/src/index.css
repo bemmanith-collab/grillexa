@@ -3958,3 +3958,8 @@ body.chat-open {
 .sheet-search { width: 100%; max-width: 320px; margin-bottom: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
 .sheet-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
 @media (max-width: 760px) { .sheet-search { max-width: none; } }
+
+/* Deliver to Store → Tally → Bill by bill: one sheet per person. */
+.person-sheet { margin-top: 14px; }
+.person-sheet-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.person-sheet-head .card-title { margin: 0; }

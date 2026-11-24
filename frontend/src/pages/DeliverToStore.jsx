@@ -12,7 +12,7 @@ import DateRange from '../components/DateRange';
 import Toast from '../components/Toast';
 import { TruckIcon, RefreshIcon } from '../components/icons';
 import { filterToCatalog, describeDropped } from '../lib/reorder';
-import { tallyOf, billSheet, toCsv } from '../lib/tally';
+import { tallyOf, billSheet, sheetsByPerson, toCsv } from '../lib/tally';
 import { formatCurrency } from '../lib/format';
 import { formatDate, todayStr } from '../utils/date';
 
@@ -267,9 +267,13 @@ export default function DeliverToStore() {
   const searching = Boolean(search.trim());
   const shown = searching ? filteredConsignments : pager.visible;
   const tally = tallyOf(shown);
-  const sheet = billSheet(shown, tally.byProduct.map((p) => p.name), !isScoped);
-  const textCols = isScoped ? 2 : 3;
-  const sheetName = searching ? 'delivery-bills-search' : `delivery-bills-${pager.visible[0]?.deliveredAt || ''}`;
+  // One bill sheet per person. A SALES user only ever downloads their own
+  // view, so theirs is one sheet under their own name.
+  const productNames = tally.byProduct.map((p) => p.name);
+  const sheets = isScoped
+    ? [{ person: user.name, sheet: billSheet(shown, productNames, false) }]
+    : sheetsByPerson(shown, productNames);
+  const sheetDay = searching ? 'search' : pager.visible[0]?.deliveredAt || '';
   return (
     <div className="page">
       <div className="page-header">
@@ -412,28 +416,39 @@ export default function DeliverToStore() {
             </details>
           )}
           <details>
-            <summary>Bill by bill</summary>
-            <button type="button" className="btn-secondary btn-sm" onClick={() => downloadCsv(sheet, sheetName)}>
-              <Download size={15} /> Download Excel (CSV)
-            </button>
-            <div className="table-scroll">
-              <table className="sheet-table">
-                <thead>
-                  <tr>{sheet.head.map((h, k) => <th key={k} className={k < textCols ? 'l' : undefined}>{h}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {[...sheet.rows, sheet.total].map((r, n) => (
-                    <tr key={n} className={n === sheet.rows.length ? 'sheet-total' : undefined}>
-                      {r.map((v, k) => (
-                        <td key={k} className={k < textCols ? 'l' : v === 0 ? 'sheet-zero' : undefined}>
-                          {k === r.length - 1 ? formatCurrency(v) : v}
-                        </td>
+            <summary>Bill by bill, per person</summary>
+            {sheets.map(({ person, sheet }) => (
+              <div key={person} className="person-sheet">
+                <div className="person-sheet-head">
+                  <h3 className="card-title">{person}</h3>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={() => downloadCsv(sheet, `${person.replace(/[^p{L}p{N}]+/gu, '-')}-delivery-bills-${sheetDay}`)}
+                  >
+                    <Download size={15} /> Download {person}
+                  </button>
+                </div>
+                <div className="table-scroll">
+                  <table className="sheet-table">
+                    <thead>
+                      <tr>{sheet.head.map((h, k) => <th key={k} className={k < 2 ? 'l' : undefined}>{h}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {[...sheet.rows, sheet.total].map((r, n) => (
+                        <tr key={n} className={n === sheet.rows.length ? 'sheet-total' : undefined}>
+                          {r.map((v, k) => (
+                            <td key={k} className={k < 2 ? 'l' : v === 0 ? 'sheet-zero' : undefined}>
+                              {k === r.length - 1 ? formatCurrency(v) : v}
+                            </td>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
           </details>
         </div>
       )}

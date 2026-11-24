@@ -47,3 +47,18 @@ export function toCsv({ head, rows, total }) {
   const cell = (v) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v);
   return [head, ...rows, total].map((r) => r.map(cell).join(',')).join('\r\n');
 }
+
+// One sheet per person, so each rider's bills can be tallied and downloaded
+// on their own. Only the products that person delivered get a column; the
+// person column is dropped since the whole sheet is theirs.
+export function sheetsByPerson(consignments, productNames) {
+  const people = new Map();
+  for (const c of consignments) {
+    const name = c.createdBy || '—';
+    people.set(name, (people.get(name) || []).concat(c));
+  }
+  return [...people].sort(([a], [b]) => a.localeCompare(b)).map(([person, bills]) => {
+    const theirs = productNames.filter((n) => bills.some((c) => c.items.some((i) => i.product === n)));
+    return { person, sheet: billSheet(bills, theirs, false) };
+  });
+}
