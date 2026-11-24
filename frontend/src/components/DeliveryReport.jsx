@@ -6,6 +6,74 @@ import EmptyState from './EmptyState';
 import { AlertIcon } from './icons';
 import Chart, { TEAL, FLAME, WARN } from './Chart';
 import { formatCurrency } from '../lib/format';
+import { tallyOf, sheetsByPerson, toCsv } from '../lib/tally';
+
+// BOM so Excel reads ₹ and Telugu store names as UTF-8.
+function downloadCsv(sheet, name) {
+  const url = URL.createObjectURL(new Blob(['﻿' + toCsv(sheet)], { type: 'text/csv;charset=utf-8' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: `${name}.csv` });
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Delivery bills, one sheet per person: a row per consignment bill with the
+// qty of each product and its value, and a TOTAL row, for ticking off against
+// the paper bills. Each downloads under the person's name. Same date, store
+// and person filters as the rest of the report.
+function BillSheets({ from, to, storeId, userId }) {
+  const [list, setList] = useState(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    setList(null);
+    setError('');
+    client
+      .get('/consignments', { params: { from, to, storeId: storeId || undefined } })
+      .then((res) => !cancelled && setList(res.data.consignments))
+      .catch((err) => !cancelled && setError(err.response?.data?.error || 'Failed to load the delivery bills.'));
+    return () => { cancelled = true; };
+  }, [from, to, storeId]);
+
+  if (error) return <div className="form-error">{error}</div>;
+  if (!list) return <Spinner label="Loading delivery bills…" />;
+  const bills = userId ? list.filter((c) => String(c.createdById) === String(userId)) : list;
+  if (bills.length === 0) return <EmptyState icon={AlertIcon} message="No delivery bills in this range." />;
+  const range = from === to ? from : `${from}-to-${to}`;
+  return sheetsByPerson(bills, tallyOf(bills).byProduct.map((p) => p.name)).map(({ person, sheet }) => (
+    <div key={person} className="person-sheet">
+      <div className="person-sheet-head">
+        <h3 className="card-title">
+          {person} <span className="cell-muted">· {sheet.total[1]} · {formatCurrency(sheet.total.at(-1))}</span>
+        </h3>
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          onClick={() => downloadCsv(sheet, `${person.replace(/[^p{L}p{N}]+/gu, '-')}-delivery-bills-${range}`)}
+        >
+          <Download size={15} /> Download {person}
+        </button>
+      </div>
+      <div className="table-scroll">
+        <table className="sheet-table">
+          <thead>
+            <tr>{sheet.head.map((h, k) => <th key={k} className={k < 2 ? 'l' : undefined}>{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {[...sheet.rows, sheet.total].map((r, n) => (
+              <tr key={n} className={n === sheet.rows.length ? 'sheet-total' : undefined}>
+                {r.map((v, k) => (
+                  <td key={k} className={k < 2 ? 'l' : v === 0 ? 'sheet-zero' : undefined}>
+                    {k === r.length - 1 ? formatCurrency(v) : v}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  ));
+}
 
 // The Delivery Report tab on Reports: who delivered what where, consignment vs
 // direct, what sold, came back or was exchanged, what each store made and
@@ -269,6 +337,15 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
             <Pager page={rowPage} total={matchRows.length} onPage={setRowPage} />
           </>
         )}
+      </div>
+
+      <div className="card">
+        <h2 className="card-title">Delivery bills, per person</h2>
+        <p className="chart-hint">
+          Every consignment bill delivered in this range, one sheet per person who delivered it. Tick each row against the
+          paper bill; the TOTAL row adds up that person's units and value. Download saves the sheet under the person's name.
+        </p>
+        <BillSheets from={from} to={to} storeId={storeId} userId={userId} />
       </div>
 
       <div className="card">

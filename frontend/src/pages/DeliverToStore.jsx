@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Search, Download } from 'lucide-react';
+import { Search } from 'lucide-react';
 import LineItemsForm, { emptyLine } from '../components/LineItemsForm';
 import SearchSelect, { SELECT_A_STORE, RECENT_STORES } from '../components/SearchSelect';
 import BillDetailModal from '../components/BillDetailModal';
@@ -12,38 +12,7 @@ import DateRange from '../components/DateRange';
 import Toast from '../components/Toast';
 import { TruckIcon, RefreshIcon } from '../components/icons';
 import { filterToCatalog, describeDropped } from '../lib/reorder';
-import { tallyOf, billSheet, sheetsByPerson, toCsv } from '../lib/tally';
-import { formatCurrency } from '../lib/format';
 import { formatDate, todayStr } from '../utils/date';
-
-// BOM so Excel reads ₹ and Telugu store names as UTF-8.
-function downloadCsv(sheet, name) {
-  const url = URL.createObjectURL(new Blob(['﻿' + toCsv(sheet)], { type: 'text/csv;charset=utf-8' }));
-  const a = Object.assign(document.createElement('a'), { href: url, download: `${name}.csv` });
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function TallyTable({ head, rows, unitsLabel }) {
-  return (
-    <div className="table-scroll">
-      <table className="data-table">
-        <thead>
-          <tr><th>{head}</th><th>{unitsLabel}</th><th>Value</th></tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.name}>
-              <td>{r.name}</td>
-              <td>{r.units}</td>
-              <td>{formatCurrency(r.value)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 // Maps a Consignment to the generic {number, date, store, lines, totalAmount}
 // shape BillDetailModal expects, so the delivery note reuses the same
@@ -266,14 +235,6 @@ export default function DeliverToStore() {
   const pager = useDatePages(filteredConsignments, (i) => i.deliveredAt);
   const searching = Boolean(search.trim());
   const shown = searching ? filteredConsignments : pager.visible;
-  const tally = tallyOf(shown);
-  // One bill sheet per person. A SALES user only ever downloads their own
-  // view, so theirs is one sheet under their own name.
-  const productNames = tally.byProduct.map((p) => p.name);
-  const sheets = isScoped
-    ? [{ person: user.name, sheet: billSheet(shown, productNames, false) }]
-    : sheetsByPerson(shown, productNames);
-  const sheetDay = searching ? 'search' : pager.visible[0]?.deliveredAt || '';
   return (
     <div className="page">
       <div className="page-header">
@@ -387,71 +348,6 @@ export default function DeliverToStore() {
       )}
 
       {!loading && !searching && <DatePager pager={pager} noun="delivery" plural="deliveries" />}
-
-      {!loading && shown.length > 0 && (
-        <div className="card form-card">
-          <h2 className="card-title">Tally {searching ? '· search results' : `· ${formatDate(pager.visible[0]?.deliveredAt)}`}</h2>
-          <div className="stat-grid">
-            {[
-              [shown.length, 'Deliveries'],
-              [tally.units, 'Units'],
-              [formatCurrency(tally.value), 'Value'],
-            ].map(([v, l]) => (
-              <div className="stat-card" key={l}>
-                <div>
-                  <div className="stat-value">{v}</div>
-                  <div className="stat-label">{l}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <details>
-            <summary>By product</summary>
-            <TallyTable head="Product" rows={tally.byProduct} unitsLabel="Qty" />
-          </details>
-          {!isScoped && (
-            <details>
-              <summary>By person</summary>
-              <TallyTable head="Delivered by" rows={tally.byPerson} unitsLabel="Deliveries" />
-            </details>
-          )}
-          <details>
-            <summary>Bill by bill, per person</summary>
-            {sheets.map(({ person, sheet }) => (
-              <div key={person} className="person-sheet">
-                <div className="person-sheet-head">
-                  <h3 className="card-title">{person}</h3>
-                  <button
-                    type="button"
-                    className="btn-secondary btn-sm"
-                    onClick={() => downloadCsv(sheet, `${person.replace(/[^p{L}p{N}]+/gu, '-')}-delivery-bills-${sheetDay}`)}
-                  >
-                    <Download size={15} /> Download {person}
-                  </button>
-                </div>
-                <div className="table-scroll">
-                  <table className="sheet-table">
-                    <thead>
-                      <tr>{sheet.head.map((h, k) => <th key={k} className={k < 2 ? 'l' : undefined}>{h}</th>)}</tr>
-                    </thead>
-                    <tbody>
-                      {[...sheet.rows, sheet.total].map((r, n) => (
-                        <tr key={n} className={n === sheet.rows.length ? 'sheet-total' : undefined}>
-                          {r.map((v, k) => (
-                            <td key={k} className={k < 2 ? 'l' : v === 0 ? 'sheet-zero' : undefined}>
-                              {k === r.length - 1 ? formatCurrency(v) : v}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ))}
-          </details>
-        </div>
-      )}
 
       {loading ? (
         <Spinner label="Loading deliveries…" />

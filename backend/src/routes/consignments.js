@@ -57,6 +57,7 @@ function shapeConsignment(c) {
     consignmentNo: c.consignmentNo,
     storeId: c.storeId,
     store: c.store?.name,
+    createdById: c.createdById,
     createdBy: c.createdBy?.name,
     status: c.status,
     deliveredAt: c.deliveredAt.toISOString().slice(0, 10),

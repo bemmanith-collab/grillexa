@@ -74,11 +74,9 @@ Unit prices are resolved **server-side from the product catalogue** (`backend/sr
 
 **"Reorder from Last …" is the opposite case, and repeats the order but not the price.** The shortcut on Deliver to Store and Direct Sale copies the previous document's products and quantities, then prices them from *today's* catalogue (`frontend/src/lib/reorder.js`). Carrying the old `pricePerUnit` across re-billed a repeat order at last month's price, and silently — the field looked filled in, so nobody checked it. A product with no catalogue price comes across blank, which the server reads as "use the catalogue price"; it is never sent as an explicit `0`, which the server takes as a deliberate override and would save the bill at zero. A product that has left the catalogue since is dropped and named in a warning rather than silently shrinking the order.
 
-## Delivery tally
+## Delivery bills, per person
 
-Deliver to Store shows a **Tally** card above the list for the day on screen (or the search results, when searching): number of deliveries, units and ₹ value, with **By product** (qty and value per product) and, for admins and managers, **By person** (deliveries and value per person). It is for checking the day against what left the van.
-
-**Bill by bill, per person** is the delivery bills sheet, one per person who delivered: each has a row per bill (bill #, store, qty of each product that person delivered, value) and its own TOTAL row, so each rider's bills can be ticked off on their own. **Download <name>** saves that person's sheet as `<name>-delivery-bills-<date>.csv`; it opens in Excel with ₹ and Telugu names intact. A SALES user gets one sheet under their own name. `sheetsByPerson()` in `frontend/src/lib/tally.js`.
+Reports → Delivery report has a **Delivery bills, per person** card, and that is the only place it appears. For the report's date range (and its store and person filters) it shows one sheet per person who delivered: a row per consignment bill (bill #, store, qty of each product that person delivered, value) and a TOTAL row, for ticking off against the paper bills. **Download <name>** saves that person's sheet as `<name>-delivery-bills-<date>.csv`, which opens in Excel with ₹ and Telugu names intact. The sheet comes from `/consignments?from&to`, which is uncapped when a date range is given; the consignment list carries `createdById` so the person filter works. The arithmetic is `sheetsByPerson()` / `billSheet()` in `frontend/src/lib/tally.js`, tested by `frontend/test/tally.js`.
 
 ## Product order
 
