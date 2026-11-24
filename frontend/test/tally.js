@@ -13,3 +13,15 @@ assert.deepEqual(t.byProduct, [{ name: 'Wings', units: 5, value: 115.3 }, { name
 assert.deepEqual(t.byPerson, [{ name: 'Ravi', units: 1, value: 100 }, { name: 'Praveen', units: 2, value: 75.3 }]);
 assert.deepEqual(tallyOf([]), { units: 0, value: 0, byProduct: [], byPerson: [] });
 console.log('ok   tally');
+
+import { billSheet, toCsv } from '../src/lib/tally.js';
+const s = billSheet([
+  { consignmentNo: 'CN-1', store: 'Raja, Kirana', createdBy: 'Praveen', totalDeliveredValue: 100, items: [{ product: 'Legs', deliveredQty: 2, totalValue: 60 }, { product: 'Wings', deliveredQty: 1, totalValue: 40 }] },
+  { consignmentNo: 'CN-2', store: 'Sai', createdBy: 'Ravi', totalDeliveredValue: 75.1, items: [{ product: 'Wings', deliveredQty: 3, totalValue: 75.1 }] },
+], ['Wings', 'Legs']);
+assert.deepEqual(s.rows[0], ['CN-1', 'Raja, Kirana', 'Praveen', 1, 2, 100]);
+assert.deepEqual(s.total, ['TOTAL', '2 bills', '', 4, 2, 175.1]);
+assert.equal(toCsv(s).split('\r\n')[1], 'CN-1,"Raja, Kirana",Praveen,1,2,100');
+console.log('ok   billSheet');
+assert.deepEqual(billSheet([], ['Wings'], false).head, ['Bill', 'Store', 'Wings', 'Value']);
+console.log('ok   billSheet without person');

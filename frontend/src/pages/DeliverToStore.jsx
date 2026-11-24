@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import client from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Search } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
 import LineItemsForm, { emptyLine } from '../components/LineItemsForm';
 import SearchSelect, { SELECT_A_STORE, RECENT_STORES } from '../components/SearchSelect';
 import BillDetailModal from '../components/BillDetailModal';
@@ -12,9 +12,17 @@ import DateRange from '../components/DateRange';
 import Toast from '../components/Toast';
 import { TruckIcon, RefreshIcon } from '../components/icons';
 import { filterToCatalog, describeDropped } from '../lib/reorder';
-import { tallyOf } from '../lib/tally';
+import { tallyOf, billSheet, toCsv } from '../lib/tally';
 import { formatCurrency } from '../lib/format';
 import { formatDate, todayStr } from '../utils/date';
+
+// BOM so Excel reads ₹ and Telugu store names as UTF-8.
+function downloadCsv(sheet, name) {
+  const url = URL.createObjectURL(new Blob(['﻿' + toCsv(sheet)], { type: 'text/csv;charset=utf-8' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: `${name}.csv` });
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function TallyTable({ head, rows, unitsLabel }) {
   return (
@@ -259,6 +267,9 @@ export default function DeliverToStore() {
   const searching = Boolean(search.trim());
   const shown = searching ? filteredConsignments : pager.visible;
   const tally = tallyOf(shown);
+  const sheet = billSheet(shown, tally.byProduct.map((p) => p.name), !isScoped);
+  const textCols = isScoped ? 2 : 3;
+  const sheetName = searching ? 'delivery-bills-search' : `delivery-bills-${pager.visible[0]?.deliveredAt || ''}`;
   return (
     <div className="page">
       <div className="page-header">
@@ -400,6 +411,30 @@ export default function DeliverToStore() {
               <TallyTable head="Delivered by" rows={tally.byPerson} unitsLabel="Deliveries" />
             </details>
           )}
+          <details>
+            <summary>Bill by bill</summary>
+            <button type="button" className="btn-secondary btn-sm" onClick={() => downloadCsv(sheet, sheetName)}>
+              <Download size={15} /> Download Excel (CSV)
+            </button>
+            <div className="table-scroll">
+              <table className="sheet-table">
+                <thead>
+                  <tr>{sheet.head.map((h, k) => <th key={k} className={k < textCols ? 'l' : undefined}>{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {[...sheet.rows, sheet.total].map((r, n) => (
+                    <tr key={n} className={n === sheet.rows.length ? 'sheet-total' : undefined}>
+                      {r.map((v, k) => (
+                        <td key={k} className={k < textCols ? 'l' : v === 0 ? 'sheet-zero' : undefined}>
+                          {k === r.length - 1 ? formatCurrency(v) : v}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
         </div>
       )}
 

@@ -24,3 +24,26 @@ export function tallyOf(consignments) {
   const sorted = (m) => [...m.values()].map((r) => ({ ...r, value: round2(r.value) })).sort((a, b) => b.value - a.value);
   return { units, value: round2(value), byProduct: sorted(products), byPerson: sorted(people) };
 }
+
+// The bill-by-bill sheet: one row per bill, a qty column per product, then a
+// TOTAL row, so every bill can be ticked off and the columns add up to the
+// product totals above. Header + rows + total, ready for a table or a CSV.
+export function billSheet(consignments, productNames, withPerson = true) {
+  const head = ['Bill', 'Store', 'Delivered by', ...productNames, 'Value'];
+  const rows = consignments.map((c) => [
+    c.consignmentNo,
+    c.store,
+    c.createdBy || '',
+    ...productNames.map((n) => c.items.filter((i) => i.product === n).reduce((s, i) => s + i.deliveredQty, 0)),
+    round2(c.totalDeliveredValue),
+  ]);
+  const total = ['TOTAL', `${rows.length} bill${rows.length === 1 ? "" : "s"}`, '', ...head.slice(3).map((_, k) => round2(rows.reduce((s, r) => s + r[3 + k], 0)))];
+  // Scoped (SALES) users don't see who delivered, so the sheet drops that column.
+  const cut = (r) => (withPerson ? r : r.filter((_, k) => k !== 2));
+  return { head: cut(head), rows: rows.map(cut), total: cut(total) };
+}
+
+export function toCsv({ head, rows, total }) {
+  const cell = (v) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v);
+  return [head, ...rows, total].map((r) => r.map(cell).join(',')).join('\r\n');
+}
