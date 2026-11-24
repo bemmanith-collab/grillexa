@@ -12,7 +12,30 @@ import DateRange from '../components/DateRange';
 import Toast from '../components/Toast';
 import { TruckIcon, RefreshIcon } from '../components/icons';
 import { filterToCatalog, describeDropped } from '../lib/reorder';
+import { tallyOf } from '../lib/tally';
+import { formatCurrency } from '../lib/format';
 import { formatDate, todayStr } from '../utils/date';
+
+function TallyTable({ head, rows, unitsLabel }) {
+  return (
+    <div className="table-scroll">
+      <table className="data-table">
+        <thead>
+          <tr><th>{head}</th><th>{unitsLabel}</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.name}>
+              <td>{r.name}</td>
+              <td>{r.units}</td>
+              <td>{formatCurrency(r.value)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 // Maps a Consignment to the generic {number, date, store, lines, totalAmount}
 // shape BillDetailModal expects, so the delivery note reuses the same
@@ -235,6 +258,7 @@ export default function DeliverToStore() {
   const pager = useDatePages(filteredConsignments, (i) => i.deliveredAt);
   const searching = Boolean(search.trim());
   const shown = searching ? filteredConsignments : pager.visible;
+  const tally = tallyOf(shown);
   return (
     <div className="page">
       <div className="page-header">
@@ -348,6 +372,36 @@ export default function DeliverToStore() {
       )}
 
       {!loading && !searching && <DatePager pager={pager} noun="delivery" plural="deliveries" />}
+
+      {!loading && shown.length > 0 && (
+        <div className="card form-card">
+          <h2 className="card-title">Tally {searching ? '· search results' : `· ${formatDate(pager.visible[0]?.deliveredAt)}`}</h2>
+          <div className="stat-grid">
+            {[
+              [shown.length, 'Deliveries'],
+              [tally.units, 'Units'],
+              [formatCurrency(tally.value), 'Value'],
+            ].map(([v, l]) => (
+              <div className="stat-card" key={l}>
+                <div>
+                  <div className="stat-value">{v}</div>
+                  <div className="stat-label">{l}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <details>
+            <summary>By product</summary>
+            <TallyTable head="Product" rows={tally.byProduct} unitsLabel="Qty" />
+          </details>
+          {!isScoped && (
+            <details>
+              <summary>By person</summary>
+              <TallyTable head="Delivered by" rows={tally.byPerson} unitsLabel="Deliveries" />
+            </details>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <Spinner label="Loading deliveries…" />

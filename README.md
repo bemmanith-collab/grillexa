@@ -74,6 +74,10 @@ Unit prices are resolved **server-side from the product catalogue** (`backend/sr
 
 **"Reorder from Last …" is the opposite case, and repeats the order but not the price.** The shortcut on Deliver to Store and Direct Sale copies the previous document's products and quantities, then prices them from *today's* catalogue (`frontend/src/lib/reorder.js`). Carrying the old `pricePerUnit` across re-billed a repeat order at last month's price, and silently — the field looked filled in, so nobody checked it. A product with no catalogue price comes across blank, which the server reads as "use the catalogue price"; it is never sent as an explicit `0`, which the server takes as a deliberate override and would save the bill at zero. A product that has left the catalogue since is dropped and named in a warning rather than silently shrinking the order.
 
+## Delivery tally
+
+Deliver to Store shows a **Tally** card above the list for the day on screen (or the search results, when searching): number of deliveries, units and ₹ value, with **By product** (qty and value per product) and, for admins and managers, **By person** (deliveries and value per person). It is for checking the day against what left the van. All statuses count, settled or not. The arithmetic is `frontend/src/lib/tally.js`, tested by `frontend/test/tally.js`.
+
 ## Product order
 
 Every list of products — the pickers on Deliver to Store and Direct Sale, Today's Stock, the Products page — is ordered by `Product.sortOrder` then by name, from one place (`backend/src/lib/catalogue.js`). Alphabetical order filed "Mixed fruit bowl" between "Green sprouts" and "Mixed sprouts"; nobody loading a van reads the list by spelling.
