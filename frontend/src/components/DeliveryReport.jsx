@@ -6,7 +6,7 @@ import EmptyState from './EmptyState';
 import { AlertIcon } from './icons';
 import Chart, { TEAL, FLAME, WARN } from './Chart';
 import { formatCurrency } from '../lib/format';
-import { tallyOf, sheetsByPerson, toCsv } from '../lib/tally';
+import { tallyOf, billSheet, sheetsByPerson, toCsv } from '../lib/tally';
 
 // BOM so Excel reads ₹ and Telugu store names as UTF-8.
 function downloadCsv(sheet, name) {
@@ -39,7 +39,17 @@ function BillSheets({ from, to, storeId, userId }) {
   const bills = userId ? list.filter((c) => String(c.createdById) === String(userId)) : list;
   if (bills.length === 0) return <EmptyState icon={AlertIcon} message="No delivery bills in this range." />;
   const range = from === to ? from : `${from}-to-${to}`;
-  return sheetsByPerson(bills, tallyOf(bills).byProduct.map((p) => p.name)).map(({ person, sheet }) => (
+  const names = tallyOf(bills).byProduct.map((p) => p.name);
+  const all = billSheet(bills, names);
+  return (
+    <>
+      <div className="person-sheet-head">
+        <span className="cell-muted">{all.total[1]} · {formatCurrency(all.total.at(-1))} in all</span>
+        <button type="button" className="btn-primary btn-sm" onClick={() => downloadCsv(all, `all-delivery-bills-${range}`)}>
+          <Download size={15} /> Download all together
+        </button>
+      </div>
+      {sheetsByPerson(bills, names).map(({ person, sheet }) => (
     <div key={person} className="person-sheet">
       <div className="person-sheet-head">
         <h3 className="card-title">
@@ -72,7 +82,9 @@ function BillSheets({ from, to, storeId, userId }) {
         </table>
       </div>
     </div>
-  ));
+      ))}
+    </>
+  );
 }
 
 // The Delivery Report tab on Reports: who delivered what where, consignment vs
@@ -340,15 +352,6 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
       </div>
 
       <div className="card">
-        <h2 className="card-title">Delivery bills, per person</h2>
-        <p className="chart-hint">
-          Every consignment bill delivered in this range, one sheet per person who delivered it. Tick each row against the
-          paper bill; the TOTAL row adds up that person's units and value. Download saves the sheet under the person's name.
-        </p>
-        <BillSheets from={from} to={to} storeId={storeId} userId={userId} />
-      </div>
-
-      <div className="card">
         <h2 className="card-title">Bills</h2>
         <p className="chart-hint">
           When each bill was generated and last edited. Edits made before 18/11/2026 were not recorded, so those bills show
@@ -568,6 +571,15 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
             ))}
           </ol>
         )}
+      </div>
+
+      <div className="card">
+        <h2 className="card-title">Delivery bills, per person</h2>
+        <p className="chart-hint">
+          Every consignment bill delivered in this range, one sheet per person who delivered it. Tick each row against the
+          paper bill; the TOTAL row adds up that person's units and value. Download all together saves every bill on one sheet with a Delivered by column; each person's button saves only their sheet, under their name.
+        </p>
+        <BillSheets from={from} to={to} storeId={storeId} userId={userId} />
       </div>
     </div>
   );
