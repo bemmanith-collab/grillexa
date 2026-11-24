@@ -20,7 +20,7 @@ function downloadCsv(sheet, name) {
 // qty of each product and its value, and a TOTAL row, for ticking off against
 // the paper bills. Each downloads under the person's name. Same date, store
 // and person filters as the rest of the report.
-export function BillSheets({ from, to, storeId, userId }) {
+export function BillSheets({ from, to, storeId, userId, onPickPerson }) {
   const [list, setList] = useState(null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -46,18 +46,22 @@ export function BillSheets({ from, to, storeId, userId }) {
   return (
     <>
       <p className="cell-muted">{all.total[1]} · {formatCurrency(all.total.at(-1))}{sheets.length > 1 ? ` · ${sheets.length} people` : ''}</p>
+      {sheets.length > 1 && (
       <div className="filter-group">
-        {sheets.length > 1 && (
           <button type="button" className="btn-primary btn-sm" onClick={() => downloadCsv(all, `all-delivery-bills-${range}`)}>
             <Download size={15} /> Download all together
           </button>
-        )}
-        {sheets.map(({ person, sheet }) => (
-          <button key={person} type="button" className="btn-secondary btn-sm" onClick={() => downloadCsv(sheet, fileName(person))}>
-            <Download size={15} /> {person}
-          </button>
-        ))}
+        {/* A name opens that person's sheet; only the Download buttons download. */}
+        {sheets.map(({ person }) => {
+            const id = bills.find((c) => (c.createdBy || '—') === person)?.createdById;
+            return (
+              <button key={person} type="button" className="filter-chip" onClick={() => id && onPickPerson(String(id))}>
+                {person}
+              </button>
+            );
+          })}
       </div>
+      )}
       {sheets.map(({ person, sheet }) => (
     <div key={person} className="person-sheet">
       <div className="person-sheet-head">

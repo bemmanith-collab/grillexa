@@ -277,10 +277,10 @@ export default function Reports() {
         <div className="delivery-report"><div className="card">
           <h2 className="card-title">Bills tally</h2>
           <p className="chart-hint">
-            Every delivery bill in this range, one sheet per person. Pick a person in "All sales people" to see only
-            theirs. Tick each row against the paper bill; the TOTAL row adds up their units and value.
+            Every delivery bill in this range, one sheet per person. Tap a name (or pick one in "All sales people") to see only
+            theirs; Download on the right saves it. Tick each row against the paper bill; the TOTAL row adds up their units and value.
           </p>
-          <BillSheets from={from} to={to} storeId={storeId} userId={userId} />
+          <BillSheets from={from} to={to} storeId={storeId} userId={userId} onPickPerson={setUserId} />
         </div></div>
       ) : tab === 'delivery' ? (
         <DeliveryReport from={from} to={to} storeId={storeId} userId={userId} />
