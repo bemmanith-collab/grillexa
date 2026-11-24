@@ -20,7 +20,7 @@ function downloadCsv(sheet, name) {
 // qty of each product and its value, and a TOTAL row, for ticking off against
 // the paper bills. Each downloads under the person's name. Same date, store
 // and person filters as the rest of the report.
-function BillSheets({ from, to, storeId, userId }) {
+export function BillSheets({ from, to, storeId, userId }) {
   const [list, setList] = useState(null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -41,15 +41,24 @@ function BillSheets({ from, to, storeId, userId }) {
   const range = from === to ? from : `${from}-to-${to}`;
   const names = tallyOf(bills).byProduct.map((p) => p.name);
   const all = billSheet(bills, names);
+  const sheets = sheetsByPerson(bills, names);
+  const fileName = (person) => `${person.replace(/[^\p{L}\p{N}]+/gu, '-')}-delivery-bills-${range}`;
   return (
     <>
-      <div className="person-sheet-head">
-        <span className="cell-muted">{all.total[1]} · {formatCurrency(all.total.at(-1))} in all</span>
-        <button type="button" className="btn-primary btn-sm" onClick={() => downloadCsv(all, `all-delivery-bills-${range}`)}>
-          <Download size={15} /> Download all together
-        </button>
+      <p className="cell-muted">{all.total[1]} · {formatCurrency(all.total.at(-1))}{sheets.length > 1 ? ` · ${sheets.length} people` : ''}</p>
+      <div className="filter-group">
+        {sheets.length > 1 && (
+          <button type="button" className="btn-primary btn-sm" onClick={() => downloadCsv(all, `all-delivery-bills-${range}`)}>
+            <Download size={15} /> Download all together
+          </button>
+        )}
+        {sheets.map(({ person, sheet }) => (
+          <button key={person} type="button" className="btn-secondary btn-sm" onClick={() => downloadCsv(sheet, fileName(person))}>
+            <Download size={15} /> {person}
+          </button>
+        ))}
       </div>
-      {sheetsByPerson(bills, names).map(({ person, sheet }) => (
+      {sheets.map(({ person, sheet }) => (
     <div key={person} className="person-sheet">
       <div className="person-sheet-head">
         <h3 className="card-title">
@@ -58,7 +67,7 @@ function BillSheets({ from, to, storeId, userId }) {
         <button
           type="button"
           className="btn-secondary btn-sm"
-          onClick={() => downloadCsv(sheet, `${person.replace(/[^p{L}p{N}]+/gu, '-')}-delivery-bills-${range}`)}
+          onClick={() => downloadCsv(sheet, fileName(person))}
         >
           <Download size={15} /> Download {person}
         </button>
@@ -573,14 +582,6 @@ export default function DeliveryReport({ from, to, storeId, userId }) {
         )}
       </div>
 
-      <div className="card">
-        <h2 className="card-title">Delivery bills, per person</h2>
-        <p className="chart-hint">
-          Every consignment bill delivered in this range, one sheet per person who delivered it. Tick each row against the
-          paper bill; the TOTAL row adds up that person's units and value. Download all together saves every bill on one sheet with a Delivered by column; each person's button saves only their sheet, under their name.
-        </p>
-        <BillSheets from={from} to={to} storeId={storeId} userId={userId} />
-      </div>
     </div>
   );
 }

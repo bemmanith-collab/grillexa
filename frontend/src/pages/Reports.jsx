@@ -9,7 +9,7 @@ import { formatDate, todayStr, startOfWeekStr, startOfMonthStr } from '../utils/
 import Chart, { lineData, barData, doughnutData, TEAL, FLAME, WARN, money } from '../components/Chart';
 import SearchSelect, { RECENT_STORES } from '../components/SearchSelect';
 import { buildReportPdf, reportFileName } from '../lib/reportPdf';
-import DeliveryReport from '../components/DeliveryReport';
+import DeliveryReport, { BillSheets } from '../components/DeliveryReport';
 
 // Empty id, not 'all': every filter here already treats '' as "no filter".
 const ALL_STORES = { id: '', name: 'All stores' };
@@ -173,7 +173,7 @@ export default function Reports() {
       </div>
 
       <div className="filter-group report-tabs" role="tablist" aria-label="Report">
-        {[['overview', 'Overview'], ['delivery', 'Delivery report']].map(([key, label]) => (
+        {[['overview', 'Overview'], ['delivery', 'Delivery report'], ['bills', 'Bills tally']].map(([key, label]) => (
           <button
             key={key}
             type="button"
@@ -273,7 +273,16 @@ export default function Reports() {
         )}
       </div>
 
-      {tab === 'delivery' ? (
+      {tab === 'bills' ? (
+        <div className="delivery-report"><div className="card">
+          <h2 className="card-title">Bills tally</h2>
+          <p className="chart-hint">
+            Every delivery bill in this range, one sheet per person. Pick a person in "All sales people" to see only
+            theirs. Tick each row against the paper bill; the TOTAL row adds up their units and value.
+          </p>
+          <BillSheets from={from} to={to} storeId={storeId} userId={userId} />
+        </div></div>
+      ) : tab === 'delivery' ? (
         <DeliveryReport from={from} to={to} storeId={storeId} userId={userId} />
       ) : (<>
       {userId && (
